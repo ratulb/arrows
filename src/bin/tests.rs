@@ -1,4 +1,4 @@
-use arrows::{from_file, to_file, type_of, Address, Message, Ractor};
+use arrows::{to_file, type_of, Address, Message, Ractor};
 use serde::{Deserialize, Serialize};
 
 #[async_std::main]
@@ -61,7 +61,7 @@ pub async fn main() {
 }
 
 async fn create_reactor_test1() {
-    fn receiver<T, R>(msg: Message<T>) -> Option<Message<R>>
+    fn receiver<T, R>(_msg: Message<T>) -> Option<Message<R>>
     where
         T: Serialize,
         R: Serialize,
@@ -74,7 +74,7 @@ async fn create_reactor_test1() {
 }
 
 async fn create_addr_test1() {
-    let mut message = Message::<&str>::new("This is a test message", "add1", "to");
-    let addr1 = Address::new("add1");
+    let message = Message::<&str>::new("This is a test message", "add1", "to");
+    let _addr1 = Address::new("add1");
     to_file(message, "msg.json").await;
 }

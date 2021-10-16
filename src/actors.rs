@@ -1,4 +1,4 @@
-use crate::{Actor, Address, MailBox, Message, Ractor, STORE};
+use crate::{Actor, Address, Message, Ractor};
 use serde::Serialize;
 use std::io::Result;
 pub struct Router {}
@@ -14,11 +14,11 @@ impl Actors {
         name: &str,
         invokable: F,
     ) -> Ractor<T, R> {
-        let addr = Address::new(name);
+        let _addr = Address::new(name);
         Ractor::new(name, Box::new(invokable))
     }
 
-    pub fn ractor_of(name: &str, ractor: impl Actor) -> Result<ActorArrow> {
+    pub fn ractor_of(_name: &str, _ractor: impl Actor) -> Result<ActorArrow> {
         Ok(ActorArrow)
     }
 }

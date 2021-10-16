@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::fs::{File, OpenOptions};
 use std::hash::{Hash, Hasher};
-use std::io::{BufReader, BufWriter, Read, Result, Seek, Write};
+use std::io::{BufReader, BufWriter, Result, Seek, Write};
 
 pub fn type_of<T>(_: &T) {
     println!("The type is {}", std::any::type_name::<T>());

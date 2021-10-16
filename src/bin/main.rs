@@ -1,7 +1,3 @@
-use arrows::Actor;
-use arrows::Address;
-use arrows::BoxStore;
-use arrows::Message;
 use async_std::net::TcpListener;
 use async_std::net::TcpStream;
 use async_std::prelude::*;
@@ -34,7 +30,7 @@ async fn main() -> std::io::Result<()> {
     Ok(())
 }
 
-async fn transfer_actor(mut stream: TcpStream) {}
+async fn transfer_actor(_stream: TcpStream) {}
 
 async fn handle_request(mut stream: TcpStream) {
     let mut buffer = [0; 1024];

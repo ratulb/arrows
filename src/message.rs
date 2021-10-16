@@ -181,8 +181,8 @@ impl<T: Serialize> Message<T> {
 mod tests {
     use super::*;
     use crate::type_of;
-    use std::fs::{self, File, OpenOptions};
-    use std::io::{self, BufWriter, Result, Seek};
+    use std::fs::OpenOptions;
+    use std::io::BufWriter;
     #[test]
     fn create_custom_msg_test_content_and_to() {
         let msg = Message::new("Content", "addr_from", "addr_to");
@@ -192,20 +192,20 @@ mod tests {
 
     #[test]
     fn create_internal_msg_test_content_and_to() {
-        let mut msg = Message::internal("Content", "addr_from", "addr_to");
+        let msg = Message::internal("Content", "addr_from", "addr_to");
         assert_eq!(msg.get_content(), &Some("Content"));
         assert_eq!(msg.get_to(), &Some(Address::new("addr_to")));
     }
 
     #[test]
     fn create_custom_msg_test_from() {
-        let mut msg = Message::new("Content", "addr_from", "addr_to");
+        let msg = Message::new("Content", "addr_from", "addr_to");
         assert_eq!(msg.get_from(), &Some(Address::new("addr_from")));
     }
 
     #[test]
     fn create_internal_msg_test_from() {
-        let mut msg = Message::internal("Content", "addr_from", "addr_to");
+        let msg = Message::internal("Content", "addr_from", "addr_to");
         assert_eq!(msg.get_from(), &Some(Address::new("addr_from")));
     }
 
@@ -297,11 +297,11 @@ mod tests {
         };
 
         let complex = Complex {
-            inner: inner,
+            inner,
             elems: vec![simple],
         };
 
-        let mut msg = Message::internal(complex, "addr_from", "addr_to");
+        let msg = Message::internal(complex, "addr_from", "addr_to");
         let file = OpenOptions::new()
             .read(true)
             .write(true)

@@ -34,6 +34,6 @@ fn type_of<T>(_: &T) {
     println!("The type is {}", std::any::type_name::<T>());
 }
 
-fn write(file_name: &str) -> std::io::Result<usize> {
+fn write(_file_name: &str) -> std::io::Result<usize> {
     Ok(0)
 }

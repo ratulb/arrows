@@ -1,8 +1,6 @@
-use crate::{to_file, type_of, Address, MailBox, Message};
+use crate::{Address, MailBox, Message};
 use serde::Deserialize;
 use serde::Serialize;
-use std::fs::OpenOptions;
-use std::io::{self, BufWriter, Write};
 
 pub struct Ractor<T: Serialize, R: Serialize> {
     addr: Address,
