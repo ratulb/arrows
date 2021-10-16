@@ -1,4 +1,4 @@
-use arrows::{from_file, to_file, type_of, Actor, Address, Message};
+use arrows::{from_file, to_file, type_of, Address, Message, Ractor};
 use serde::{Deserialize, Serialize};
 
 #[async_std::main]
@@ -39,7 +39,7 @@ pub async fn main() {
         })
     };
     let boxed_invokable = Box::new(invokable);
-    let mut actor1 = Actor::new("actor1", boxed_invokable);
+    let mut actor1 = Ractor::new("actor1", boxed_invokable);
 
     let reply = actor1
         .receive(Message::Custom {
@@ -68,7 +68,7 @@ async fn create_reactor_test1() {
     {
         None
     }
-    let ractor1: Actor<String, bool> = Actor::new("ractor1", Box::new(receiver));
+    let ractor1: Ractor<String, bool> = Ractor::new("ractor1", Box::new(receiver));
     type_of(&ractor1);
     println!("create_reactor_test1");
 }

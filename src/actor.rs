@@ -4,13 +4,13 @@ use serde::Serialize;
 use std::fs::OpenOptions;
 use std::io::{self, BufWriter, Write};
 
-pub struct Actor<T: Serialize, R: Serialize> {
+pub struct Ractor<T: Serialize, R: Serialize> {
     addr: Address,
     mailbox: Option<MailBox>,
     invokable: Box<dyn Fn(Message<T>) -> Option<Message<R>>>,
 }
 
-impl<T: Serialize, R: Serialize> Actor<T, R> {
+impl<T: Serialize, R: Serialize> Ractor<T, R> {
     //Create an actor passing a Message<T> -> Message<R> closure
     pub fn new(name: &str, invokable: Box<dyn Fn(Message<T>) -> Option<Message<R>>>) -> Self {
         Self {
@@ -25,11 +25,11 @@ impl<T: Serialize, R: Serialize> Actor<T, R> {
     }
 }
 
-pub trait Ractor {
-    fn receive<R, T>(message: Message<T>) -> Option<Message<R>>
+pub trait Actor {
+    fn receive<'a, R, T>(message: Message<T>) -> Option<Message<R>>
     where
-        T: Serialize + std::fmt::Debug,
-        R: Serialize,
+        T: Clone + std::fmt::Debug + Serialize + Deserialize<'a>,
+        R: Clone + std::fmt::Debug + Serialize + Deserialize<'a>,
     {
         //Default implementation - override as needed
         println!("Received message: {:#?}", message);

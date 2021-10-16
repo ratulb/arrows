@@ -13,12 +13,19 @@ impl Actors {
     >(
         name: &str,
         invokable: F,
-    ) -> Actor<T, R> {
+    ) -> Ractor<T, R> {
         let addr = Address::new(name);
-        Actor::new(name, Box::new(invokable))
+        Ractor::new(name, Box::new(invokable))
     }
 
-    pub fn ractor_of(name: &str, ractor: impl Ractor) -> Result<ActorArrow> {
+    pub fn ractor_of(name: &str, ractor: impl Actor) -> Result<ActorArrow> {
         Ok(ActorArrow)
     }
 }
+enum ActorCatalog {
+    ActorBuilder,
+}
+
+struct ActorBuilder;
+
+impl Actor for ActorBuilder {}
