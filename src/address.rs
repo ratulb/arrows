@@ -1,7 +1,8 @@
 use crate::compute_hash;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
-#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum Scheme {
     Email,
     Inprocess,
@@ -11,7 +12,8 @@ pub enum Scheme {
     Grpc,
     Udp,
 }
-#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct Address {
     id: u64,
     name: String,
@@ -37,6 +39,9 @@ impl Address {
         };
         addr.id = compute_hash(&addr);
         addr
+    }
+    pub fn get_name(&self) -> &String {
+        &self.name
     }
 }
 

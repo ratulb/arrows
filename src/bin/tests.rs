@@ -20,7 +20,7 @@ pub async fn main() {
                 from: _,
                 to: _,
                 content,
-                recipents: _,
+                recipients: _,
                 created: _,
             } => {
                 println!("Received arg: {:?}", content);
@@ -34,7 +34,7 @@ pub async fn main() {
             from: None,
             to: None,
             content: Some(output),
-            recipents: None,
+            recipients: None,
             created: std::time::SystemTime::now(),
         })
     };
@@ -46,7 +46,7 @@ pub async fn main() {
             from: None,
             to: None,
             content: Some(test_input),
-            recipents: None,
+            recipients: None,
             created: std::time::SystemTime::now(),
         })
         .await;
