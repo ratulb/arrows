@@ -1,5 +1,6 @@
 pub use crate::actor::*;
 pub use crate::actors::*;
+pub use crate::address::addresses::Addresses;
 pub use crate::address::Address;
 pub use crate::boxes::Store;
 pub use crate::boxes::*;

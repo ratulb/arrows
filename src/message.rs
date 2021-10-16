@@ -1,9 +1,11 @@
 use crate::Address;
+use crate::Addresses;
 use serde::{Deserialize, Serialize};
 use std::io::{Result, Seek, Write};
 use std::time::SystemTime;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+//#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize)]
 pub enum Message<T> {
     Business {
         from: Option<Address>,
@@ -12,6 +14,8 @@ pub enum Message<T> {
         created: SystemTime,
         signature: Option<Signature>,
         addressing: AddressMode,
+        #[serde(skip_deserializing)]
+        additional_recipients: Option<Addresses>,
     },
     System {
         from: Option<Address>,
@@ -20,6 +24,8 @@ pub enum Message<T> {
         created: SystemTime,
         signature: Option<Signature>,
         addressing: AddressMode,
+        #[serde(skip_deserializing)]
+        additional_recipients: Option<Addresses>,
     },
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -45,6 +51,7 @@ impl<T: for<'de> Deserialize<'de> + Clone + std::fmt::Debug + Serialize> Message
             created: SystemTime::now(),
             signature: None,
             addressing: AddressMode::default(),
+            additional_recipients: None,
         }
     }
     pub(crate) fn system(content: T, from: &str, to: &str) -> Self {
@@ -56,7 +63,14 @@ impl<T: for<'de> Deserialize<'de> + Clone + std::fmt::Debug + Serialize> Message
             created: SystemTime::now(),
             signature: None,
             addressing: AddressMode::default(),
+            additional_recipients: None,
         }
+    }
+    pub fn with_recipient(&mut self, recipient: &str) -> &Self {
+      if let Message::Business {ref mut to, ..} = self {
+         *to =  Some(Address::new(recipient));
+      }
+      self
     }
 }
 

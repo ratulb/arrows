@@ -1,4 +1,4 @@
-use arrows::{from_file, to_file, type_of, Actor, Message, AddressMode};
+use arrows::{from_file, to_file, type_of, Actor, Address, AddressMode, Message};
 use serde::{Deserialize, Serialize};
 
 #[async_std::main]
@@ -23,6 +23,7 @@ pub async fn main() {
                 created: _,
                 signature: _,
                 addressing: _,
+            additional_recipients: _,
             } => {
                 println!("Received arg: {:?}", content);
                 Output {
@@ -38,6 +39,7 @@ pub async fn main() {
             created: std::time::SystemTime::now(),
             signature: None,
             addressing: AddressMode::default(),
+            additional_recipients: None,
         })
     };
     let boxed_invokable = Box::new(invokable);
@@ -51,15 +53,17 @@ pub async fn main() {
             created: std::time::SystemTime::now(),
             signature: None,
             addressing: AddressMode::default(),
+            additional_recipients: None,
         })
         .await;
 
     println!("The reply type");
     type_of(&reply);
     to_file(&reply, "reply.json").await;
-    let from_file = from_file::<Message<Output>>("reply.json").await.unwrap();
-    println!("At the end - from_file -> {:?}", from_file);
+    //let from_file = from_file::<Message<Output>>("reply.json").await.unwrap();
+    //println!("At the end - from_file -> {:?}", from_file);
     create_reactor_test1().await;
+    create_addr_test1().await;
 }
 
 async fn create_reactor_test1() {
@@ -73,4 +77,13 @@ async fn create_reactor_test1() {
     let ractor1: Actor<String, bool> = Actor::new("ractor1", Box::new(receiver));
     type_of(&ractor1);
     println!("create_reactor_test1");
+}
+
+async fn create_addr_test1() {
+    let mut message = Message::new("This is a test message", "add1", "to");
+    let additional_recipients = Address::addresses_of(&["addr2","addr3"]);
+    let addr1 = Address::new("add1");
+    message.with_recipient("to all");
+   // std::mem::replace(&mut message.additional_recipients, Some(additional_recipients));
+    to_file(message, "msg.json").await;
 }
