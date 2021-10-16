@@ -1,4 +1,4 @@
-use crate::{to_file, type_of, Address, AddressMode, MailBox, Message};
+use crate::{to_file, type_of, Address, MailBox, Message};
 use serde::Deserialize;
 use serde::Serialize;
 use std::fs::OpenOptions;

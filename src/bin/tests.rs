@@ -1,4 +1,4 @@
-use arrows::{from_file, to_file, type_of, Actor, Address, AddressMode, Message};
+use arrows::{from_file, to_file, type_of, Actor, Address, Message};
 use serde::{Deserialize, Serialize};
 
 #[async_std::main]
@@ -16,14 +16,12 @@ pub async fn main() {
     }
     let invokable = |param: Message<Input>| -> Option<Message<Output>> {
         let output = match param {
-            Message::Business {
+            Message::Custom {
                 from: _,
                 to: _,
                 content,
+                recipents: _,
                 created: _,
-                signature: _,
-                addressing: _,
-            additional_recipients: _,
             } => {
                 println!("Received arg: {:?}", content);
                 Output {
@@ -32,28 +30,24 @@ pub async fn main() {
             }
             _ => Output { result: 0 },
         };
-        Some(Message::Business {
+        Some(Message::Custom {
             from: None,
             to: None,
             content: Some(output),
+            recipents: None,
             created: std::time::SystemTime::now(),
-            signature: None,
-            addressing: AddressMode::default(),
-            additional_recipients: None,
         })
     };
     let boxed_invokable = Box::new(invokable);
     let mut actor1 = Actor::new("actor1", boxed_invokable);
 
     let reply = actor1
-        .receive(Message::Business {
+        .receive(Message::Custom {
             from: None,
             to: None,
             content: Some(test_input),
+            recipents: None,
             created: std::time::SystemTime::now(),
-            signature: None,
-            addressing: AddressMode::default(),
-            additional_recipients: None,
         })
         .await;
 
@@ -80,10 +74,7 @@ async fn create_reactor_test1() {
 }
 
 async fn create_addr_test1() {
-    let mut message = Message::new("This is a test message", "add1", "to");
-    let additional_recipients = Address::addresses_of(&["addr2","addr3"]);
+    let mut message = Message::<&str>::new("This is a test message", "add1", "to");
     let addr1 = Address::new("add1");
-    message.with_recipient("to all");
-   // std::mem::replace(&mut message.additional_recipients, Some(additional_recipients));
     to_file(message, "msg.json").await;
 }
