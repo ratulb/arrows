@@ -1,2 +1,2 @@
 # arrows
-Arrows - asynchrous actor framework in rust
+Arrows - asynchrous actor framework in rust - WIP
