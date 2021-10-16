@@ -1,4 +1,4 @@
-use crate::{Actor, Address, MailBox, Message, Ractor, Store};
+use crate::{Actor, Address, MailBox, Message, Ractor, STORE};
 use serde::Serialize;
 use std::io::Result;
 pub struct Router {}

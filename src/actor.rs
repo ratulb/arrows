@@ -16,7 +16,7 @@ impl<T: Serialize, R: Serialize> Actor<T, R> {
         Self {
             addr: Address::new(name),
             mailbox: None,
-            invokable: invokable,
+            invokable,
         }
     }
     pub async fn receive(&mut self, msg: Message<T>) -> Option<Message<R>> {

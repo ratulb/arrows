@@ -12,10 +12,10 @@ fn main() {
 
             let msg = b"Hello!";
 
-            stream.write(msg).unwrap();
+            stream.write_all(msg).unwrap();
             println!("Sent Hello, awaiting reply...");
 
-            let mut data = [0 as u8; 6]; // using 6 byte buffer
+            let mut data = [0_u8; 6]; // using 6 byte buffer
             match stream.read_exact(&mut data) {
                 Ok(_) => {
                     if &data == msg {

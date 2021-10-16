@@ -20,7 +20,7 @@ pub enum MailBox {
 }
 
 lazy_static! {
-    pub static ref Store: BoxStore = block_on(async { BoxStore::init().await });
+    pub static ref STORE: BoxStore = block_on(async { BoxStore::init().await });
 }
 
 #[derive(Debug)]
@@ -50,9 +50,7 @@ impl BoxStore {
     }
 
     pub async fn process_dir() -> PathBuf {
-        let mut path_buf = std::env::current_dir()
-            .ok()
-            .expect("Current dir call should not fail");
+        let mut path_buf = std::env::current_dir().expect("Current dir call should not fail");
         path_buf.push("data");
         path_buf.into()
     }

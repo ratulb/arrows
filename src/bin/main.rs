@@ -11,7 +11,7 @@ use std::time::Duration;
 
 #[async_std::main]
 async fn main() -> std::io::Result<()> {
-    let store = &arrows::Store;
+    let store = &arrows::STORE;
     println!("Store dir: {:?}", store.get_dir().await);
     let listener;
     match TcpListener::bind("0.0.0.0:7171").await {

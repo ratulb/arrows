@@ -116,42 +116,40 @@ impl<T> Message<T> {
 
     pub fn get_content(&self) -> &Option<T> {
         match self {
-            Message::Custom { content, .. } => &content,
-            Message::Internal { content, .. } => &content,
+            Message::Custom { content, .. } => content,
+            Message::Internal { content, .. } => content,
         }
     }
 
     pub fn get_to(&self) -> &Option<Address> {
         match self {
-            Message::Custom { to, .. } => &to,
-            Message::Internal { to, .. } => &to,
+            Message::Custom { to, .. } => to,
+            Message::Internal { to, .. } => to,
         }
     }
 
     pub fn get_from(&self) -> &Option<Address> {
         match self {
-            Message::Custom { from, .. } => &from,
-            Message::Internal { from, .. } => &from,
+            Message::Custom { from, .. } => from,
+            Message::Internal { from, .. } => from,
         }
     }
 
     pub fn get_recipients(&self) -> &Option<AdditionalRecipients> {
         match self {
-            Message::Custom { recipients, .. } => &recipients,
-            Message::Internal { recipients, .. } => &recipients,
+            Message::Custom { recipients, .. } => recipients,
+            Message::Internal { recipients, .. } => recipients,
         }
     }
 
     pub fn is_recipient_all(&self) -> bool {
         match self {
-            Message::Custom { ref recipients, .. } => match recipients {
-                &Some(AdditionalRecipients::All) => return true,
-                _ => return false,
-            },
-            Message::Internal { ref recipients, .. } => match recipients {
-                &Some(AdditionalRecipients::All) => return true,
-                _ => return false,
-            },
+            Message::Custom { ref recipients, .. } => {
+                matches!(*recipients, Some(AdditionalRecipients::All))
+            }
+            Message::Internal { ref recipients, .. } => {
+                matches!(*recipients, Some(AdditionalRecipients::All))
+            }
         }
     }
 

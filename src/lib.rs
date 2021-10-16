@@ -1,7 +1,7 @@
 pub use crate::actor::*;
 pub use crate::actors::*;
 pub use crate::address::Address;
-pub use crate::boxes::Store;
+pub use crate::boxes::STORE;
 pub use crate::boxes::*;
 pub use crate::message::*;
 pub use crate::utils::compute_hash;
