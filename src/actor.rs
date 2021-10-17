@@ -24,7 +24,7 @@ impl<T: Serialize, R: Serialize> Ractor<T, R> {
 }
 
 pub trait Actor {
-    fn receive<'a, R, T>(message: Message<T>) -> Option<Message<R>>
+    fn receive<'a, R, T>(&mut self, message: Message<T>) -> Option<Message<R>>
     where
         T: Clone + std::fmt::Debug + Serialize + Deserialize<'a>,
         R: Clone + std::fmt::Debug + Serialize + Deserialize<'a>,

@@ -11,7 +11,7 @@ pub use crate::utils::type_of;
 
 pub mod actor;
 pub mod actors;
-mod address;
+pub mod address;
 pub mod boxes;
 pub mod message;
 pub mod utils;

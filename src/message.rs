@@ -60,6 +60,22 @@ impl<T> Message<T> {
         self
     }
 
+    pub fn with_content(&mut self, new_content: T) -> &mut Self {
+        match self {
+            Message::Custom {
+                ref mut content, ..
+            } => {
+                *content = Some(new_content);
+            }
+            Message::Internal {
+                ref mut content, ..
+            } => {
+                *content = Some(new_content);
+            }
+        }
+        self
+    }
+
     pub fn set_recipient(&mut self, new_to: &str) -> &mut Self {
         match self {
             Message::Custom { ref mut to, .. } => {
