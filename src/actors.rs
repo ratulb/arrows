@@ -1,7 +1,7 @@
 use crate::{type_of, Actor, Address, Message, Ractor};
-use bincode::{deserialize, serialize};
+use bincode::deserialize;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+
 use std::io::Result;
 pub struct Router {}
 
@@ -38,13 +38,14 @@ impl Actor for ActorBuilder {
         let content = message.get_content();
         let empty_data = vec![];
         let content = match content {
-            Some(ref value) => &value,
+            Some(ref value) => value,
             None => &empty_data,
         };
 
         println!("Received message buffer length = {}", content.len());
+        type_of(&content);
+
         let decoded: Complex<Inner> = deserialize(&content[..]).unwrap();
-        println!("Received message =======*******========");
 
         println!("{:?}", decoded);
         println!("============**********===============");

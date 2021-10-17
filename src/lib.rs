@@ -5,9 +5,7 @@ pub use crate::boxes::STORE;
 pub use crate::boxes::*;
 pub use crate::message::*;
 pub use crate::utils::compute_hash;
-pub use crate::utils::from_file;
-pub use crate::utils::to_file;
-pub use crate::utils::type_of;
+pub use crate::utils::*;
 
 pub mod actor;
 pub mod actors;

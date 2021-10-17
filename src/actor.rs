@@ -1,6 +1,4 @@
 use crate::{Address, MailBox, Message};
-use serde::Deserialize;
-use serde::Serialize;
 
 pub struct Ractor {
     addr: Address,
