@@ -1,21 +1,17 @@
-use crate::{Actor, Address, Message, Ractor, type_of};
+use crate::{type_of, Actor, Address, Message, Ractor};
+use bincode::{deserialize, serialize};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use bincode::{deserialize, serialize};
 use std::io::Result;
 pub struct Router {}
 
 pub struct Actors;
 pub struct ActorArrow;
 impl Actors {
-    pub fn actor_from<
-        T: Serialize,
-        R: Serialize,
-        F: 'static + Serialize + Fn(Message<T>) -> Option<Message<R>>,
-    >(
+    pub fn actor_from<F: 'static + Serialize + Fn(Message) -> Option<Message>>(
         name: &str,
         invokable: F,
-    ) -> Ractor<T, R> {
+    ) -> Ractor {
         let _addr = Address::new(name);
         Ractor::new(name, Box::new(invokable))
     }
@@ -36,63 +32,43 @@ struct ActorCatalog {
 pub struct ActorBuilder;
 
 impl Actor for ActorBuilder {
-    fn receive<'a, R, T>(&mut self, message: Message<T>) -> Option<Message<R>>
-    where
-        T: Clone + std::fmt::Debug + Serialize + Deserialize<'a>,
-        R: Clone + std::fmt::Debug + Serialize + Deserialize<'a>,
-    {
+    fn receive(&mut self, message: Message) -> Option<Message> {
         //Default implementation - override as needed
         println!("Received message: {:#?}", message);
-         let content = message.get_content();
-         let value = match content {
-            Some(v) => v,
-            _=> panic!("Close call"),
-         };
-         let value = *value as Vec<u8>;
-         let decoded: Message<Complex<Inner>> = deserialize(&value[..]).unwrap();
+        let content = message.get_content();
+        let empty_data = vec![];
+        let content = match content {
+            Some(ref value) => &value,
+            None => &empty_data,
+        };
+
+        println!("Received message buffer length = {}", content.len());
+        let decoded: Complex<Inner> = deserialize(&content[..]).unwrap();
         println!("Received message =======*******========");
-    match decoded {
-        Message::Custom { content, .. } => {
-            if let Some(complex) = content {
-                if let Complex { inner, elems } = complex {
-                    println!("Inner = {:?}", inner);
-                    println!("Elems {:?} ", elems);
-                    type_of(&elems);
-                    println!("Elems len {:?} ", elems.len());
-                    println!("At position 0 {:?} ", elems[0]);
-                }
-            }
-        }
-        _ => (),
-    }
 
-    println!("============**********===============");
+        println!("{:?}", decoded);
+        println!("============**********===============");
 
-
-
-
-
-
-        let result: Option<Message<R>> = None;
+        let result: Option<Message> = None;
         result
     }
 }
 
- #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-    struct Complex<T> {
-        inner: T,
-        elems: Vec<Simple>,
-    }
-    #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-    struct Inner {
-        name: String,
-        children: Vec<String>,
-        male: bool,
-        age: u8,
-    }
-    #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-    struct Simple {
-        e1: i32,
-        e2: usize,
-        e3: Option<bool>,
-    }
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+struct Complex<T> {
+    inner: T,
+    elems: Vec<Simple>,
+}
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+struct Inner {
+    name: String,
+    children: Vec<String>,
+    male: bool,
+    age: u8,
+}
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+struct Simple {
+    e1: i32,
+    e2: usize,
+    e3: Option<bool>,
+}

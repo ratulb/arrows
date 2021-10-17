@@ -4,18 +4,18 @@ use std::io::{Result, Seek, Write};
 use std::time::SystemTime;
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum Message<T> {
+pub enum Message {
     Custom {
         from: Option<Address>,
         to: Option<Address>,
-        content: Option<T>,
+        content: Option<Vec<u8>>,
         recipients: Option<AdditionalRecipients>,
         created: SystemTime,
     },
     Internal {
         from: Option<Address>,
         to: Option<Address>,
-        content: Option<T>,
+        content: Option<Vec<u8>>,
         recipients: Option<AdditionalRecipients>,
         created: SystemTime,
     },
@@ -27,8 +27,8 @@ pub enum AdditionalRecipients {
     OnlySome(Vec<Address>),
 }
 
-impl<T> Message<T> {
-    pub fn new(content: T, from: &str, to: &str) -> Self {
+impl Message {
+    pub fn new(content: Vec<u8>, from: &str, to: &str) -> Self {
         Self::Custom {
             from: Some(Address::new(from)),
             to: Some(Address::new(to)),
@@ -38,7 +38,7 @@ impl<T> Message<T> {
         }
     }
 
-    pub fn with_content_and_to(&mut self, new_content: T, new_to: &str) -> &mut Self {
+    pub fn with_content_and_to(&mut self, new_content: Vec<u8>, new_to: &str) -> &mut Self {
         match self {
             Message::Custom {
                 ref mut content,
@@ -60,7 +60,7 @@ impl<T> Message<T> {
         self
     }
 
-    pub fn with_content(&mut self, new_content: T) -> &mut Self {
+    pub fn with_content(&mut self, new_content: Vec<u8>) -> &mut Self {
         match self {
             Message::Custom {
                 ref mut content, ..
@@ -130,7 +130,7 @@ impl<T> Message<T> {
         self
     }
 
-    pub fn get_content(&self) -> &Option<T> {
+    pub fn get_content(&self) -> &Option<Vec<u8>> {
         match self {
             Message::Custom { content, .. } => content,
             Message::Internal { content, .. } => content,
@@ -169,7 +169,7 @@ impl<T> Message<T> {
         }
     }
 
-    pub(crate) fn internal(content: T, from: &str, to: &str) -> Self {
+    pub(crate) fn internal(content: Vec<u8>, from: &str, to: &str) -> Self {
         Self::Internal {
             from: Some(Address::new(from)),
             to: Some(Address::new(to)),
@@ -180,13 +180,13 @@ impl<T> Message<T> {
     }
 }
 
-impl<T: Serialize> Message<T> {
+impl Message {
     pub async fn write<W: Seek + Write>(&self, w: &mut W) -> Result<()> {
         serde_json::to_writer(w, self)?;
         Ok(())
     }
 }
-impl<T: Serialize> Message<T> {
+impl Message {
     pub fn write_sync<W: Seek + Write>(&self, w: &mut W) -> Result<()> {
         serde_json::to_writer(w, self)?;
         Ok(())

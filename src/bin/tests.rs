@@ -3,6 +3,7 @@ use bincode::{deserialize, serialize};
 use serde::{Deserialize, Serialize};
 use std::fs::OpenOptions;
 use std::io::BufWriter;
+
 #[async_std::main]
 pub async fn main() {
     #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -14,9 +15,9 @@ pub async fn main() {
     };
     #[derive(Clone, Debug, Serialize, Deserialize)]
     struct Output {
-        result: usize,
+        result: String,
     }
-    let invokable = |param: Message<Input>| -> Option<Message<Output>> {
+    let invokable = |param: Message| -> Option<Message> {
         let output = match param {
             Message::Custom {
                 from: _,
@@ -25,17 +26,19 @@ pub async fn main() {
                 recipients: _,
                 created: _,
             } => {
-                println!("Received arg: {:?}", content);
+                let content = content.unwrap();
+                let content: Input = deserialize(&content[..]).unwrap();
+                println!("Actor received {:?}", content.arg);
                 Output {
-                    result: content.unwrap().arg.len(),
+                    result: content.arg,
                 }
             }
-            _ => Output { result: 0 },
+            _ => Output { result: "".to_string() },
         };
         Some(Message::Custom {
             from: None,
             to: None,
-            content: Some(output),
+            content: Some(serialize(&output).unwrap()),
             recipients: None,
             created: std::time::SystemTime::now(),
         })
@@ -47,38 +50,39 @@ pub async fn main() {
         .receive(Message::Custom {
             from: None,
             to: None,
-            content: Some(test_input),
+            content: Some(serialize(&test_input).unwrap()),
             recipients: None,
             created: std::time::SystemTime::now(),
         })
         .await;
 
-    println!("The reply type");
-    type_of(&reply);
     to_file(&reply, "reply.json").await;
-    //let from_file = from_file::<Message<Output>>("reply.json").await.unwrap();
-    //println!("At the end - from_file -> {:?}", from_file);
-    create_reactor_test1().await;
-    create_addr_test1().await;
+    let content = reply.unwrap();
+    let content = content.get_content();
+    match content {
+      Some(v) => {
+        let v: String = deserialize(&v[..]).unwrap();
+        println!("Reply from actor  = {}", v);
+      },
+      _ => println!("Failed to get reply"),
+    }
+    //create_reactor_test1().await;
+    //create_addr_test1().await;
     //create_actor_builder_test().await;
-    set_complex_msg_test_1().await;
+    //send_complex_msg_test_1().await;
 }
 
 async fn create_reactor_test1() {
-    fn receiver<T, R>(_msg: Message<T>) -> Option<Message<R>>
-    where
-        T: Serialize,
-        R: Serialize,
-    {
+    fn receiver(_msg: Message) -> Option<Message> {
         None
     }
-    let ractor1: Ractor<String, bool> = Ractor::new("ractor1", Box::new(receiver));
+    let ractor1: Ractor = Ractor::new("ractor1", Box::new(receiver));
     type_of(&ractor1);
     println!("create_reactor_test1");
 }
 
 async fn create_addr_test1() {
-    let message = Message::<&str>::new("This is a test message", "add1", "to");
+    let message = Message::new(br#"This is a test message"#.to_vec(), "add1", "to");
     let _addr1 = Address::new("add1");
     to_file(message, "msg.json").await;
 }
@@ -86,13 +90,14 @@ async fn create_addr_test1() {
 async fn create_actor_builder_test() {
     let mut actor_builder = ActorBuilder;
     let mut cloned_builder = actor_builder.clone();
-    let message = Message::<&str>::new("This is a test message", "add1", "to");
+    let message = Message::new(br#"This is a test message"#.to_vec(), "add1", "to");
     let mut cloned_msg = message.clone();
 
-    cloned_builder.receive::<String, &str>(message);
+    cloned_builder.receive(message);
     println!("Original getting msg");
-    cloned_msg.with_content("This is brand new content");
-    actor_builder.receive::<String, &str>(cloned_msg);
+    // br#"e{"ddie"}"#.to_vec();
+    cloned_msg.with_content(br#"This is brand new content"#.to_vec());
+    actor_builder.receive(cloned_msg);
     println!("{:?}", actor_builder);
 }
 
@@ -132,7 +137,7 @@ async fn send_complex_msg_test_1() {
         inner,
         elems: vec![simple],
     };
-
+    let complex = serialize(&complex).unwrap();
     let msg = Message::new(complex, "addr_from", "addr_to");
     let cloned_msg = msg.clone();
     let file = OpenOptions::new()
@@ -144,18 +149,20 @@ async fn send_complex_msg_test_1() {
     let mut bufwriter = BufWriter::new(file);
     assert_eq!(msg.write_sync(&mut bufwriter).expect("Should get ()"), ());
     let encoded: Vec<u8> = serialize(&cloned_msg).unwrap();
-    
+
     let mut actor_builder = ActorBuilder;
-    let message = Message::<Vec<u8>>::new(encoded.clone(), "add1", "to");
-    actor_builder.receive::<String, Vec<u8>>(message);
-    
-    let decoded: Message<Complex<Inner>> = deserialize(&encoded[..]).unwrap();
+    let message = Message::new(encoded.clone(), "add1", "to");
+    actor_builder.receive(message);
+
+    let decoded: Message = deserialize(&encoded[..]).unwrap();
     let decoded_cloned = decoded.clone();
     match decoded_cloned {
         Message::Custom { content, .. } => {
             if let Some(complex) = content {
-                if let Complex { inner, elems } = complex {
-                    println!("Inner = {:?}", inner);
+                {
+                    let complex_decoded: Complex<Inner> = deserialize(&complex[..]).unwrap();
+                    println!("Inner = {:?}", complex_decoded.inner);
+                    let elems = complex_decoded.elems;
                     println!("Elems {:?} ", elems);
                     type_of(&elems);
                     println!("Elems len {:?} ", elems.len());
@@ -167,7 +174,7 @@ async fn send_complex_msg_test_1() {
     }
 
     println!("===========================");
-    println!("{:?}", decoded.get_content());
+    println!("{:?} *****", decoded.get_content());
     println!("===========================");
     type_of(&decoded);
 }
