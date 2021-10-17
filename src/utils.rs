@@ -42,7 +42,7 @@ pub async fn from_file<T: for<'de> Deserialize<'de>>(file: &str) -> Result<T> {
     Ok(t)
 }
 
-pub fn option_of_bytes<T: std::fmt::Debug + Serialize+ ?Sized>(t: &T) -> Option<Vec<u8>> {
+pub fn option_of_bytes<T: std::fmt::Debug + Serialize + ?Sized>(t: &T) -> Option<Vec<u8>> {
     serialize(t).ok()
 }
 

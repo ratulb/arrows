@@ -1,8 +1,8 @@
-use arrows::{option_of_bytes,from_bytes, to_file, type_of, Actor, ActorBuilder, Address, Message, Ractor};
-use bincode::{serialize};
+use arrows::{
+    from_bytes, option_of_bytes, to_file, type_of, Actor, ActorBuilder, Address, Message, Ractor,
+};
+use bincode::serialize;
 use serde::{Deserialize, Serialize};
-
-
 
 #[async_std::main]
 pub async fn main() {
