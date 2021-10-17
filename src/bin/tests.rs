@@ -1,8 +1,8 @@
 use arrows::{option_of_bytes,from_bytes, to_file, type_of, Actor, ActorBuilder, Address, Message, Ractor};
-use bincode::{deserialize, serialize};
+use bincode::{serialize};
 use serde::{Deserialize, Serialize};
-use std::fs::OpenOptions;
-use std::io::BufWriter;
+
+
 
 #[async_std::main]
 pub async fn main() {
@@ -69,7 +69,7 @@ async fn actor_test_with_closure() {
     type_of(&reply);
     let message = reply.expect("Should contain message");
     if let Some(content) = message.get_content() {
-        let actor_reply: String = from_bytes(&content).expect("Should deserialize");
+        let actor_reply: String = from_bytes(content).expect("Should deserialize");
         println!("Actor reply -> {}", actor_reply);
     }
 }
@@ -93,7 +93,7 @@ async fn create_actor_builder_test_cloning() {
     let mut actor_builder = ActorBuilder;
     let input = "This is a test message";
     let input_vectorized = option_of_bytes(&input);
-    let message = Message::new(input_vectorized.unwrap_or(vec![]), "add1", "to");
+    let message = Message::new(input_vectorized.unwrap_or_default(), "add1", "to");
 
     let cloned_message = message.clone();
     let mut message_updated = message.clone();
