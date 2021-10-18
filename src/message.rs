@@ -1,6 +1,7 @@
-use crate::Address;
+use crate::{option_of_bytes, Address};
 use serde::{Deserialize, Serialize};
 use std::io::{Result, Seek, Write};
+use std::mem::{replace, swap};
 use std::time::SystemTime;
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
@@ -43,6 +44,38 @@ impl<'a> Message<'a> {
             recipients: None,
             created: SystemTime::now(),
         }
+    }
+    pub fn new_with_text(content: &str, from: &'a str, to: &'a str) -> Self {
+        Self::Custom {
+            from: Some(Address::new(from)),
+            to: Some(Address::new(to)),
+            content: option_of_bytes(content),
+            recipients: None,
+            created: SystemTime::now(),
+        }
+    }
+    pub fn uturn_with_text(&'a mut self, reply: &str) -> &'a mut Self {
+        match self {
+            Message::Custom {
+                ref mut from,
+                ref mut to,
+                ref mut content,
+                ..
+            } => {
+                std::mem::swap(from, to);
+                let _ignore = std::mem::replace(content, option_of_bytes(reply));
+            }
+            Message::Internal {
+                ref mut from,
+                ref mut to,
+                ref mut content,
+                ..
+            } => {
+                std::mem::swap(from, to);
+                let _ignore = std::mem::replace(content, option_of_bytes(reply));
+            }
+        }
+        self
     }
 
     pub fn with_content_and_to(
@@ -94,6 +127,29 @@ impl<'a> Message<'a> {
             }
             Message::Internal { ref mut to, .. } => {
                 *to = Some(Address::new(new_to));
+            }
+        }
+        self
+    }
+    pub fn uturn_with_reply(&'a mut self, reply: Option<Vec<u8>>) -> &'a mut Self {
+        match self {
+            Message::Custom {
+                ref mut from,
+                ref mut to,
+                ref mut content,
+                ..
+            } => {
+                std::mem::swap(from, to);
+                let _ignore = std::mem::replace(content, reply);
+            }
+            Message::Internal {
+                ref mut from,
+                ref mut to,
+                ref mut content,
+                ..
+            } => {
+                std::mem::swap(from, to);
+                let _ignore = std::mem::replace(content, reply);
             }
         }
         self
@@ -353,5 +409,23 @@ mod tests {
             .expect("Complex msg write failure");
         let mut bufwriter = BufWriter::new(file);
         assert_eq!(msg.write_sync(&mut bufwriter).expect("Should get ()"), ());
+    }
+
+    #[test]
+    fn uturn_with_reply_test_1() {
+        let mut msg = Message::internal(option_of_bytes("Content"), "addr_from", "addr_to");
+        let msg = msg.uturn_with_reply(option_of_bytes("Reply"));
+        assert_eq!(msg.get_to(), &Some(Address::new("addr_from")));
+        assert_eq!(msg.get_from(), &Some(Address::new("addr_to")));
+        assert_eq!(msg.get_content(), &option_of_bytes("Reply"));
+    }
+    #[test]
+    fn uturn_with_text_reply_test_1() {
+        let mut msg = Message::internal(option_of_bytes("Content"), "addr_from", "addr_to");
+        assert_eq!(msg.get_content(), &option_of_bytes("Content"));
+        let msg = msg.uturn_with_text("Reply");
+        assert_eq!(msg.get_to(), &Some(Address::new("addr_from")));
+        assert_eq!(msg.get_from(), &Some(Address::new("addr_to")));
+        assert_eq!(msg.get_content(), &option_of_bytes("Reply"));
     }
 }

@@ -83,14 +83,14 @@ struct Simple {
     e2: usize,
     e3: Option<bool>,
 }
-
+pub(crate) const SYS_REQUEST_VALIDATOR: &str = "sys-request-validator";
 pub(crate) struct ActorInitializer;
-/***
+
 pub(crate) struct RequestValidator<'a> {
     addr: Address<'a>,
 }
 
-impl RequestValidator {
+impl<'a> RequestValidator<'a> {
     pub(crate) fn new() -> Self {
         dbg!("Request validator starting with assumed name of \"sys-request-validator\"");
         Self {
@@ -99,16 +99,16 @@ impl RequestValidator {
     }
 }
 
-impl Actor for RequestValidator {
-    fn receive(&mut self, msg: Message) -> Option<Message> {
+impl<'a> Actor for RequestValidator<'a> {
+    fn receive<'I, 'O>(&mut self, _msg: Message<'I>) -> Option<Message<'O>> {
         dbg!("Received validation message - allowing to proceed");
         //Some(Message::internal(to_bytes(&true),
         None
     }
-}***/
+}
 
 impl Actor for ActorInitializer {
-    fn receive<'a, 'b>(&mut self, _msg: Message<'a>) -> Option<Message<'b>> {
+    fn receive<'I, 'O>(&mut self, _msg: Message<'I>) -> Option<Message<'O>> {
         None
     }
 }
