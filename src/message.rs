@@ -78,7 +78,6 @@ impl<'a> Message<'a> {
     }
 
     pub fn with_content_and_to(
-        //&'a mut self,
         &mut self,
         new_content: Vec<u8>,
         new_to: &'a str,
@@ -103,7 +102,7 @@ impl<'a> Message<'a> {
         }
     }
 
-    pub fn with_content(&mut self, new_content: Vec<u8>) -> &mut Self {
+    pub fn with_content(&mut self, new_content: Vec<u8>) {
         match self {
             Message::Custom {
                 ref mut content, ..
@@ -116,10 +115,9 @@ impl<'a> Message<'a> {
                 *content = Some(new_content);
             }
         }
-        self
     }
 
-    pub fn set_recipient(&'a mut self, new_to: &'a str) -> &'a mut Self {
+    pub fn set_recipient(&mut self, new_to: &'a str) {
         match self {
             Message::Custom { ref mut to, .. } => {
                 *to = Some(Address::new(new_to));
@@ -128,9 +126,8 @@ impl<'a> Message<'a> {
                 *to = Some(Address::new(new_to));
             }
         }
-        self
     }
-    pub fn uturn_with_reply(&'a mut self, reply: Option<Vec<u8>>) -> &'a mut Self {
+    pub fn uturn_with_reply(&mut self, reply: Option<Vec<u8>>) {
         match self {
             Message::Custom {
                 ref mut from,
@@ -151,10 +148,10 @@ impl<'a> Message<'a> {
                 let _ignore = replace(content, reply);
             }
         }
-        self
     }
 
-    pub fn with_recipients(&'a mut self, new_recipients: Vec<&'a str>) -> &'a mut Self {
+    //pub fn with_recipients(&'a mut self, new_recipients: Vec<&'a str>) -> &'a mut Self {
+    pub fn with_recipients(&mut self, new_recipients: Vec<&'a str>)  {
         match self {
             Message::Custom {
                 ref mut recipients, ..
@@ -177,10 +174,9 @@ impl<'a> Message<'a> {
                 ));
             }
         }
-        self
     }
 
-    pub fn set_recipient_all(&mut self) -> &mut Self {
+    pub fn set_recipient_all(&mut self) {
         match self {
             Message::Custom {
                 ref mut recipients, ..
@@ -193,7 +189,6 @@ impl<'a> Message<'a> {
                 *recipients = Some(AdditionalRecipients::All);
             }
         }
-        self
     }
 
     pub fn get_content(&self) -> &Option<Vec<u8>> {
@@ -214,14 +209,14 @@ impl<'a> Message<'a> {
         }
     }
 
-    pub fn get_to(&'a self) -> &'a Option<Address<'a>> {
+    pub fn get_to(&self) -> &Option<Address<'a>> {
         match self {
             Message::Custom { to, .. } => to,
             Message::Internal { to, .. } => to,
         }
     }
 
-    pub fn get_from(&'a self) -> &'a Option<Address<'a>> {
+    pub fn get_from(&self) -> &Option<Address<'a>> {
         match self {
             Message::Custom { from, .. } => from,
             Message::Internal { from, .. } => from,
@@ -331,7 +326,7 @@ mod tests {
     fn alter_additional_recipients_test_1() {
         let mut msg = Message::internal(option_of_bytes("Content"), "addr_from", "addr_to");
         let additional_recipients = vec!["Recipient1", "Recipient2", "Recipient3"];
-        let msg = msg.with_recipients(additional_recipients);
+        msg.with_recipients(additional_recipients);
         let additional_recipients_returned = vec!["Recipient1", "Recipient2", "Recipient3"];
         if let Some(AdditionalRecipients::OnlySome(recipients)) = msg.get_recipients() {
             let mut index = 0;
@@ -357,7 +352,7 @@ mod tests {
     fn set_recipient_test_1() {
         let mut msg = Message::internal(option_of_bytes("Content"), "addr_from", "addr_to");
         assert_eq!(msg.get_to(), &Some(Address::new("addr_to")));
-        let msg = msg.set_recipient("The new recipient");
+        msg.set_recipient("The new recipient");
         assert_eq!(msg.get_to(), &Some(Address::new("The new recipient")));
     }
 
@@ -413,7 +408,7 @@ mod tests {
     #[test]
     fn uturn_with_reply_test_1() {
         let mut msg = Message::internal(option_of_bytes("Content"), "addr_from", "addr_to");
-        let msg = msg.uturn_with_reply(option_of_bytes("Reply"));
+        msg.uturn_with_reply(option_of_bytes("Reply"));
         assert_eq!(msg.get_to(), &Some(Address::new("addr_from")));
         assert_eq!(msg.get_from(), &Some(Address::new("addr_to")));
         assert_eq!(msg.get_content(), &option_of_bytes("Reply"));
