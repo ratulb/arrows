@@ -186,29 +186,29 @@ async fn send_msg_within_msg_test_1() {
         elems: vec![simple],
     };
     let complex_as_opt = option_of_bytes(&complex);
-    let msg = Message::new(complex_as_opt , "addr_from", "addr_to");
-    let msg_container = Message::new(option_of_bytes(&msg),"addr_from", "addr_to");
+    let msg = Message::new(complex_as_opt, "addr_from", "addr_to");
+    let msg_container = Message::new(option_of_bytes(&msg), "addr_from", "addr_to");
 
     struct NewActor;
 
     impl Actor for NewActor {
-      fn receive(&mut self, msg: Message) -> Option<Message> {
-         println!("New actor received msg ->");           
-         println!("");
-         println!("{:?}", msg);
-         let mut msg = msg;
-         let inner_msg_option: Option<Vec<u8>> = msg.get_content_out();
-         let inner_vec = inner_msg_option.unwrap();
-         let mut inner_msg: Message = from_bytes(&inner_vec).ok().unwrap();
-         let inner_content_option = inner_msg.get_content_out();
-         let bytes_for_complex = inner_content_option.unwrap();
-         let nested_complex: Complex<Inner> = from_bytes(&bytes_for_complex).ok().unwrap();
+        fn receive(&mut self, msg: Message) -> Option<Message> {
+            println!("New actor received msg ->");
+            println!();
+            println!("{:?}", msg);
+            let mut msg = msg;
+            let inner_msg_option: Option<Vec<u8>> = msg.get_content_out();
+            let inner_vec = inner_msg_option.unwrap();
+            let mut inner_msg: Message = from_bytes(&inner_vec).ok().unwrap();
+            let inner_content_option = inner_msg.get_content_out();
+            let bytes_for_complex = inner_content_option.unwrap();
+            let nested_complex: Complex<Inner> = from_bytes(&bytes_for_complex).ok().unwrap();
 
-         println!("The nested complex: {:?}", nested_complex);
-         let returned_complex_bytes = option_of_bytes(&nested_complex);
-         let returned_msg  = Message::new(returned_complex_bytes, "addr_from", "addr_to");
-         Some(returned_msg)
-      }
+            println!("The nested complex: {:?}", nested_complex);
+            let returned_complex_bytes = option_of_bytes(&nested_complex);
+            let returned_msg = Message::new(returned_complex_bytes, "addr_from", "addr_to");
+            Some(returned_msg)
+        }
     }
     let mut new_actor = NewActor;
     let call_result = new_actor.receive(msg_container);

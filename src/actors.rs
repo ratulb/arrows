@@ -21,11 +21,20 @@ impl Actors {
         Ok(ActorArrow)
     }
 }
+pub(crate) enum SysAddrs {
+    test,
+}
 
-struct WrappedActor {}
+pub(crate) struct SysActors {
+    sys_actors: HashMap<u64, Box<dyn Actor>>,
+}
 
-struct ActorCatalog {
-    actor_impls: HashMap<String, Box<dyn Actor>>,
+impl SysActors {
+    pub(crate) fn new() -> Self {
+        Self {
+            sys_actors: HashMap::new(),
+        }
+    }
 }
 
 //Need to be made crate private
@@ -73,4 +82,32 @@ struct Simple {
     e1: i32,
     e2: usize,
     e3: Option<bool>,
+}
+
+pub(crate) struct ActorInitializer;
+pub(crate) struct RequestValidator<'a> {
+    addr: Address<'a>,
+}
+
+impl RequestValidator {
+    pub(crate) fn new() -> Self {
+        dbg!("Request validator starting with assumed name of \"sys-request-validator\"");
+        Self {
+            addr: Address::new("sys-request-validator"),
+        }
+    }
+}
+
+impl Actor for RequestValidator {
+    fn receive(&mut self, msg: Message) -> Option<Message> {
+        dbg!("Received validation message - allowing to proceed");
+        //Some(Message::internal(to_bytes(&true),
+        None
+    }
+}
+
+impl Actor for ActorInitializer {
+    fn receive(&mut self, msg: Message) -> Option<Message> {
+        None
+    }
 }
