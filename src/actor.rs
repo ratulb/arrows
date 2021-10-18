@@ -22,7 +22,7 @@ impl<'a, 'b> Ractor<'a, 'b> {
 }
 
 pub trait Actor {
-    fn receive<'a, 'b>(&mut self, message: Message<'a>) -> Option<Message<'b>> {
+    fn receive<'i: 'o, 'o>(&mut self, message: &mut Message<'i>) -> Option<Message<'o>> {
         //Default implementation - override as needed
         println!("Received message: {:#?}", message);
         None

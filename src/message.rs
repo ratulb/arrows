@@ -54,7 +54,7 @@ impl<'a> Message<'a> {
             created: SystemTime::now(),
         }
     }
-    pub fn uturn_with_text(&'a mut self, reply: &str) -> &'a mut Self {
+    pub fn uturn_with_text(&mut self, reply: &str) {
         match self {
             Message::Custom {
                 ref mut from,
@@ -75,14 +75,14 @@ impl<'a> Message<'a> {
                 let _ignore = replace(content, option_of_bytes(reply));
             }
         }
-        self
     }
 
     pub fn with_content_and_to(
-        &'a mut self,
+        //&'a mut self,
+        &mut self,
         new_content: Vec<u8>,
         new_to: &'a str,
-    ) -> &'a mut Self {
+    ) {
         match self {
             Message::Custom {
                 ref mut content,
@@ -101,7 +101,6 @@ impl<'a> Message<'a> {
                 *to = Some(Address::new(new_to));
             }
         }
-        self
     }
 
     pub fn with_content(&mut self, new_content: Vec<u8>) -> &mut Self {
@@ -313,7 +312,7 @@ mod tests {
         let mut msg = Message::new(option_of_bytes("Content"), "addr_from", "addr_to");
         assert_eq!(msg.get_content(), &option_of_bytes("Content"));
         assert_eq!(msg.get_to(), &Some(Address::new("addr_to")));
-        let msg = msg.with_content_and_to(option_of_bytes("New content").unwrap(), "New_to");
+        msg.with_content_and_to(option_of_bytes("New content").unwrap(), "New_to");
         assert_eq!(msg.get_content(), &option_of_bytes("New content"));
         assert_eq!(msg.get_to(), &Some(Address::new("New_to")));
     }
@@ -323,7 +322,7 @@ mod tests {
         let mut msg = Message::internal(option_of_bytes("Content"), "addr_from", "addr_to");
         assert_eq!(msg.get_content(), &option_of_bytes("Content"));
         assert_eq!(msg.get_to(), &Some(Address::new("addr_to")));
-        let msg = msg.with_content_and_to(option_of_bytes("New content").unwrap(), "New_to");
+        msg.with_content_and_to(option_of_bytes("New content").unwrap(), "New_to");
         assert_eq!(msg.get_content(), &option_of_bytes("New content"));
         assert_eq!(msg.get_to(), &Some(Address::new("New_to")));
     }
@@ -423,7 +422,7 @@ mod tests {
     fn uturn_with_text_reply_test_1() {
         let mut msg = Message::internal(option_of_bytes("Content"), "addr_from", "addr_to");
         assert_eq!(msg.get_content(), &option_of_bytes("Content"));
-        let msg = msg.uturn_with_text("Reply");
+        msg.uturn_with_text("Reply");
         assert_eq!(msg.get_to(), &Some(Address::new("addr_from")));
         assert_eq!(msg.get_from(), &Some(Address::new("addr_to")));
         assert_eq!(msg.get_content(), &option_of_bytes("Reply"));
