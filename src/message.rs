@@ -4,31 +4,38 @@ use std::io::{Result, Seek, Write};
 use std::time::SystemTime;
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum Message {
+pub enum Message<'a> {
     Custom {
-        from: Option<Address>,
-        to: Option<Address>,
+        #[serde(borrow)]
+        from: Option<Address<'a>>,
+        #[serde(borrow)]
+        to: Option<Address<'a>>,
         content: Option<Vec<u8>>,
-        recipients: Option<AdditionalRecipients>,
+        #[serde(borrow)]
+        recipients: Option<AdditionalRecipients<'a>>,
         created: SystemTime,
     },
     Internal {
-        from: Option<Address>,
-        to: Option<Address>,
+        #[serde(borrow)]
+        from: Option<Address<'a>>,
+        #[serde(borrow)]
+        to: Option<Address<'a>>,
         content: Option<Vec<u8>>,
-        recipients: Option<AdditionalRecipients>,
+        #[serde(borrow)]
+        recipients: Option<AdditionalRecipients<'a>>,
         created: SystemTime,
     },
 }
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum AdditionalRecipients {
+pub enum AdditionalRecipients<'a> {
     All,
-    OnlySome(Vec<Address>),
+    #[serde(borrow)]
+    OnlySome(Vec<Address<'a>>),
 }
 
-impl Message {
-    pub fn new(content: Option<Vec<u8>>, from: &str, to: &str) -> Self {
+impl<'a> Message<'a> {
+    pub fn new(content: Option<Vec<u8>>, from: &'a str, to: &'a str) -> Self {
         Self::Custom {
             from: Some(Address::new(from)),
             to: Some(Address::new(to)),
@@ -38,7 +45,11 @@ impl Message {
         }
     }
 
-    pub fn with_content_and_to(&mut self, new_content: Vec<u8>, new_to: &str) -> &mut Self {
+    pub fn with_content_and_to(
+        &'a mut self,
+        new_content: Vec<u8>,
+        new_to: &'a str,
+    ) -> &'a mut Self {
         match self {
             Message::Custom {
                 ref mut content,
@@ -76,7 +87,7 @@ impl Message {
         self
     }
 
-    pub fn set_recipient(&mut self, new_to: &str) -> &mut Self {
+    pub fn set_recipient(&'a mut self, new_to: &'a str) -> &'a mut Self {
         match self {
             Message::Custom { ref mut to, .. } => {
                 *to = Some(Address::new(new_to));
@@ -88,7 +99,7 @@ impl Message {
         self
     }
 
-    pub fn with_recipients(&mut self, new_recipients: Vec<&str>) -> &mut Self {
+    pub fn with_recipients(&'a mut self, new_recipients: Vec<&'a str>) -> &'a mut Self {
         match self {
             Message::Custom {
                 ref mut recipients, ..
@@ -148,21 +159,21 @@ impl Message {
         }
     }
 
-    pub fn get_to(&self) -> &Option<Address> {
+    pub fn get_to(&'a self) -> &'a Option<Address<'a>> {
         match self {
             Message::Custom { to, .. } => to,
             Message::Internal { to, .. } => to,
         }
     }
 
-    pub fn get_from(&self) -> &Option<Address> {
+    pub fn get_from(&'a self) -> &'a Option<Address<'a>> {
         match self {
             Message::Custom { from, .. } => from,
             Message::Internal { from, .. } => from,
         }
     }
 
-    pub fn get_recipients(&self) -> &Option<AdditionalRecipients> {
+    pub fn get_recipients(&'a self) -> &'a Option<AdditionalRecipients<'a>> {
         match self {
             Message::Custom { recipients, .. } => recipients,
             Message::Internal { recipients, .. } => recipients,
@@ -180,7 +191,7 @@ impl Message {
         }
     }
 
-    pub(crate) fn internal(content: Option<Vec<u8>>, from: &str, to: &str) -> Self {
+    pub(crate) fn internal(content: Option<Vec<u8>>, from: &'a str, to: &'a str) -> Self {
         Self::Internal {
             from: Some(Address::new(from)),
             to: Some(Address::new(to)),
@@ -191,14 +202,14 @@ impl Message {
     }
 }
 
-impl Message {
-    pub async fn write<W: Seek + Write>(&self, w: &mut W) -> Result<()> {
+impl<'a> Message<'a> {
+    pub async fn write<W: Seek + Write>(&'a self, w: &mut W) -> Result<()> {
         serde_json::to_writer(w, self)?;
         Ok(())
     }
 }
-impl Message {
-    pub fn write_sync<W: Seek + Write>(&self, w: &mut W) -> Result<()> {
+impl<'a> Message<'a> {
+    pub fn write_sync<W: Seek + Write>(&'a self, w: &mut W) -> Result<()> {
         serde_json::to_writer(w, self)?;
         Ok(())
     }
@@ -246,7 +257,7 @@ mod tests {
         let mut msg = Message::new(option_of_bytes("Content"), "addr_from", "addr_to");
         assert_eq!(msg.get_content(), &option_of_bytes("Content"));
         assert_eq!(msg.get_to(), &Some(Address::new("addr_to")));
-        msg.with_content_and_to(option_of_bytes("New content").unwrap(), "New_to");
+        let msg = msg.with_content_and_to(option_of_bytes("New content").unwrap(), "New_to");
         assert_eq!(msg.get_content(), &option_of_bytes("New content"));
         assert_eq!(msg.get_to(), &Some(Address::new("New_to")));
     }
@@ -256,7 +267,7 @@ mod tests {
         let mut msg = Message::internal(option_of_bytes("Content"), "addr_from", "addr_to");
         assert_eq!(msg.get_content(), &option_of_bytes("Content"));
         assert_eq!(msg.get_to(), &Some(Address::new("addr_to")));
-        msg.with_content_and_to(option_of_bytes("New content").unwrap(), "New_to");
+        let msg = msg.with_content_and_to(option_of_bytes("New content").unwrap(), "New_to");
         assert_eq!(msg.get_content(), &option_of_bytes("New content"));
         assert_eq!(msg.get_to(), &Some(Address::new("New_to")));
     }
@@ -265,12 +276,12 @@ mod tests {
     fn alter_additional_recipients_test_1() {
         let mut msg = Message::internal(option_of_bytes("Content"), "addr_from", "addr_to");
         let additional_recipients = vec!["Recipient1", "Recipient2", "Recipient3"];
-        msg.with_recipients(additional_recipients);
+        let msg = msg.with_recipients(additional_recipients);
         let additional_recipients_returned = vec!["Recipient1", "Recipient2", "Recipient3"];
         if let Some(AdditionalRecipients::OnlySome(recipients)) = msg.get_recipients() {
             let mut index = 0;
             recipients.iter().for_each(|addr| {
-                assert_eq!(&addr.get_name()[..], additional_recipients_returned[index]);
+                assert_eq!(addr.get_name(), additional_recipients_returned[index]);
                 index += 1;
             });
         } else {
@@ -291,7 +302,7 @@ mod tests {
     fn set_recipient_test_1() {
         let mut msg = Message::internal(option_of_bytes("Content"), "addr_from", "addr_to");
         assert_eq!(msg.get_to(), &Some(Address::new("addr_to")));
-        msg.set_recipient("The new recipient");
+        let msg = msg.set_recipient("The new recipient");
         assert_eq!(msg.get_to(), &Some(Address::new("The new recipient")));
     }
 

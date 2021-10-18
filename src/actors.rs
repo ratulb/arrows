@@ -42,7 +42,7 @@ impl SysActors {
 pub struct ActorBuilder;
 
 impl Actor for ActorBuilder {
-    fn receive(&mut self, message: Message) -> Option<Message> {
+    fn receive<'a, 'b>(&mut self, message: Message<'a>) -> Option<Message<'b>> {
         //Default implementation - override as needed
         println!("Received message: {:#?}", message);
         let content = message.get_content();
@@ -85,6 +85,7 @@ struct Simple {
 }
 
 pub(crate) struct ActorInitializer;
+/***
 pub(crate) struct RequestValidator<'a> {
     addr: Address<'a>,
 }
@@ -104,10 +105,10 @@ impl Actor for RequestValidator {
         //Some(Message::internal(to_bytes(&true),
         None
     }
-}
+}***/
 
 impl Actor for ActorInitializer {
-    fn receive(&mut self, msg: Message) -> Option<Message> {
+    fn receive<'a, 'b>(&mut self, _msg: Message<'a>) -> Option<Message<'b>> {
         None
     }
 }

@@ -14,25 +14,29 @@ pub enum Scheme {
 }
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Hash)]
-pub struct Address {
+pub struct Address<'a> {
     id: u64,
-    name: String,
-    class: Option<String>,
-    ns: Option<String>,
-    host: Option<String>,
+    #[serde(borrow)]
+    name: &'a str,
+    class: Option<&'a str>,
+    #[serde(borrow)]
+    ns: Option<&'a str>,
+    #[serde(borrow)]
+    host: Option<&'a str>,
     port: Option<u16>,
     proto: Option<Scheme>,
-    parent: Option<String>,
+    #[serde(borrow)]
+    parent: Option<&'a str>,
 }
 
-impl Address {
-    pub fn new(name: &str) -> Self {
+impl<'a> Address<'a> {
+    pub fn new(name: &'a str) -> Self {
         let mut addr = Self {
             id: 0,
-            name: name.to_string(),
-            class: Some("default".to_string()),
-            ns: Some("system".to_string()),
-            host: Some("127.0.0.1".to_string()),
+            name,
+            class: Some("default"),
+            ns: Some("system"),
+            host: Some("127.0.0.1"),
             port: Some(7171),
             proto: Some(Scheme::Inprocess),
             parent: None,
@@ -40,8 +44,8 @@ impl Address {
         addr.id = compute_hash(&addr);
         addr
     }
-    pub fn get_name(&self) -> &String {
-        &self.name
+    pub fn get_name(&'a self) -> &'a str {
+        self.name
     }
 }
 

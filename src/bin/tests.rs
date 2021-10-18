@@ -192,7 +192,7 @@ async fn send_msg_within_msg_test_1() {
     struct NewActor;
 
     impl Actor for NewActor {
-        fn receive(&mut self, msg: Message) -> Option<Message> {
+        fn receive<'a, 'b>(&mut self, msg: Message<'a>) -> Option<Message<'b>> {
             println!("New actor received msg ->");
             println!();
             println!("{:?}", msg);
