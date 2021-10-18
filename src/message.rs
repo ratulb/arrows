@@ -1,4 +1,4 @@
-use crate::{Address,option_of_bytes,from_bytes};
+use crate::Address;
 use serde::{Deserialize, Serialize};
 use std::io::{Result, Seek, Write};
 use std::time::SystemTime;
@@ -32,7 +32,7 @@ impl Message {
         Self::Custom {
             from: Some(Address::new(from)),
             to: Some(Address::new(to)),
-            content: content,
+            content,
             recipients: None,
             created: SystemTime::now(),
         }
@@ -136,14 +136,17 @@ impl Message {
             Message::Internal { content, .. } => content,
         }
     }
-
+    //Would take content out - leaving message content to a None
     pub fn get_content_out(&mut self) -> Option<Vec<u8>> {
         match self {
-            Message::Custom { ref  mut content, .. } => content.take(),
-            Message::Internal { ref mut content, .. } => content.take(),
+            Message::Custom {
+                ref mut content, ..
+            } => content.take(),
+            Message::Internal {
+                ref mut content, ..
+            } => content.take(),
         }
     }
-
 
     pub fn get_to(&self) -> &Option<Address> {
         match self {
@@ -181,7 +184,7 @@ impl Message {
         Self::Internal {
             from: Some(Address::new(from)),
             to: Some(Address::new(to)),
-            content: content,
+            content,
             recipients: None,
             created: SystemTime::now(),
         }
@@ -204,13 +207,18 @@ impl Message {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::from_bytes;
+    use crate::option_of_bytes;
     use crate::type_of;
     use std::fs::OpenOptions;
     use std::io::BufWriter;
     #[test]
     fn create_custom_msg_test_content_and_to() {
         let mut msg = Message::new(option_of_bytes("Content"), "addr_from", "addr_to");
-        assert_eq!(from_bytes(&msg.get_content_out().unwrap()).ok(), Some("Content"));
+        assert_eq!(
+            from_bytes(&msg.get_content_out().unwrap()).ok(),
+            Some("Content")
+        );
         assert_eq!(msg.get_to(), &Some(Address::new("addr_to")));
     }
 
