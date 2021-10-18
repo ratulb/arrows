@@ -49,6 +49,21 @@ impl<'a> Address<'a> {
     }
 }
 
+impl<'a> Default for Address<'a> {
+    fn default() -> Self {
+        Self {
+            id: 0,
+            name: "",
+            class: None,
+            ns: None,
+            host: None,
+            port: None,
+            proto: None,
+            parent: None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

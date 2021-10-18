@@ -100,12 +100,11 @@ impl<'a> RequestValidator<'a> {
 }
 
 impl<'a> Actor for RequestValidator<'a> {
-    fn receive<'b: 'c, 'c>(&mut self, incoming: &mut Message<'b>) -> Option<Message<'c>> {
+    fn receive<'i: 'o, 'o>(&mut self, incoming: &mut Message<'i>) -> Option<Message<'o>> {
         dbg!("Received validation message - allowing to proceed");
-        let _incoming1 = incoming.uturn_with_text("Request validation passed");
-        //Some(Message::new(None,"from", "to"))
-        //Some(incoming1)
-        None
+        incoming.uturn_with_text("Request validation passed");
+        let incoming = std::mem::replace(incoming, Message::Invalid);
+        Some(incoming)
     }
 }
 /***

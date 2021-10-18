@@ -26,6 +26,7 @@ pub enum Message<'a> {
         recipients: Option<AdditionalRecipients<'a>>,
         created: SystemTime,
     },
+    Invalid,
 }
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
@@ -74,14 +75,11 @@ impl<'a> Message<'a> {
                 swap(from, to);
                 let _ignore = replace(content, option_of_bytes(reply));
             }
+            _ => (),
         }
     }
 
-    pub fn with_content_and_to(
-        &mut self,
-        new_content: Vec<u8>,
-        new_to: &'a str,
-    ) {
+    pub fn with_content_and_to(&mut self, new_content: Vec<u8>, new_to: &'a str) {
         match self {
             Message::Custom {
                 ref mut content,
@@ -99,6 +97,7 @@ impl<'a> Message<'a> {
                 *content = Some(new_content);
                 *to = Some(Address::new(new_to));
             }
+            _ => (),
         }
     }
 
@@ -114,6 +113,7 @@ impl<'a> Message<'a> {
             } => {
                 *content = Some(new_content);
             }
+            _ => (),
         }
     }
 
@@ -125,6 +125,7 @@ impl<'a> Message<'a> {
             Message::Internal { ref mut to, .. } => {
                 *to = Some(Address::new(new_to));
             }
+            _ => (),
         }
     }
     pub fn uturn_with_reply(&mut self, reply: Option<Vec<u8>>) {
@@ -147,11 +148,11 @@ impl<'a> Message<'a> {
                 swap(from, to);
                 let _ignore = replace(content, reply);
             }
+            _ => (),
         }
     }
 
-    //pub fn with_recipients(&'a mut self, new_recipients: Vec<&'a str>) -> &'a mut Self {
-    pub fn with_recipients(&mut self, new_recipients: Vec<&'a str>)  {
+    pub fn with_recipients(&mut self, new_recipients: Vec<&'a str>) {
         match self {
             Message::Custom {
                 ref mut recipients, ..
@@ -173,6 +174,7 @@ impl<'a> Message<'a> {
                         .collect(),
                 ));
             }
+            _ => (),
         }
     }
 
@@ -188,6 +190,7 @@ impl<'a> Message<'a> {
             } => {
                 *recipients = Some(AdditionalRecipients::All);
             }
+            _ => (),
         }
     }
 
@@ -195,6 +198,7 @@ impl<'a> Message<'a> {
         match self {
             Message::Custom { content, .. } => content,
             Message::Internal { content, .. } => content,
+            _ => &None,
         }
     }
     //Would take content out - leaving message content to a None
@@ -206,6 +210,7 @@ impl<'a> Message<'a> {
             Message::Internal {
                 ref mut content, ..
             } => content.take(),
+            _ => None,
         }
     }
 
@@ -213,6 +218,7 @@ impl<'a> Message<'a> {
         match self {
             Message::Custom { to, .. } => to,
             Message::Internal { to, .. } => to,
+            _ => &None,
         }
     }
 
@@ -220,6 +226,7 @@ impl<'a> Message<'a> {
         match self {
             Message::Custom { from, .. } => from,
             Message::Internal { from, .. } => from,
+            _ => &None,
         }
     }
 
@@ -227,6 +234,7 @@ impl<'a> Message<'a> {
         match self {
             Message::Custom { recipients, .. } => recipients,
             Message::Internal { recipients, .. } => recipients,
+            _ => &None,
         }
     }
 
@@ -238,6 +246,7 @@ impl<'a> Message<'a> {
             Message::Internal { ref recipients, .. } => {
                 matches!(*recipients, Some(AdditionalRecipients::All))
             }
+            _ => false,
         }
     }
 
