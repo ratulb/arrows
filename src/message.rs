@@ -62,8 +62,8 @@ impl<'a> Message<'a> {
                 ref mut content,
                 ..
             } => {
-                std::mem::swap(from, to);
-                let _ignore = std::mem::replace(content, option_of_bytes(reply));
+                swap(from, to);
+                let _ignore = replace(content, option_of_bytes(reply));
             }
             Message::Internal {
                 ref mut from,
@@ -71,8 +71,8 @@ impl<'a> Message<'a> {
                 ref mut content,
                 ..
             } => {
-                std::mem::swap(from, to);
-                let _ignore = std::mem::replace(content, option_of_bytes(reply));
+                swap(from, to);
+                let _ignore = replace(content, option_of_bytes(reply));
             }
         }
         self
@@ -139,8 +139,8 @@ impl<'a> Message<'a> {
                 ref mut content,
                 ..
             } => {
-                std::mem::swap(from, to);
-                let _ignore = std::mem::replace(content, reply);
+                swap(from, to);
+                let _ignore = replace(content, reply);
             }
             Message::Internal {
                 ref mut from,
@@ -148,8 +148,8 @@ impl<'a> Message<'a> {
                 ref mut content,
                 ..
             } => {
-                std::mem::swap(from, to);
-                let _ignore = std::mem::replace(content, reply);
+                swap(from, to);
+                let _ignore = replace(content, reply);
             }
         }
         self
