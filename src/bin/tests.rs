@@ -84,7 +84,7 @@ async fn create_actor_from_from_fn_test1() {
 }
 
 async fn write_addr_test1() {
-    let message = Message::new(option_of_bytes("This some string").unwrap(), "add1", "to");
+    let message = Message::new(option_of_bytes("This some string"), "add1", "to");
     let _addr1 = Address::new("add1");
     to_file(message, "msg.json").await;
 }
@@ -93,7 +93,7 @@ async fn create_actor_builder_test_cloning() {
     let mut actor_builder = ActorBuilder;
     let input = "This is a test message";
     let input_vectorized = option_of_bytes(&input);
-    let message = Message::new(input_vectorized.unwrap_or_default(), "add1", "to");
+    let message = Message::new(input_vectorized, "add1", "to");
 
     let cloned_message = message.clone();
     let mut message_updated = message.clone();
@@ -142,7 +142,7 @@ async fn send_complex_msg_test_1() {
         inner,
         elems: vec![simple],
     };
-    let complex = serialize(&complex).unwrap();
+    let complex = option_of_bytes(&complex);
     let msg = Message::new(complex, "addr_from", "addr_to");
 
     let mut actor_builder = ActorBuilder;

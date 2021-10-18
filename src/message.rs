@@ -1,4 +1,4 @@
-use crate::Address;
+use crate::{Address,option_of_bytes,from_bytes};
 use serde::{Deserialize, Serialize};
 use std::io::{Result, Seek, Write};
 use std::time::SystemTime;
@@ -28,11 +28,11 @@ pub enum AdditionalRecipients {
 }
 
 impl Message {
-    pub fn new(content: Vec<u8>, from: &str, to: &str) -> Self {
+    pub fn new(content: Option<Vec<u8>>, from: &str, to: &str) -> Self {
         Self::Custom {
             from: Some(Address::new(from)),
             to: Some(Address::new(to)),
-            content: Some(content),
+            content: content,
             recipients: None,
             created: SystemTime::now(),
         }
@@ -137,6 +137,14 @@ impl Message {
         }
     }
 
+    pub fn get_content_out(&mut self) -> Option<Vec<u8>> {
+        match self {
+            Message::Custom { ref  mut content, .. } => content.take(),
+            Message::Internal { ref mut content, .. } => content.take(),
+        }
+    }
+
+
     pub fn get_to(&self) -> &Option<Address> {
         match self {
             Message::Custom { to, .. } => to,
@@ -169,11 +177,11 @@ impl Message {
         }
     }
 
-    pub(crate) fn internal(content: Vec<u8>, from: &str, to: &str) -> Self {
+    pub(crate) fn internal(content: Option<Vec<u8>>, from: &str, to: &str) -> Self {
         Self::Internal {
             from: Some(Address::new(from)),
             to: Some(Address::new(to)),
-            content: Some(content),
+            content: content,
             recipients: None,
             created: SystemTime::now(),
         }
@@ -192,7 +200,7 @@ impl Message {
         Ok(())
     }
 }
-/***
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -201,53 +209,53 @@ mod tests {
     use std::io::BufWriter;
     #[test]
     fn create_custom_msg_test_content_and_to() {
-        let msg = Message::new("Content", "addr_from", "addr_to");
-        assert_eq!(msg.get_content(), &Some("Content"));
+        let mut msg = Message::new(option_of_bytes("Content"), "addr_from", "addr_to");
+        assert_eq!(from_bytes(&msg.get_content_out().unwrap()).ok(), Some("Content"));
         assert_eq!(msg.get_to(), &Some(Address::new("addr_to")));
     }
 
     #[test]
     fn create_internal_msg_test_content_and_to() {
-        let msg = Message::internal("Content", "addr_from", "addr_to");
-        assert_eq!(msg.get_content(), &Some("Content"));
+        let msg = Message::internal(option_of_bytes("Content"), "addr_from", "addr_to");
+        assert_eq!(*msg.get_content(), option_of_bytes("Content"));
         assert_eq!(msg.get_to(), &Some(Address::new("addr_to")));
     }
 
     #[test]
     fn create_custom_msg_test_from() {
-        let msg = Message::new("Content", "addr_from", "addr_to");
+        let msg = Message::new(option_of_bytes("Content"), "addr_from", "addr_to");
         assert_eq!(msg.get_from(), &Some(Address::new("addr_from")));
     }
 
     #[test]
     fn create_internal_msg_test_from() {
-        let msg = Message::internal("Content", "addr_from", "addr_to");
+        let msg = Message::internal(option_of_bytes("Content"), "addr_from", "addr_to");
         assert_eq!(msg.get_from(), &Some(Address::new("addr_from")));
     }
 
     #[test]
     fn create_custom_msg_test_alter_content_and_to() {
-        let mut msg = Message::new("Content", "addr_from", "addr_to");
-        assert_eq!(msg.get_content(), &Some("Content"));
+        let mut msg = Message::new(option_of_bytes("Content"), "addr_from", "addr_to");
+        assert_eq!(msg.get_content(), &option_of_bytes("Content"));
         assert_eq!(msg.get_to(), &Some(Address::new("addr_to")));
-        msg.with_content_and_to("New content", "New_to");
-        assert_eq!(msg.get_content(), &Some("New content"));
+        msg.with_content_and_to(option_of_bytes("New content").unwrap(), "New_to");
+        assert_eq!(msg.get_content(), &option_of_bytes("New content"));
         assert_eq!(msg.get_to(), &Some(Address::new("New_to")));
     }
 
     #[test]
     fn create_internal_msg_test_alter_content_and_to() {
-        let mut msg = Message::internal("Content", "addr_from", "addr_to");
-        assert_eq!(msg.get_content(), &Some("Content"));
+        let mut msg = Message::internal(option_of_bytes("Content"), "addr_from", "addr_to");
+        assert_eq!(msg.get_content(), &option_of_bytes("Content"));
         assert_eq!(msg.get_to(), &Some(Address::new("addr_to")));
-        msg.with_content_and_to("New content", "New_to");
-        assert_eq!(msg.get_content(), &Some("New content"));
+        msg.with_content_and_to(option_of_bytes("New content").unwrap(), "New_to");
+        assert_eq!(msg.get_content(), &option_of_bytes("New content"));
         assert_eq!(msg.get_to(), &Some(Address::new("New_to")));
     }
 
     #[test]
     fn alter_additional_recipients_test_1() {
-        let mut msg = Message::internal("Content", "addr_from", "addr_to");
+        let mut msg = Message::internal(option_of_bytes("Content"), "addr_from", "addr_to");
         let additional_recipients = vec!["Recipient1", "Recipient2", "Recipient3"];
         msg.with_recipients(additional_recipients);
         let additional_recipients_returned = vec!["Recipient1", "Recipient2", "Recipient3"];
@@ -264,7 +272,7 @@ mod tests {
 
     #[test]
     fn set_recipients_all_test_1() {
-        let mut msg = Message::internal("Content", "addr_from", "addr_to");
+        let mut msg = Message::internal(option_of_bytes("Content"), "addr_from", "addr_to");
         assert_eq!(msg.get_recipients(), &None);
         msg.set_recipient_all();
         type_of(&msg.get_recipients());
@@ -273,7 +281,7 @@ mod tests {
 
     #[test]
     fn set_recipient_test_1() {
-        let mut msg = Message::internal("Content", "addr_from", "addr_to");
+        let mut msg = Message::internal(option_of_bytes("Content"), "addr_from", "addr_to");
         assert_eq!(msg.get_to(), &Some(Address::new("addr_to")));
         msg.set_recipient("The new recipient");
         assert_eq!(msg.get_to(), &Some(Address::new("The new recipient")));
@@ -317,7 +325,7 @@ mod tests {
             elems: vec![simple],
         };
 
-        let msg = Message::internal(complex, "addr_from", "addr_to");
+        let msg = Message::internal(option_of_bytes(&complex), "addr_from", "addr_to");
         let file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -327,4 +335,4 @@ mod tests {
         let mut bufwriter = BufWriter::new(file);
         assert_eq!(msg.write_sync(&mut bufwriter).expect("Should get ()"), ());
     }
-}***/
+}

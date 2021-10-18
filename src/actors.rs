@@ -1,6 +1,7 @@
 use crate::{type_of, Actor, Address, Message, Ractor};
 use bincode::deserialize;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use std::io::Result;
 pub struct Router {}
@@ -24,7 +25,7 @@ impl Actors {
 struct WrappedActor {}
 
 struct ActorCatalog {
-    //actor_impls: HashMap<String, WrappedActor>,
+    actor_impls: HashMap<String, Box<dyn Actor>>,
 }
 
 //Need to be made crate private
