@@ -1,4 +1,5 @@
-use arrows::{from_bytes, option_of_bytes, type_of, Actor, Message, Ractor};
+use arrows::etc::Ractor;
+use arrows::{from_bytes, option_of_bytes, type_of, Actor, Message};
 
 use serde::{Deserialize, Serialize};
 

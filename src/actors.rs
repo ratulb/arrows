@@ -1,34 +1,15 @@
-use crate::{Actor, Address, Message, Ractor};
-
-use serde::Serialize;
+use crate::{Actor, Address, Message, STORE};
 use std::collections::HashMap;
+use std::io;
 
-use std::io::Result;
-pub struct Router {}
+pub(crate) const REQUEST_VALIDATOR: &str = "request-validator";
 
-pub struct Actors;
-pub struct ActorArrow;
-impl Actors {
-    pub fn actor_from<F: 'static + Serialize + Fn(Message) -> Option<Message>>(
-        name: &str,
-        invokable: F,
-    ) -> Ractor {
-        let _addr = Address::new(name);
-        Ractor::new(name, Box::new(invokable))
-    }
-
-    pub fn ractor_of(_name: &str, _ractor: impl Actor) -> Result<ActorArrow> {
-        Ok(ActorArrow)
-    }
-}
-pub(crate) enum SysAddrs {
-    test,
-}
-
+#[derive(Debug)]
 pub(crate) struct SysActors {
-    sys_actors: HashMap<u64, Box<dyn Actor>>,
+    pub(crate) sys_actors: HashMap<u64, Box<dyn Actor>>,
 }
-
+unsafe impl Send for SysActors {}
+unsafe impl Sync for SysActors {}
 impl SysActors {
     pub(crate) fn new() -> Self {
         Self {
@@ -36,55 +17,14 @@ impl SysActors {
         }
     }
 }
-/***
-//Need to be made crate private
-#[derive(Debug, Clone)]
-pub struct ActorBuilder;
 
-impl Actor for ActorBuilder {
-    fn receive(&mut self, message: Message) -> Option<Message> {
-        //Default implementation - override as needed
-        println!("Received message: {:#?}", message);
-        let content = message.get_content();
-        let empty_data = vec![];
-        let content = match content {
-            Some(ref value) => value,
-            None => &empty_data,
-        };
-
-        println!("Received message buffer length = {}", content.len());
-        type_of(&content);
-
-        let decoded: Complex<Inner> = deserialize(&content[..]).unwrap();
-
-        println!("{:?}", decoded);
-        println!("============**********===============");
-
-        let result: Option<Message> = None;
-        result
+pub(crate) struct ActorInitializer;
+pub(crate) struct ActorInvoker;
+impl ActorInvoker {
+    fn invoke(incoming: Message) -> io::Result<()> {
+        Ok(())
     }
 }
-
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-struct Complex<T> {
-    inner: T,
-    elems: Vec<Simple>,
-}
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-struct Inner {
-    name: String,
-    children: Vec<String>,
-    male: bool,
-    age: u8,
-}
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-struct Simple {
-    e1: i32,
-    e2: usize,
-    e3: Option<bool>,
-}***/
-pub(crate) const SYS_REQUEST_VALIDATOR: &str = "sys-request-validator";
-pub(crate) struct ActorInitializer;
 
 pub(crate) struct RequestValidator<'a> {
     addr: Address<'a>,
@@ -92,9 +32,12 @@ pub(crate) struct RequestValidator<'a> {
 
 impl<'a> RequestValidator<'a> {
     pub(crate) fn new() -> Self {
-        dbg!("Request validator starting with assumed name of \"sys-request-validator\"");
+        dbg!(
+            "Request validator starting with assumed name of \"{}\"",
+            REQUEST_VALIDATOR
+        );
         Self {
-            addr: Address::new(SYS_REQUEST_VALIDATOR),
+            addr: Address::new(REQUEST_VALIDATOR),
         }
     }
 }
@@ -103,13 +46,12 @@ impl<'a> Actor for RequestValidator<'a> {
     fn receive<'i: 'o, 'o>(&mut self, incoming: &mut Message<'i>) -> Option<Message<'o>> {
         dbg!("Received validation message - allowing to proceed");
         incoming.uturn_with_text("Request validation passed");
-        let incoming = std::mem::replace(incoming, Message::Invalid);
-        Some(incoming)
+        let outgoing = std::mem::replace(incoming, Message::Blank);
+        Some(outgoing)
     }
 }
-/***
 impl Actor for ActorInitializer {
-    fn receive<(&mut self, _msg: Message) -> Option<Message> {
+    fn receive<'i: 'o, 'o>(&mut self, incoming: &mut Message<'i>) -> Option<Message<'o>> {
         None
     }
-}***/
+}

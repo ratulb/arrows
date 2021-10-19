@@ -1,6 +1,3 @@
-pub(crate) fn internal_fun() {
-    println!("The interal fn");
-}
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::str::from_utf8;

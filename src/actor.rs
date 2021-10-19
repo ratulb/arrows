@@ -1,30 +1,14 @@
-use crate::{Address, MailBox, Message};
-
-pub struct Ractor<'a, 'b> {
-    addr: Address<'a>,
-    mailbox: Option<MailBox>,
-    invokable: Box<dyn Fn(Message<'b>) -> Option<Message<'b>>>,
-}
-
-impl<'a, 'b> Ractor<'a, 'b> {
-    //Create an actor passing a Message -> Message closure
-    pub fn new(name: &'a str, invokable: Box<dyn Fn(Message<'b>) -> Option<Message<'b>>>) -> Self {
-        Self {
-            addr: Address::new(name),
-            mailbox: None,
-            invokable,
-        }
-    }
-    pub async fn receive(&mut self, msg: Message<'b>) -> Option<Message<'b>> {
-        println!("Actor received message");
-        (self.invokable)(msg)
-    }
-}
+use crate::Message;
+use core::fmt::Debug;
 
 pub trait Actor {
-    fn receive<'i: 'o, 'o>(&mut self, message: &mut Message<'i>) -> Option<Message<'o>> {
-        //Default implementation - override as needed
-        println!("Received message: {:#?}", message);
-        None
+    fn receive<'i: 'o, 'o>(&mut self, message: &mut Message<'i>) -> Option<Message<'o>>;
+}
+
+impl Debug for dyn Actor {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Actor impl")
     }
 }
+
+pub struct ActorArrow {}
