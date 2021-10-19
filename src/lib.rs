@@ -19,7 +19,7 @@ pub mod etc;
 pub async fn start() {
     use crate::actors::REQUEST_VALIDATOR;
     actors::start();
-    for _ in 0..1000 {
+    for _ in 0..10000 {
         let welcome = Message::internal(None, "actor-invoker", REQUEST_VALIDATOR);
         actors::ActorInvoker::invoke(welcome);
         println!("System startup check1");
