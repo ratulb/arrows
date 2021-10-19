@@ -47,6 +47,9 @@ impl<'a> Address<'a> {
     pub fn get_name(&'a self) -> &'a str {
         self.name
     }
+    pub fn get_id(&self) -> u64 {
+        self.id
+    }
 }
 
 impl<'a> Default for Address<'a> {

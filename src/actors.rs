@@ -22,6 +22,7 @@ pub(crate) struct ActorInitializer;
 pub(crate) struct ActorInvoker;
 impl ActorInvoker {
     fn invoke(incoming: Message) -> io::Result<()> {
+        let id = incoming.get_to_id();
         Ok(())
     }
 }

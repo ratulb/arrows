@@ -222,6 +222,20 @@ impl<'a> Message<'a> {
         }
     }
 
+    pub fn get_to_id(&self) -> u64 {
+        match self {
+            Message::Custom { to, .. } => match to {
+                Some(ref addr) => addr.get_id(),
+                None => 0,
+            },
+            Message::Internal { to, .. } => match to {
+                Some(ref addr) => addr.get_id(),
+                None => 0,
+            },
+            Message::Blank => 0,
+        }
+    }
+
     pub fn get_from(&self) -> &Option<Address<'a>> {
         match self {
             Message::Custom { from, .. } => from,

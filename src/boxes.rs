@@ -3,8 +3,6 @@ use async_std::{fs::DirBuilder, path::PathBuf, task::block_on};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::Mutex;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum MailBox {
@@ -32,16 +30,11 @@ pub struct BoxStore {
     //Replace with LRU caches
     outboxes: HashMap<u64, MailBox>,
     inboxes: HashMap<u64, MailBox>,
-    //sys_actors: Arc<Mutex<SysActors>>,
     sys_actors: SysActors,
 }
 
 impl BoxStore {
     pub async fn init() -> Self {
-        /***let sys_actors = Arc::new(Mutex::new(SysActors {
-            sys_actors: HashMap::new(),
-        }));***/
-
         let sys_actors = SysActors {
             sys_actors: HashMap::new(),
         };

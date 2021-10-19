@@ -123,9 +123,9 @@ async fn send_msg_within_msg_test_1() {
 
     impl Actor for NewActor {
         fn receive<'a: 'b, 'b>(&mut self, msg: &mut Message<'a>) -> Option<Message<'b>> {
-            println!("New actor received msg ->");
-            println!();
-            println!("{:?}", msg);
+            //println!("New actor received msg ->");
+            //println!();
+            //println!("{:?}", msg);
             let msg = msg;
             let inner_msg_option: Option<Vec<u8>> = msg.get_content_out();
             let inner_vec = inner_msg_option.unwrap();
@@ -134,7 +134,7 @@ async fn send_msg_within_msg_test_1() {
             let bytes_for_complex = inner_content_option.unwrap();
             let nested_complex: Complex<Inner> = from_bytes(&bytes_for_complex).ok().unwrap();
 
-            println!("The nested complex: {:?}", nested_complex);
+            //println!("The nested complex: {:?}", nested_complex);
             let returned_complex_bytes = option_of_bytes(&nested_complex);
             let returned_msg = Message::new(returned_complex_bytes, "addr_from", "addr_to");
             Some(returned_msg)
