@@ -32,8 +32,9 @@ impl SysActors {
     }
 }
 
-pub(crate) fn sys_actors_start() {
+pub(crate) fn start() {
     let validator = RequestValidator::new();
+    println!("System startup check 0: {} ", validator.identity());
     let initializer = ActorInitializer::new();
     let write_lock_result = STORE.write();
     let mut store = write_lock_result.unwrap();
@@ -68,14 +69,18 @@ impl<'a> ActorInitializer<'a> {
 pub(crate) struct ActorInvoker;
 
 impl ActorInvoker {
-    fn invoke(mut incoming: Message) -> io::Result<()> {
+    pub(crate) fn invoke(mut incoming: Message) -> io::Result<()> {
         let to_addr_id = incoming.get_to_id();
+        println!("System startup check2 {:?}", to_addr_id);
         let read_lock_result = STORE.read();
         let store = read_lock_result.unwrap();
         let mut actor = store.sys_actors.get_actor(to_addr_id);
         if let Some(ref mut actor_ref) = actor {
             let outcome = actor_ref.receive(&mut incoming);
             println!("Outcome: {:?}", outcome);
+            println!("System startup check3");
+        } else {
+            println!("System startup check4");
         }
         Ok(())
     }

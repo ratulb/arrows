@@ -5,9 +5,10 @@ use serde::{Deserialize, Serialize};
 
 #[async_std::main]
 pub async fn main() {
-    actor_test_with_closure().await;
-    create_actor_from_from_fn_test1().await;
-    send_msg_within_msg_test_1().await;
+    system_startup_test().await;
+    //actor_test_with_closure().await;
+    //create_actor_from_from_fn_test1().await;
+    //send_msg_within_msg_test_1().await;
 }
 
 async fn actor_test_with_closure() {
@@ -147,4 +148,6 @@ async fn send_msg_within_msg_test_1() {
     assert_eq!(result_complex, complex);
 }
 
-fn create_sys_actor_test1() {}
+async fn system_startup_test() {
+    let _result = arrows::start().await;
+}

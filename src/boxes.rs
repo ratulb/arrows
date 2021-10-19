@@ -3,7 +3,6 @@ use async_std::{fs::DirBuilder, path::PathBuf, task::block_on};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-//use std::ops::{Deref, DerefMut};
 use std::sync::RwLock;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -30,7 +29,6 @@ lazy_static! {
 #[derive(Debug)]
 pub(crate) struct BoxStore {
     pub(crate) process_dir: PathBuf,
-    //Replace with LRU caches
     pub(crate) outboxes: HashMap<u64, MailBox>,
     pub(crate) inboxes: HashMap<u64, MailBox>,
     pub(crate) sys_actors: SysActors,
@@ -62,18 +60,3 @@ impl BoxStore {
         path_buf.into()
     }
 }
-
-/***impl Deref for BoxStore {
-    type Target = SysActors;
-
-    fn deref(&self) -> &Self::Target {
-        &self.sys_actors
-    }
-}
-
-impl DerefMut for BoxStore  {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.sys_actors
-    }
-}
-***/
