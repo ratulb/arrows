@@ -3,6 +3,8 @@ use async_std::{fs::DirBuilder, path::PathBuf, task::block_on};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+//use std::ops::{Deref, DerefMut};
+use std::sync::RwLock;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum MailBox {
@@ -21,24 +23,22 @@ pub enum MailBox {
 }
 
 lazy_static! {
-    pub static ref STORE: BoxStore = block_on(async { BoxStore::init().await });
+    pub(crate) static ref STORE: RwLock<BoxStore> =
+        block_on(async { RwLock::new(BoxStore::init().await) });
 }
 
 #[derive(Debug)]
-pub struct BoxStore {
-    process_dir: PathBuf,
+pub(crate) struct BoxStore {
+    pub(crate) process_dir: PathBuf,
     //Replace with LRU caches
-    outboxes: HashMap<u64, MailBox>,
-    inboxes: HashMap<u64, MailBox>,
-    sys_actors: SysActors,
+    pub(crate) outboxes: HashMap<u64, MailBox>,
+    pub(crate) inboxes: HashMap<u64, MailBox>,
+    pub(crate) sys_actors: SysActors,
 }
 
 impl BoxStore {
     pub async fn init() -> Self {
-        let sys_actors = SysActors {
-            sys_actors: HashMap::new(),
-        };
-
+        let sys_actors = SysActors::new();
         let directory = Self::process_dir().await;
         if !directory.exists().await || !directory.is_dir().await {
             println!("Process dir does not exists. Creating...");
@@ -62,3 +62,18 @@ impl BoxStore {
         path_buf.into()
     }
 }
+
+/***impl Deref for BoxStore {
+    type Target = SysActors;
+
+    fn deref(&self) -> &Self::Target {
+        &self.sys_actors
+    }
+}
+
+impl DerefMut for BoxStore  {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.sys_actors
+    }
+}
+***/

@@ -146,3 +146,5 @@ async fn send_msg_within_msg_test_1() {
     let result_complex: Complex<Inner> = from_bytes(&call_result).ok().unwrap();
     assert_eq!(result_complex, complex);
 }
+
+fn create_sys_actor_test1() {}
