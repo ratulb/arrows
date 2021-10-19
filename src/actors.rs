@@ -1,4 +1,4 @@
-use crate::{Actor, Address, Message, STORE};
+use crate::{Actor, Address, Message};
 use std::collections::HashMap;
 use std::io;
 
@@ -22,7 +22,7 @@ pub(crate) struct ActorInitializer;
 pub(crate) struct ActorInvoker;
 impl ActorInvoker {
     fn invoke(incoming: Message) -> io::Result<()> {
-        let id = incoming.get_to_id();
+        let _id = incoming.get_to_id();
         Ok(())
     }
 }
@@ -52,7 +52,7 @@ impl<'a> Actor for RequestValidator<'a> {
     }
 }
 impl Actor for ActorInitializer {
-    fn receive<'i: 'o, 'o>(&mut self, incoming: &mut Message<'i>) -> Option<Message<'o>> {
+    fn receive<'i: 'o, 'o>(&mut self, _incoming: &mut Message<'i>) -> Option<Message<'o>> {
         None
     }
 }

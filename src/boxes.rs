@@ -46,7 +46,7 @@ impl BoxStore {
             builder.create(&directory.as_path()).await;
         }
         Self {
-            sys_actors: sys_actors,
+            sys_actors,
             process_dir: directory,
             outboxes: HashMap::new(),
             inboxes: HashMap::new(),
