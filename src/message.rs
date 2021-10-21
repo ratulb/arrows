@@ -164,6 +164,33 @@ impl<'a> Message<'a> {
             Message::Blank => (),
         }
     }
+    pub fn set_recipient_ip(&mut self, new_to_ip: &'a str) {
+        match self {
+            Message::Custom { to, .. } => match to {
+                Some(ref mut addr) => addr.with_ip(new_to_ip),
+                None => (),
+            },
+            Message::Internal { to, .. } => match to {
+                Some(ref mut addr) => addr.with_ip(new_to_ip),
+                None => (),
+            },
+            Message::Blank => (),
+        }
+    }
+    pub fn set_recipient_port(&mut self, new_port: u16) {
+        match self {
+            Message::Custom { to, .. } => match to {
+                Some(ref mut addr) => addr.with_port(new_port),
+                None => (),
+            },
+            Message::Internal { to, .. } => match to {
+                Some(ref mut addr) => addr.with_port(new_port),
+                None => (),
+            },
+            Message::Blank => (),
+        }
+    }
+
     pub fn uturn_with_reply(&mut self, reply: Option<Vec<u8>>) {
         match self {
             Message::Custom {
@@ -511,5 +538,26 @@ mod tests {
         msg.update_text_content("New updated content");
         assert_eq!(msg.get_content(), &option_of_bytes("New updated content"));
         assert_eq!(msg.content_as_text(), Some("New updated content"));
+    }
+    #[test]
+    fn outbound_mgs_test_1() {
+        let internal_msg = Message::internal(option_of_bytes("Content"), "addr_from", "addr_to");
+        assert_eq!(internal_msg.is_outbound(), false);
+        let custom_msg = Message::new(option_of_bytes("Content"), "addr_from", "addr_to");
+        assert_eq!(custom_msg.is_outbound(), false);
+        let blank = Message::Blank;
+        assert_eq!(blank.is_outbound(), false);
+
+        let mut internal_msg =
+            Message::internal(option_of_bytes("Content"), "addr_from", "addr_to");
+        internal_msg.set_recipient_ip("89.89.89.89");
+
+        assert_eq!(internal_msg.is_outbound(), true);
+        let mut custom_msg = Message::new(option_of_bytes("Content"), "addr_from", "addr_to");
+
+        custom_msg.set_recipient_ip("89.89.89.89");
+        assert_eq!(custom_msg.is_outbound(), true);
+        let blank = Message::Blank;
+        assert_eq!(blank.is_outbound(), false);
     }
 }
