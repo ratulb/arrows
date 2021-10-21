@@ -43,6 +43,7 @@ impl BoxStore {
             let builder = DirBuilder::new();
             builder.create(&directory.as_path()).await;
         }
+        println!("System startup check 3 : Store got initialized");
         Self {
             sys_actors,
             process_dir: directory,

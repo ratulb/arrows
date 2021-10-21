@@ -1,4 +1,4 @@
-use crate::{option_of_bytes, Address};
+use crate::{from_bytes, option_of_bytes, Address};
 use serde::{Deserialize, Serialize};
 use std::io::{Result, Seek, Write};
 use std::mem::{replace, swap};
@@ -55,6 +55,26 @@ impl<'a> Message<'a> {
             created: SystemTime::now(),
         }
     }
+    pub fn content_as_text(&self) -> Option<&str> {
+        match self {
+            Message::Custom { ref content, .. } => match content {
+                Some(ref value) => {
+                    let text: Result<&str> = from_bytes(value);
+                    text.ok()
+                }
+                None => None,
+            },
+            Message::Internal { ref content, .. } => match content {
+                Some(ref value) => {
+                    let text: Result<&str> = from_bytes(value);
+                    text.ok()
+                }
+                None => None,
+            },
+            Message::Blank => None,
+        }
+    }
+
     pub fn uturn_with_text(&mut self, reply: &str) {
         match self {
             Message::Custom {
@@ -73,6 +93,22 @@ impl<'a> Message<'a> {
                 ..
             } => {
                 swap(from, to);
+                let _ignore = replace(content, option_of_bytes(reply));
+            }
+            Message::Blank => (),
+        }
+    }
+
+    pub fn update_text_content(&mut self, reply: &str) {
+        match self {
+            Message::Custom {
+                ref mut content, ..
+            } => {
+                let _ignore = replace(content, option_of_bytes(reply));
+            }
+            Message::Internal {
+                ref mut content, ..
+            } => {
                 let _ignore = replace(content, option_of_bytes(reply));
             }
             Message::Blank => (),
@@ -241,6 +277,19 @@ impl<'a> Message<'a> {
             Message::Custom { from, .. } => from,
             Message::Internal { from, .. } => from,
             Message::Blank => &None,
+        }
+    }
+    pub fn is_outbound(&self) -> bool {
+        match self {
+            Message::Custom { to, .. } => match to {
+                Some(ref addr) => !addr.is_local(),
+                None => false,
+            },
+            Message::Internal { to, .. } => match to {
+                Some(ref addr) => !addr.is_local(),
+                None => false,
+            },
+            Message::Blank => false,
         }
     }
 
@@ -444,5 +493,23 @@ mod tests {
         assert_eq!(msg.get_to(), &Some(Address::new("addr_from")));
         assert_eq!(msg.get_from(), &Some(Address::new("addr_to")));
         assert_eq!(msg.get_content(), &option_of_bytes("Reply"));
+    }
+    #[test]
+    fn content_as_text_test_1() {
+        let mut msg = Message::internal(option_of_bytes("Content"), "addr_from", "addr_to");
+        assert_eq!(msg.get_content(), &option_of_bytes("Content"));
+        assert_eq!(msg.content_as_text(), Some("Content"));
+
+        msg.update_text_content("Updated content");
+        assert_eq!(msg.get_content(), &option_of_bytes("Updated content"));
+        assert_eq!(msg.content_as_text(), Some("Updated content"));
+
+        let mut msg = Message::new(option_of_bytes("Custom content"), "addr_from", "addr_to");
+        assert_eq!(msg.get_content(), &option_of_bytes("Custom content"));
+        assert_eq!(msg.content_as_text(), Some("Custom content"));
+
+        msg.update_text_content("New updated content");
+        assert_eq!(msg.get_content(), &option_of_bytes("New updated content"));
+        assert_eq!(msg.content_as_text(), Some("New updated content"));
     }
 }
