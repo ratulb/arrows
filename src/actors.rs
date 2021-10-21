@@ -86,7 +86,7 @@ impl ActorInvoker {
                 );
             } else {
                 println!("System startup check 5(2) - could not get actor");
-                MsgRouter::route(incoming);
+                Router::route(incoming);
             }
         }
         /***println!("System startup check 6 - Going to remove actor");
@@ -96,15 +96,30 @@ impl ActorInvoker {
         Ok(())
     }
 }
-pub(crate) struct MsgRouter {}
-impl MsgRouter {
+pub(crate) struct Router;
+impl Router {
+    pub(crate) fn route(msg: Message) -> Result<()> {
+        if !msg.is_outbound() {
+            LocalRouter::route(msg)
+        } else {
+            RemoteRouter::route(msg)
+        }
+    }
+}
+
+struct LocalRouter;
+impl LocalRouter {
     pub(crate) fn route(msg: Message) -> Result<()> {
         Ok(())
     }
 }
 
-struct LocalMsgRouter;
-struct RemoteMsgRouter;
+struct RemoteRouter;
+impl RemoteRouter {
+    pub(crate) fn route(msg: Message) -> Result<()> {
+        Ok(())
+    }
+}
 
 pub(crate) struct RequestValidator<'a> {
     addr: Address<'a>,
