@@ -1,4 +1,4 @@
-use crate::{Actor, Address, MailBox, Message};
+use crate::{Actor, Address, Mailbox, Message};
 use serde::Serialize;
 use std::io::Result;
 
@@ -17,22 +17,22 @@ impl Actors {
     }
 }
 
-pub struct Ractor<'a, 'b> {
+pub struct Ractor<'b: 'c, 'c, 'a> {
     addr: Address<'a>,
-    mailbox: Option<MailBox>,
-    invokable: Box<dyn Fn(Message<'b>) -> Option<Message<'b>>>,
+    mailbox: Option<Mailbox<'a>>,
+    invokable: Box<dyn Fn(Message<'b>) -> Option<Message<'c>>>,
 }
 
-impl<'a, 'b> Ractor<'a, 'b> {
+impl<'b: 'c, 'c, 'a> Ractor<'b, 'c, 'a> {
     //Create an actor passing a Message -> Message closure
-    pub fn new(name: &'a str, invokable: Box<dyn Fn(Message<'b>) -> Option<Message<'b>>>) -> Self {
+    pub fn new(name: &'a str, invokable: Box<dyn Fn(Message<'b>) -> Option<Message<'c>>>) -> Self {
         Self {
             addr: Address::new(name),
             mailbox: None,
             invokable,
         }
     }
-    pub async fn receive(&mut self, msg: Message<'b>) -> Option<Message<'b>> {
+    pub async fn receive(&mut self, msg: Message<'b>) -> Option<Message<'c>> {
         println!("Actor received message");
         (self.invokable)(msg)
     }

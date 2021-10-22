@@ -93,10 +93,10 @@ impl<'a> Address<'a> {
             None => false,
             Some(sa) => {
                 if sa.ip().is_loopback() {
-                    return true;
+                    true
                 } else {
                     let local_ip = local_ip();
-                    return local_ip.is_ok() && sa.ip() == local_ip.unwrap();
+                    local_ip.is_ok() && sa.ip() == local_ip.unwrap()
                 }
             }
         }

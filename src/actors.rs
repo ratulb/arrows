@@ -72,6 +72,9 @@ pub(crate) struct ActorInvoker;
 
 impl ActorInvoker {
     pub(crate) fn invoke(mut incoming: Message) -> Result<()> {
+        if incoming.is_outbound() {
+            return RemoteRouter::route(incoming);
+        }
         let to_addr_id = incoming.get_to_id();
         println!("System startup check 4 - in invoke {:?}", to_addr_id);
         {
@@ -109,14 +112,14 @@ impl Router {
 
 struct LocalRouter;
 impl LocalRouter {
-    pub(crate) fn route(msg: Message) -> Result<()> {
+    pub(crate) fn route(_msg: Message) -> Result<()> {
         Ok(())
     }
 }
 
 struct RemoteRouter;
 impl RemoteRouter {
-    pub(crate) fn route(msg: Message) -> Result<()> {
+    pub(crate) fn route(_msg: Message) -> Result<()> {
         Ok(())
     }
 }

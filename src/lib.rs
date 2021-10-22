@@ -12,6 +12,7 @@ pub mod actors;
 pub mod address;
 pub mod boxes;
 pub mod message;
+mod storage;
 pub mod utils;
 
 pub mod etc;
