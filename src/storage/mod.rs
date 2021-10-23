@@ -1,44 +1,46 @@
 use crate::{option_of_bytes, Message};
+use constants::*;
 use rusqlite::{named_params, CachedStatement, Connection, Result, Statement};
-use std::collections::HashMap;
-
-const BEGIN_TRANSACTION: &str = "BEGIN TRANSACTION;";
-const COMMIT_TRANSACTION: &str = "COMMIT TRANSACTION;";
+use std::collections::{HashMap, VecDeque};
 
 pub(crate) struct StorageContext<'a> {
     conn: &'a Connection,
-    insert_stmts: HashMap<u64, Option<CachedStatement<'a>>>,
+    inbox_insert_stmts: HashMap<u64, Option<CachedStatement<'a>>>,
+    inbox_select_stmts: HashMap<u64, Option<CachedStatement<'a>>>,
+    outbox_insert_stmts: HashMap<u64, Option<CachedStatement<'a>>>,
+    outbox_select_stmts: HashMap<u64, Option<CachedStatement<'a>>>,
+
     select_stmnts: HashMap<u64, Option<Statement<'a>>>,
     create_outbox_stmnts: HashMap<u64, Option<bool>>,
 }
 
 impl<'a> StorageContext<'a> {
-    pub(crate) fn new(conn: &'a Connection) -> Self {
+    fn new(conn: &'a Connection) -> Self {
         Self {
             conn,
-            insert_stmts: HashMap::new(),
+            inbox_insert_stmts: HashMap::new(),
+            outbox_insert_stmts: HashMap::new(),
+            inbox_select_stmts: HashMap::new(),
+            outbox_select_stmts: HashMap::new(),
+
             select_stmnts: HashMap::new(),
             create_outbox_stmnts: HashMap::new(),
         }
     }
     pub(crate) fn setup(&mut self) -> Result<()> {
         self.conn.execute_batch(BEGIN_TRANSACTION)?;
-        self.conn.execute(
-            "CREATE TABLE IF NOT EXISTS actors (actor_id INTEGER PRIMARY KEY)",
-            [],
-        )?;
-        let mut stmt = self.conn.prepare("SELECT actor_id FROM actors")?;
-        let mut rows = stmt.query([])?;
-        while let Some(row) = rows.next()? {
-            let actor_id: u64 = row.get(0)?;
-            self.inbox_for_actor(actor_id)?;
-            self.outbox_for_actor(actor_id)?;
+        self.conn.execute(ACTORS, [])?;
+        let mut stmt = self.conn.prepare(SELECT_ACTORS)?;
+        let mut actors = stmt.query([])?;
+        while let Some(actor) = actors.next()? {
+            let actor_id: u64 = actor.get(0)?;
+            self.inbox_of(actor_id)?;
+            self.outbox_of(actor_id)?;
         }
         self.conn.execute_batch(COMMIT_TRANSACTION)?;
-
         Ok(())
     }
-    pub(crate) fn inbox_for_actor(&mut self, actor_id: u64) -> Result<()> {
+    pub(crate) fn inbox_of(&mut self, actor_id: u64) -> Result<()> {
         let stmt = format!(
             "CREATE TABLE IF NOT EXISTS inbox_{} (msg_id INTEGER PRIMARY KEY, msg BLOB)",
             &actor_id.to_string()[..]
@@ -46,7 +48,7 @@ impl<'a> StorageContext<'a> {
         self.conn.execute(&stmt, [])?;
         Ok(())
     }
-    pub(crate) fn outbox_for_actor(&mut self, actor_id: u64) -> Result<()> {
+    pub(crate) fn outbox_of(&mut self, actor_id: u64) -> Result<()> {
         let stmt = format!(
             "CREATE TABLE IF NOT EXISTS outbox_{} (msg_id INTEGER PRIMARY KEY, msg BLOB)",
             &actor_id.to_string()[..]
@@ -55,14 +57,14 @@ impl<'a> StorageContext<'a> {
         Ok(())
     }
 
-    pub(crate) fn insert_into_inbox(&mut self, actor_id: u64, msg: Message) -> Result<()> {
-        let stmt = self.insert_stmts.entry(actor_id).or_insert_with(|| {
+    pub(crate) fn into_outbox(&mut self, actor_id: u64, msg: Message) -> Result<()> {
+        let stmt = self.outbox_insert_stmts.entry(actor_id).or_insert_with(|| {
             self.conn
-                    .prepare_cached(&format!(
-                        "INSERT INTO inbox_{} (msg_id, msg) VALUES (:msg_id, :msg)",
-                        &actor_id.to_string()[..]
-                    ))
-                    .ok()
+                .prepare_cached(&format!(
+                    "INSERT INTO outbox_{} (msg_id, msg) VALUES (:msg_id, :msg)",
+                    &actor_id.to_string()[..]
+                ))
+                .ok()
         });
 
         let msg_id = msg.get_id().clone().to_string();
@@ -72,6 +74,38 @@ impl<'a> StorageContext<'a> {
             None => panic!(),
         };
         Ok(())
+    }
+
+    pub(crate) fn into_inbox(&mut self, actor_id: u64, msg: Message) -> Result<()> {
+        let stmt = self.inbox_insert_stmts.entry(actor_id).or_insert_with(|| {
+            self.conn
+                .prepare_cached(&format!(
+                    "INSERT INTO inbox_{} (msg_id, msg) VALUES (:msg_id, :msg)",
+                    &actor_id.to_string()[..]
+                ))
+                .ok()
+        });
+
+        let msg_id = msg.get_id().clone().to_string();
+        let bytes = option_of_bytes(&msg);
+        match stmt {
+            Some(ref mut s) => s.execute(named_params! { ":msg_id": msg_id, ":msg": bytes })?,
+            None => panic!(),
+        };
+        Ok(())
+    }
+
+    pub(crate) fn drain_inbox(&mut self, actor_id: u64) -> Result<VecDeque<Message>> {
+        /***let stmt = self.inbox_select_stmts.entry(actor_id).or_insert_with(|| {
+            self.conn
+                .prepare_cached(&format!(
+                    "SELECT msg FROM inbox_{} ORDER BY rowid DESC",
+                    &actor_id.to_string()[..]
+                ))
+                .ok()
+        });***/
+
+        todo!()
     }
 
     pub(crate) fn create_inbox(&mut self, actor_id: u64) -> Result<()> {
@@ -96,31 +130,49 @@ impl<'a> StorageContext<'a> {
     }
 }
 pub(crate) fn create_actor_inbox(actor_id: u64) -> Result<()> {
-    let conn = Connection::open("arrows.db")?;
+    let conn = Connection::open(DATABASE)?;
     let mut ctx = StorageContext::new(&conn);
-    ctx.create_inbox(actor_id)
+    ctx.setup();
+    ctx.inbox_of(actor_id)
 }
 
 pub(crate) fn create_actor_outbox(actor_id: u64) -> Result<()> {
-    let conn = Connection::open("arrows.db")?;
+    let conn = Connection::open(DATABASE)?;
     let mut ctx = StorageContext::new(&conn);
-    ctx.create_outbox(actor_id)
+    ctx.setup();
+    ctx.outbox_of(actor_id)
 }
-pub(crate) fn insert_into_inbox(actor_id: u64, msg: Message) -> Result<()> {
-    let conn = Connection::open("arrows.db")?;
+
+pub(crate) fn into_inbox(actor_id: u64, msg: Message) -> Result<()> {
+    let conn = Connection::open(DATABASE)?;
     let mut ctx = StorageContext::new(&conn);
-    ctx.insert_into_inbox(actor_id, msg)
+    ctx.setup();
+    ctx.into_inbox(actor_id, msg)
+}
+pub(crate) fn into_outbox(actor_id: u64, msg: Message) -> Result<()> {
+    let conn = Connection::open(DATABASE)?;
+    let mut ctx = StorageContext::new(&conn);
+    ctx.setup();
+    ctx.into_outbox(actor_id, msg)
+}
+
+pub(crate) fn remove_db() -> std::io::Result<()> {
+    std::fs::remove_file(DATABASE)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{option_of_bytes,from_byte_array, type_of, Message};
+    use crate::{from_byte_array, option_of_bytes, type_of, Message};
     use rand::{thread_rng, Rng};
-    use rusqlite::types::{ValueRef};
-    use rusqlite::{DropBehavior, Result,params};
+    use rusqlite::types::ValueRef;
+    use rusqlite::{params, DropBehavior, Result};
 
-    
+    #[test]
+    fn setup_test_1() {
+        let actor_id: u64 = 1000;
+    }
+
     #[test]
     fn create_actor_inbox_test1() {
         let inbox_create_result = create_actor_inbox(1000);
@@ -132,14 +184,14 @@ mod tests {
         assert_eq!(outbox_create_result, Ok(()));
     }
     #[test]
-    fn insert_into_inbox_test1() {
-        let insert_into_inbox_result =
-            insert_into_inbox(1000, Message::new_with_text("The test msg", "from", "to"));
-        assert_eq!(insert_into_inbox_result, Ok(()));
+    fn into_inbox_test1() {
+        let into_inbox_result =
+            into_inbox(1000, Message::new_with_text("The test msg", "from", "to"));
+        assert_eq!(into_inbox_result, Ok(()));
     }
 
     pub(crate) fn create_table_and_insert_message() -> Result<()> {
-        let conn = Connection::open("arrows.db")?;
+        let conn = Connection::open(DATABASE)?;
         //let mut stmt = conn.prepare("DROP TABLE IF EXISTS inbox")?;
         //stmt.execute(params![])?;
         conn.execute("CREATE TABLE IF NOT EXISTS inbox (msg BLOB)", [])?;
@@ -156,7 +208,7 @@ mod tests {
     }
     #[test]
     fn read_from_inbox() -> Result<()> {
-        let mut conn = Connection::open("arrows.db")?;
+        let mut conn = Connection::open(DATABASE)?;
         let mut tx = conn.transaction()?;
         tx.set_drop_behavior(DropBehavior::Commit);
         let mut stmnt = tx.prepare_cached("SELECT msg FROM inbox LIMIT 1000")?;
@@ -186,26 +238,46 @@ mod tests {
     }
 
     fn insert_message_batch(num: u32) -> Result<()> {
-        let mut conn = Connection::open("arrows.db")?;
-        let mut tx = conn.transaction()?;
-        tx.set_drop_behavior(DropBehavior::Commit);
+        println!("What is happening1:wq0?");
+        let mut conn = Connection::open(DATABASE)?;
+        //let mut tx = conn.transaction()?;
+        //tx.set_drop_behavior(DropBehavior::Commit);
         //set_prepared_statement_cache_capacity(&self, capacity: usize)
+        println!("What is happening200?");
         let mut rng = thread_rng();
-        let mut stmnt = tx.prepare_cached("INSERT INTO inbox (msg) VALUES (?)")?;
+        let mut stmt = conn.prepare_cached("INSERT INTO inbox (msg_id, msg) VALUES (?, ?)")?;
+        println!("What is happening1:wq300");
         for _ in 0..num {
-            let random_num: i32 = rng.gen();
+            let random_num: u64 = rng.gen();
             let msg_content = format!("The test msg-{}", random_num.to_string());
             let msg = Message::new_with_text(&msg_content, "from", "to");
-            //let id = msg.get_id();
+            let id = msg.get_id();
             let msg: Option<Vec<u8>> = option_of_bytes(&msg);
-            stmnt.execute([msg])?;
+            println!("What is happening?");
+            //stmnt.insert([msg, id])?;
+            stmt.execute(params![&id, &msg])?;
         }
 
         Ok(())
     }
     #[test]
     fn insert_message_batch_test_1() {
-        let num = 100000;
-        insert_message_batch(num);
+        let num = 100;
+        //InvalidParameterCount
+        //Err(SqliteFailure(
+        //Err(ToSqlConversionFailure(TryFromIntError
+        //Err(SqliteFailure(Error { code: ReadOnly, extended_code: 1032 }
+        //Err(SqliteFailure(Error { code: TypeMismatch
+        let r = insert_message_batch(num);
+        println!("What is the matter? {:?}", r);
     }
+}
+
+mod constants {
+    pub(super) const DATABASE: &str = "arrows.db";
+    pub(super) const BEGIN_TRANSACTION: &str = "BEGIN TRANSACTION;";
+    pub(super) const COMMIT_TRANSACTION: &str = "COMMIT TRANSACTION;";
+    pub(super) const SELECT_ACTORS: &str = "SELECT actor_id FROM actors";
+    pub(super) const ACTORS: &str =
+        "CREATE TABLE IF NOT EXISTS actors (actor_id INTEGER PRIMARY KEY)";
 }

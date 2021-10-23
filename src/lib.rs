@@ -16,7 +16,6 @@ mod storage;
 pub mod utils;
 
 pub mod etc;
-
 pub async fn start() {
     use crate::actors::REQUEST_VALIDATOR;
     println!("System startup check1");
