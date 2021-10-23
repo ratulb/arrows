@@ -1,10 +1,13 @@
 use crate::{from_byte_array, from_bytes, option_of_bytes, Message};
-use rusqlite::{named_params, params, Connection, Result, Statement};
+use rusqlite::{named_params, params, CachedStatement, Connection, Result, Statement};
 use std::collections::HashMap;
+
+const BEGIN_TRANSACTION: &'static str = "BEGIN TRANSACTION;";
+const COMMIT_TRANSACTION: &'static str = "COMMIT TRANSACTION;";
 
 pub(crate) struct StorageContext<'a> {
     conn: &'a Connection,
-    insert_stmnts: HashMap<u64, Option<Statement<'a>>>,
+    insert_stmts: HashMap<u64, Option<CachedStatement<'a>>>,
     select_stmnts: HashMap<u64, Option<Statement<'a>>>,
     create_outbox_stmnts: HashMap<u64, Option<bool>>,
 }
@@ -13,34 +16,63 @@ impl<'a> StorageContext<'a> {
     pub(crate) fn new(conn: &'a Connection) -> Self {
         Self {
             conn,
-            insert_stmnts: HashMap::new(),
+            insert_stmts: HashMap::new(),
             select_stmnts: HashMap::new(),
             create_outbox_stmnts: HashMap::new(),
         }
     }
-    pub(crate) fn insert_into_inbox(&mut self, actor_id: u64, msg: Message) -> Result<()> {
-        self.conn.execute_batch("BEGIN TRANSACTION;")?;
-        if self.insert_stmnts.get(&actor_id).is_none() {
-            let stmnt = format!(
-                "INSERT INTO inbox_{} (msg_id, msg) VALUES (:msg_id, :msg)",
-                &actor_id.to_string()[..]
-            );
-
-            println!("The insert statement: {:?}", stmnt);
-            let stmnt = self.conn.prepare(&stmnt)?;
-            self.insert_stmnts.insert(actor_id, Some(stmnt));
+    pub(crate) fn setup(&mut self) -> Result<()> {
+        self.conn.execute_batch(BEGIN_TRANSACTION)?;
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS actors (actor_id INTEGER PRIMARY KEY)",
+            [],
+        )?;
+        let mut stmt = self.conn.prepare("SELECT actor_id FROM actors")?;
+        let mut rows = stmt.query([])?;
+        while let Some(row) = rows.next()? {
+            let actor_id: u64 = row.get(0)?;
+            self.inbox_for_actor(actor_id)?;
+            self.outbox_for_actor(actor_id)?;
         }
+        self.conn.execute_batch(COMMIT_TRANSACTION)?;
+
+        Ok(())
+    }
+    pub(crate) fn inbox_for_actor(&mut self, actor_id: u64) -> Result<()> {
+        let stmt = format!(
+            "CREATE TABLE IF NOT EXISTS inbox_{} (msg_id INTEGER PRIMARY KEY, msg BLOB)",
+            &actor_id.to_string()[..]
+        );
+        self.conn.execute(&stmt, [])?;
+        Ok(())
+    }
+    pub(crate) fn outbox_for_actor(&mut self, actor_id: u64) -> Result<()> {
+        let stmt = format!(
+            "CREATE TABLE IF NOT EXISTS outbox_{} (msg_id INTEGER PRIMARY KEY, msg BLOB)",
+            &actor_id.to_string()[..]
+        );
+        self.conn.execute(&stmt, [])?;
+        Ok(())
+    }
+
+    pub(crate) fn insert_into_inbox(&mut self, actor_id: u64, msg: Message) -> Result<()> {
+        let mut stmt = self.insert_stmts.entry(actor_id).or_insert_with(|| {
+            Some(
+                self.conn
+                    .prepare_cached(&format!(
+                        "INSERT INTO inbox_{} (msg_id, msg) VALUES (:msg_id, :msg)",
+                        &actor_id.to_string()[..]
+                    ))
+                    .ok()?,
+            )
+        });
+
         let msg_id = msg.get_id().clone().to_string();
         let bytes = option_of_bytes(&msg);
-        println!("The bytes: {:?}", bytes);
-        self.insert_stmnts
-            .get_mut(&actor_id)
-            .unwrap()
-            .as_mut()
-            .unwrap()
-            .execute(named_params! { ":msg_id": msg_id, ":msg": bytes })?;
-        println!("Executing here");
-        self.conn.execute_batch("COMMIT TRANSACTION;")?;
+        match stmt {
+            Some(ref mut s) => s.execute(named_params! { ":msg_id": msg_id, ":msg": bytes })?,
+            None => panic!(),
+        };
         Ok(())
     }
 
@@ -101,7 +133,7 @@ mod tests {
         let outbox_create_result = create_actor_outbox(1000);
         assert_eq!(outbox_create_result, Ok(()));
     }
-    //#[test]
+    #[test]
     fn insert_into_inbox_test1() {
         let insert_into_inbox_result =
             insert_into_inbox(1000, Message::new_with_text("The test msg", "from", "to"));
@@ -129,8 +161,8 @@ mod tests {
         let mut conn = Connection::open("arrows.db")?;
         let mut tx = conn.transaction()?;
         tx.set_drop_behavior(DropBehavior::Commit);
-        //let mut stmnt = tx.prepare_cached("SELECT msg FROM inbox LIMIT 1000")?;
-        let mut stmnt = tx.prepare_cached("SELECT msg FROM inbox")?;
+        let mut stmnt = tx.prepare_cached("SELECT msg FROM inbox LIMIT 1000")?;
+        //let mut stmnt = tx.prepare_cached("SELECT msg FROM inbox")?;
         //let mut stmnt = conn.prepare("SELECT * FROM inbox where name = ?")?;
         let mut rows = stmnt.query([])?;
         //let mut rows = stmnt.query(rusqlite::params!["msg"])?;
