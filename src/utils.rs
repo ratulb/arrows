@@ -58,6 +58,18 @@ pub fn from_bytes<'a, T: std::fmt::Debug + Deserialize<'a>>(bytes: &'a Vec<u8>) 
         }
     }
 }
+pub fn from_byte_array<'a, T: std::fmt::Debug + Deserialize<'a>>(bytes: &'a [u8]) -> Result<T> {
+    //use std::io::{Error, ErrorKind};
+    use std::io::Error;
+    match deserialize(bytes) {
+        Ok(t) => Ok(t),
+        Err(err) => {
+            eprintln!("Error derializing: {:?}", err);
+            //Err(Error::new(ErrorKind::Other, "Failed deserializing"))
+            Err(Error::last_os_error())
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

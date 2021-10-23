@@ -26,6 +26,7 @@ async fn actor_test_with_closure() {
     let invokable = |param: Message| -> Option<Message> {
         let output = match param {
             Message::Custom {
+                id: _,
                 from: _,
                 to: _,
                 content,
@@ -44,6 +45,7 @@ async fn actor_test_with_closure() {
             },
         };
         Some(Message::Custom {
+            id: 1000,
             from: None,
             to: None,
             content: option_of_bytes(&output),
@@ -56,6 +58,7 @@ async fn actor_test_with_closure() {
 
     let reply = actor1
         .receive(Message::Custom {
+            id: 1000,
             from: None,
             to: None,
             content: option_of_bytes(&test_input),

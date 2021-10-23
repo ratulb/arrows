@@ -1,12 +1,14 @@
-use crate::{from_bytes, option_of_bytes, Address};
+use crate::{compute_hash, from_bytes, option_of_bytes, Address};
 use serde::{Deserialize, Serialize};
 use std::io::{Result, Seek, Write};
 use std::mem::{replace, swap};
 use std::time::SystemTime;
+use uuid::Uuid;
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Message<'a> {
     Custom {
+        id: u64,
         #[serde(borrow)]
         from: Option<Address<'a>>,
         #[serde(borrow)]
@@ -17,6 +19,7 @@ pub enum Message<'a> {
         created: SystemTime,
     },
     Internal {
+        id: u64,
         #[serde(borrow)]
         from: Option<Address<'a>>,
         #[serde(borrow)]
@@ -39,6 +42,7 @@ pub enum AdditionalRecipients<'a> {
 impl<'a> Message<'a> {
     pub fn new(content: Option<Vec<u8>>, from: &'a str, to: &'a str) -> Self {
         Self::Custom {
+            id: compute_hash(&Uuid::new_v4()),
             from: Some(Address::new(from)),
             to: Some(Address::new(to)),
             content,
@@ -48,6 +52,7 @@ impl<'a> Message<'a> {
     }
     pub fn new_with_text(content: &str, from: &'a str, to: &'a str) -> Self {
         Self::Custom {
+            id: compute_hash(&Uuid::new_v4()),
             from: Some(Address::new(from)),
             to: Some(Address::new(to)),
             content: option_of_bytes(content),
@@ -284,6 +289,13 @@ impl<'a> Message<'a> {
             Message::Blank => &None,
         }
     }
+    pub fn get_id(&self) -> &u64 {
+        match self {
+            Message::Custom { id, .. } => id,
+            Message::Internal { id, .. } => id,
+            Message::Blank => &0,
+        }
+    }
 
     pub fn get_to_id(&self) -> u64 {
         match self {
@@ -342,6 +354,7 @@ impl<'a> Message<'a> {
 
     pub(crate) fn internal(content: Option<Vec<u8>>, from: &'a str, to: &'a str) -> Self {
         Self::Internal {
+            id: compute_hash(&Uuid::new_v4()),
             from: Some(Address::new(from)),
             to: Some(Address::new(to)),
             content,
