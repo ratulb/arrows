@@ -1,9 +1,9 @@
-use crate::{from_byte_array, from_bytes, option_of_bytes, Message};
-use rusqlite::{named_params, params, CachedStatement, Connection, Result, Statement};
+use crate::{option_of_bytes, Message};
+use rusqlite::{named_params, CachedStatement, Connection, Result, Statement};
 use std::collections::HashMap;
 
-const BEGIN_TRANSACTION: &'static str = "BEGIN TRANSACTION;";
-const COMMIT_TRANSACTION: &'static str = "COMMIT TRANSACTION;";
+const BEGIN_TRANSACTION: &str = "BEGIN TRANSACTION;";
+const COMMIT_TRANSACTION: &str = "COMMIT TRANSACTION;";
 
 pub(crate) struct StorageContext<'a> {
     conn: &'a Connection,
@@ -56,15 +56,13 @@ impl<'a> StorageContext<'a> {
     }
 
     pub(crate) fn insert_into_inbox(&mut self, actor_id: u64, msg: Message) -> Result<()> {
-        let mut stmt = self.insert_stmts.entry(actor_id).or_insert_with(|| {
-            Some(
-                self.conn
+        let stmt = self.insert_stmts.entry(actor_id).or_insert_with(|| {
+            self.conn
                     .prepare_cached(&format!(
                         "INSERT INTO inbox_{} (msg_id, msg) VALUES (:msg_id, :msg)",
                         &actor_id.to_string()[..]
                     ))
-                    .ok()?,
-            )
+                    .ok()
         });
 
         let msg_id = msg.get_id().clone().to_string();
@@ -117,12 +115,12 @@ pub(crate) fn insert_into_inbox(actor_id: u64, msg: Message) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{option_of_bytes, type_of, Message};
+    use crate::{option_of_bytes,from_byte_array, type_of, Message};
     use rand::{thread_rng, Rng};
-    use rusqlite::types::{FromSql, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
-    use rusqlite::{DropBehavior, Result};
+    use rusqlite::types::{ValueRef};
+    use rusqlite::{DropBehavior, Result,params};
 
-    use rusqlite::MappedRows;
+    
     #[test]
     fn create_actor_inbox_test1() {
         let inbox_create_result = create_actor_inbox(1000);
@@ -146,7 +144,7 @@ mod tests {
         //stmt.execute(params![])?;
         conn.execute("CREATE TABLE IF NOT EXISTS inbox (msg BLOB)", [])?;
         let msg = Message::new_with_text("The test msg", "from", "to");
-        let id = msg.get_id();
+        let _id = msg.get_id();
         let msg: Option<Vec<u8>> = option_of_bytes(&msg);
         //let msg: Option<Vec<u8>> = Some(vec![1,2,3,4]);
         conn.execute("INSERT INTO inbox (msg) VALUES (?1)", params![msg])?;
