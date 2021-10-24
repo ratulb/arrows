@@ -1,7 +1,11 @@
-use crate::{option_of_bytes, Message};
+use crate::{from_byte_array, option_of_bytes, Message};
 use constants::*;
-use rusqlite::{named_params, CachedStatement, Connection, Result, Statement};
+
+use rusqlite::{
+    named_params, types::ValueRef, CachedStatement, Connection, Result, Row, Statement,
+};
 use std::collections::{HashMap, VecDeque};
+use std::str::FromStr;
 
 pub(crate) struct StorageContext<'a> {
     conn: &'a Connection,
@@ -57,7 +61,7 @@ impl<'a> StorageContext<'a> {
         Ok(())
     }
 
-    pub(crate) fn into_outbox(&mut self, actor_id: u64, msg: Message) -> Result<()> {
+    pub(crate) fn into_outbox(&mut self, actor_id: u64, msg: Message<'_>) -> Result<()> {
         let stmt = self.outbox_insert_stmts.entry(actor_id).or_insert_with(|| {
             self.conn
                 .prepare_cached(&format!(
@@ -76,7 +80,7 @@ impl<'a> StorageContext<'a> {
         Ok(())
     }
 
-    pub(crate) fn into_inbox(&mut self, actor_id: u64, msg: Message) -> Result<()> {
+    pub(crate) fn into_inbox(&mut self, actor_id: u64, msg: Message<'_>) -> Result<()> {
         let stmt = self.inbox_insert_stmts.entry(actor_id).or_insert_with(|| {
             self.conn
                 .prepare_cached(&format!(
@@ -95,17 +99,27 @@ impl<'a> StorageContext<'a> {
         Ok(())
     }
 
-    pub(crate) fn drain_inbox(&mut self, actor_id: u64) -> Result<VecDeque<Message>> {
-        /***let stmt = self.inbox_select_stmts.entry(actor_id).or_insert_with(|| {
+    pub(crate) fn drain_inbox(&mut self, actor_id: u64) -> Result<VecDeque<Message<'a>>> {
+        let stmt = self.inbox_select_stmts.entry(actor_id).or_insert_with(|| {
             self.conn
                 .prepare_cached(&format!(
-                    "SELECT msg FROM inbox_{} ORDER BY rowid DESC",
-                    &actor_id.to_string()[..]
+                    "SELECT msg FROM inbox_{} ORDER BY rowid ASC LIMIT {}",
+                    &actor_id.to_string()[..],
+                    FETCH_LIMIT
                 ))
                 .ok()
-        });***/
-
-        todo!()
+        });
+        let mut messages = VecDeque::with_capacity(usize::from_str(FETCH_LIMIT).unwrap());
+        match stmt {
+            Some(ref mut s) => {
+                let rows = s.query_and_then([], |row| row.get::<_, Message<'_>>(0))?;
+                for row in rows {
+                    messages.push_front(row?);
+                }
+            }
+            None => panic!("Error draining inbox - CachedStatement not found"),
+        }
+        return Ok(messages);
     }
 
     pub(crate) fn create_inbox(&mut self, actor_id: u64) -> Result<()> {
@@ -129,6 +143,7 @@ impl<'a> StorageContext<'a> {
         Ok(())
     }
 }
+
 pub(crate) fn create_actor_inbox(actor_id: u64) -> Result<()> {
     let conn = Connection::open(DATABASE)?;
     let mut ctx = StorageContext::new(&conn);
@@ -143,13 +158,13 @@ pub(crate) fn create_actor_outbox(actor_id: u64) -> Result<()> {
     ctx.outbox_of(actor_id)
 }
 
-pub(crate) fn into_inbox(actor_id: u64, msg: Message) -> Result<()> {
+pub(crate) fn into_inbox(actor_id: u64, msg: Message<'_>) -> Result<()> {
     let conn = Connection::open(DATABASE)?;
     let mut ctx = StorageContext::new(&conn);
     ctx.setup();
     ctx.into_inbox(actor_id, msg)
 }
-pub(crate) fn into_outbox(actor_id: u64, msg: Message) -> Result<()> {
+pub(crate) fn into_outbox(actor_id: u64, msg: Message<'_>) -> Result<()> {
     let conn = Connection::open(DATABASE)?;
     let mut ctx = StorageContext::new(&conn);
     ctx.setup();
@@ -158,6 +173,14 @@ pub(crate) fn into_outbox(actor_id: u64, msg: Message) -> Result<()> {
 
 pub(crate) fn remove_db() -> std::io::Result<()> {
     std::fs::remove_file(DATABASE)
+}
+
+use crate::type_of;
+use rusqlite::types::{FromSql, FromSqlError, FromSqlResult};
+impl FromSql for Message<'_> {
+    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
+        Ok(Message::Blank)
+    }
 }
 
 #[cfg(test)]
@@ -170,7 +193,19 @@ mod tests {
 
     #[test]
     fn setup_test_1() {
-        let actor_id: u64 = 1000;
+        let _actor_id: u64 = 1000;
+    }
+
+    #[test]
+    fn read_inbox_test1() {
+        let actor_id = 1000;
+        let conn = Connection::open(DATABASE).unwrap();
+        let mut ctx = StorageContext::new(&conn);
+        ctx.setup();
+        let messages = ctx.drain_inbox(actor_id).unwrap();
+        for msg in messages {
+            println!("The msg: {:?}", msg);
+        }
     }
 
     #[test]
@@ -183,7 +218,7 @@ mod tests {
         let outbox_create_result = create_actor_outbox(1000);
         assert_eq!(outbox_create_result, Ok(()));
     }
-    #[test]
+    //#[test]
     fn into_inbox_test1() {
         let into_inbox_result =
             into_inbox(1000, Message::new_with_text("The test msg", "from", "to"));
@@ -220,12 +255,10 @@ mod tests {
             type_of(&row.get_ref_unwrap(0));
             if let ValueRef::Blob(b) = row.get_ref_unwrap(0) {
                 type_of(&b);
-                //println!("b then is: {:?}", b);
-                let r: std::io::Result<Message> = from_byte_array(b);
+                let r: std::io::Result<Message<'_>> = from_byte_array(b);
                 println!("{:?}", r.unwrap());
             }
         }
-        //tx.commit()
         Ok(())
     }
 
@@ -239,7 +272,7 @@ mod tests {
 
     fn insert_message_batch(num: u32) -> Result<()> {
         println!("What is happening1:wq0?");
-        let mut conn = Connection::open(DATABASE)?;
+        let conn = Connection::open(DATABASE)?;
         //let mut tx = conn.transaction()?;
         //tx.set_drop_behavior(DropBehavior::Commit);
         //set_prepared_statement_cache_capacity(&self, capacity: usize)
@@ -275,6 +308,7 @@ mod tests {
 
 mod constants {
     pub(super) const DATABASE: &str = "arrows.db";
+    pub(super) const FETCH_LIMIT: &str = "100";
     pub(super) const BEGIN_TRANSACTION: &str = "BEGIN TRANSACTION;";
     pub(super) const COMMIT_TRANSACTION: &str = "COMMIT TRANSACTION;";
     pub(super) const SELECT_ACTORS: &str = "SELECT actor_id FROM actors";

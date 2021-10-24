@@ -296,7 +296,7 @@ impl<'a> Message<'a> {
             Message::Blank => &0,
         }
     }
-
+    //Callers would be better served by cloning the returned &u64
     pub fn get_to_id(&self) -> u64 {
         match self {
             Message::Custom { to, .. } => match to {
@@ -361,6 +361,12 @@ impl<'a> Message<'a> {
             recipients: None,
             created: SystemTime::now(),
         }
+    }
+}
+
+impl<'a> Default for Message<'a> {
+    fn default() -> Self {
+        Message::Blank
     }
 }
 

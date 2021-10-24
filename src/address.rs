@@ -72,7 +72,7 @@ impl<'a> Address<'a> {
             eprintln!("Could not parse given ip: {:?}", ip);
         }
     }
-    fn addr_hash(addr: &mut Address) {
+    fn addr_hash(addr: &mut Address<'_>) {
         addr.id = 0;
         addr.id = compute_hash(&addr);
     }

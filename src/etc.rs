@@ -5,10 +5,10 @@ use std::io::Result;
 pub struct Actors;
 pub struct ActorArrow;
 impl Actors {
-    pub fn actor_from<F: 'static + Serialize + Fn(Message) -> Option<Message>>(
+    pub fn actor_from<F: 'static + Serialize + Fn(Message<'_>) -> Option<Message<'_>>>(
         name: &str,
         invokable: F,
-    ) -> Ractor {
+    ) -> Ractor<'_, '_, '_> {
         let _addr = Address::new(name);
         Ractor::new(name, Box::new(invokable))
     }

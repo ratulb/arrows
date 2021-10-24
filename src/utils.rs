@@ -5,6 +5,14 @@ use std::fs::{File, OpenOptions};
 use std::hash::{Hash, Hasher};
 use std::io::{BufReader, BufWriter, Result, Seek, Write};
 
+use std::convert::TryInto;
+
+pub fn convert_to_arr<const N: usize>(v: Vec<u8>) -> [u8; N] {
+    v.try_into().unwrap_or_else(|v: Vec<u8>| {
+        panic!("Expected a Vec of length {} but it was {}", N, v.len())
+    })
+}
+
 pub fn type_of<T>(_: &T) {
     println!("The type is {}", std::any::type_name::<T>());
 }
@@ -58,6 +66,7 @@ pub fn from_bytes<'a, T: std::fmt::Debug + Deserialize<'a>>(bytes: &'a Vec<u8>) 
         }
     }
 }
+
 pub fn from_byte_array<'a, T: std::fmt::Debug + Deserialize<'a>>(bytes: &'a [u8]) -> Result<T> {
     //use std::io::{Error, ErrorKind};
     use std::io::Error;

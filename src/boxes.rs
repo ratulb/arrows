@@ -22,7 +22,7 @@ impl<'a> Mailbox<'a> {
         self.inbox.len()
     }
 
-    pub(crate) fn read_inbox(&mut self) -> Option<Message> {
+    pub(crate) fn read_inbox(&mut self) -> Option<Message<'a>> {
         self.inbox.pop_front()
     }
     pub(crate) fn add_to_outbox(&mut self, msg: Message<'a>) {
@@ -31,7 +31,7 @@ impl<'a> Mailbox<'a> {
     pub(crate) fn outgoing_count(&self) -> usize {
         self.outbox.len()
     }
-    pub(crate) fn send_outgoing(&mut self) -> Option<Message> {
+    pub(crate) fn send_outgoing(&mut self) -> Option<Message<'a>> {
         self.outbox.pop_front()
     }
 }

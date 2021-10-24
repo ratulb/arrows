@@ -21,7 +21,7 @@ impl SysActors {
             actors: HashMap::new(),
         }
     }
-    pub(crate) fn get(&self, addr_id: u64) -> Option<RefMut<dyn Actor>> {
+    pub(crate) fn get(&self, addr_id: u64) -> Option<RefMut<'_, dyn Actor>> {
         match self.actors.get(&addr_id) {
             Some(ref mut yes) => Some(yes.borrow_mut()),
             None => None,
@@ -71,7 +71,7 @@ impl<'a> ActorInitializer<'a> {
 pub(crate) struct ActorInvoker;
 
 impl ActorInvoker {
-    pub(crate) fn invoke(mut incoming: Message) -> Result<()> {
+    pub(crate) fn invoke(mut incoming: Message<'_>) -> Result<()> {
         if incoming.is_outbound() {
             return RemoteRouter::route(incoming);
         }
@@ -101,7 +101,7 @@ impl ActorInvoker {
 }
 pub(crate) struct Router;
 impl Router {
-    pub(crate) fn route(msg: Message) -> Result<()> {
+    pub(crate) fn route(msg: Message<'_>) -> Result<()> {
         if !msg.is_outbound() {
             LocalRouter::route(msg)
         } else {
@@ -112,14 +112,14 @@ impl Router {
 
 struct LocalRouter;
 impl LocalRouter {
-    pub(crate) fn route(_msg: Message) -> Result<()> {
+    pub(crate) fn route(_msg: Message<'_>) -> Result<()> {
         Ok(())
     }
 }
 
 struct RemoteRouter;
 impl RemoteRouter {
-    pub(crate) fn route(_msg: Message) -> Result<()> {
+    pub(crate) fn route(_msg: Message<'_>) -> Result<()> {
         Ok(())
     }
 }
