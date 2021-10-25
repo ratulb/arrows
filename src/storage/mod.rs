@@ -91,10 +91,9 @@ impl<'a> StorageContext<'a> {
                 .ok()
         });
 
-        let msg_id = msg.get_id().clone().to_string();
         let bytes = option_of_bytes(&msg);
         match stmt {
-            Some(ref mut s) => s.execute(named_params! { ":msg_id": msg_id, ":msg": bytes })?,
+            Some(ref mut s) => s.execute(named_params! { ":msg_id": &msg.id_as_string() as &dyn ToSql, ":msg": &bytes as &dyn ToSql })?,
             None => panic!(),
         };
         Ok(())
@@ -295,15 +294,12 @@ mod tests {
         ctx.setup();
         ctx.inbox_of(actor_id);
 
-        let sleep_millis = time::Duration::from_millis(30);
         let mut rng = thread_rng();
         for _ in 0..num {
             let random_num: u64 = rng.gen();
             let msg_content = format!("The test msg-{}", random_num.to_string());
             let msg = Message::new_with_text(&msg_content, "from", "to");
             let result = ctx.into_inbox(actor_id, msg);
-            thread::sleep(sleep_millis);
-
             println!("Batch insert result: {:?}", result);
         }
 
@@ -311,7 +307,7 @@ mod tests {
     }
     #[test]
     fn insert_message_batch_test_1() {
-        let num = 100;
+        let num = 1000;
         let actor_id = 1000;
         //InvalidParameterCount
         //Err(SqliteFailure(
