@@ -102,10 +102,13 @@ impl<'a> StorageContext<'a> {
     pub(crate) fn drain_inbox(&mut self, actor_id: u64) -> Result<VecDeque<Message>> {
         let stmt = self.inbox_select_stmts.entry(actor_id).or_insert_with(|| {
             self.conn
+                /***                .prepare_cached(&format!(
+                "SELECT msg FROM inbox_{} ORDER BY rowid ASC LIMIT {}",
+                &actor_id.to_string()[..],
+                FETCH_LIMIT***/
                 .prepare_cached(&format!(
-                    "SELECT msg FROM inbox_{} ORDER BY rowid ASC LIMIT {}",
-                    &actor_id.to_string()[..],
-                    FETCH_LIMIT
+                    "SELECT msg FROM inbox_{} ORDER BY rowid ASC",
+                    &actor_id.to_string()[..]
                 ))
                 .ok()
         });
@@ -179,9 +182,18 @@ use crate::type_of;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult};
 impl FromSql for Message {
     fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
-        Ok(Message::Blank)
+        match value {
+            ValueRef::Blob(byte_arr) if byte_arr.len() > 0 => {
+                match from_byte_array::<'_, Message>(byte_arr) {
+                    Ok(good) => Ok(good),
+                    _ => Ok(Message::Blank),
+                }
+            }
+            _ => Ok(Message::Blank),
+        }
     }
 }
+//.map_err(|err| FromSqlError::Other(Box::new(err)))
 
 #[cfg(test)]
 mod tests {
@@ -190,6 +202,7 @@ mod tests {
     use rand::{thread_rng, Rng};
     use rusqlite::types::ValueRef;
     use rusqlite::{params, DropBehavior, Result};
+    use std::{thread, time};
 
     #[test]
     fn setup_test_1() {
@@ -199,13 +212,19 @@ mod tests {
     #[test]
     fn read_inbox_test1() {
         let actor_id = 1000;
+        let mut read_count = 0;
         let conn = Connection::open(DATABASE).unwrap();
         let mut ctx = StorageContext::new(&conn);
         ctx.setup();
         let messages = ctx.drain_inbox(actor_id).unwrap();
         for msg in messages {
             println!("The msg: {:?}", msg);
+            println!("");
+            println!("");
+            println!("");
+            read_count += 1;
         }
+        println!("The msg read count: {:?}", read_count);
     }
 
     #[test]
@@ -264,51 +283,49 @@ mod tests {
 
     #[test]
     fn drop_create_insert_test1() {
-        let num = 10;
+        let num = 100;
         for _ in 0..num {
             assert_eq!(create_table_and_insert_message(), Ok(()));
         }
     }
 
-    fn insert_message_batch(num: u32) -> Result<()> {
-        println!("What is happening1:wq0?");
+    fn insert_message_batch(num: u32, actor_id: u64) -> Result<()> {
         let conn = Connection::open(DATABASE)?;
-        //let mut tx = conn.transaction()?;
-        //tx.set_drop_behavior(DropBehavior::Commit);
-        //set_prepared_statement_cache_capacity(&self, capacity: usize)
-        println!("What is happening200?");
+        let mut ctx = StorageContext::new(&conn);
+        ctx.setup();
+        ctx.inbox_of(actor_id);
+
+        let sleep_millis = time::Duration::from_millis(30);
         let mut rng = thread_rng();
-        let mut stmt = conn.prepare_cached("INSERT INTO inbox (msg_id, msg) VALUES (?, ?)")?;
-        println!("What is happening1:wq300");
         for _ in 0..num {
             let random_num: u64 = rng.gen();
             let msg_content = format!("The test msg-{}", random_num.to_string());
             let msg = Message::new_with_text(&msg_content, "from", "to");
-            let id = msg.get_id();
-            let msg: Option<Vec<u8>> = option_of_bytes(&msg);
-            println!("What is happening?");
-            //stmnt.insert([msg, id])?;
-            stmt.execute(params![&id, &msg])?;
+            let result = ctx.into_inbox(actor_id, msg);
+            thread::sleep(sleep_millis);
+
+            println!("Batch insert result: {:?}", result);
         }
 
         Ok(())
     }
     #[test]
     fn insert_message_batch_test_1() {
-        let num = 100;
+        let num = 100000;
+        let actor_id = 1000;
         //InvalidParameterCount
         //Err(SqliteFailure(
         //Err(ToSqlConversionFailure(TryFromIntError
         //Err(SqliteFailure(Error { code: ReadOnly, extended_code: 1032 }
         //Err(SqliteFailure(Error { code: TypeMismatch
-        let r = insert_message_batch(num);
+        let r = insert_message_batch(num, actor_id);
         println!("What is the matter? {:?}", r);
     }
 }
 
 mod constants {
     pub(super) const DATABASE: &str = "arrows.db";
-    pub(super) const FETCH_LIMIT: &str = "100";
+    pub(super) const FETCH_LIMIT: &str = "1000";
     pub(super) const BEGIN_TRANSACTION: &str = "BEGIN TRANSACTION;";
     pub(super) const COMMIT_TRANSACTION: &str = "COMMIT TRANSACTION;";
     pub(super) const SELECT_ACTORS: &str = "SELECT actor_id FROM actors";

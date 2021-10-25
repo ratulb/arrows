@@ -78,7 +78,10 @@ impl Address {
     }
     pub fn get_socket_addr(&self) -> Option<SocketAddr> {
         if let Some(h) = &self.host {
-            return Some(SocketAddr::new(h[..].parse().ok().unwrap(), self.port.unwrap()));
+            return Some(SocketAddr::new(
+                h[..].parse().ok().unwrap(),
+                self.port.unwrap(),
+            ));
         }
         None
     }

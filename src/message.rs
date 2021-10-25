@@ -32,7 +32,7 @@ pub enum AdditionalRecipients {
     OnlySome(Vec<Address>),
 }
 
-impl  Message {
+impl Message {
     pub fn new(content: Option<Vec<u8>>, from: &str, to: &str) -> Self {
         Self::Custom {
             id: compute_hash(&Uuid::new_v4()),
@@ -363,13 +363,13 @@ impl Default for Message {
     }
 }
 
-impl  Message {
+impl Message {
     pub async fn write<W: Seek + Write>(&self, w: &mut W) -> Result<()> {
         serde_json::to_writer(w, self)?;
         Ok(())
     }
 }
-impl  Message {
+impl Message {
     pub fn write_sync<W: Seek + Write>(&self, w: &mut W) -> Result<()> {
         serde_json::to_writer(w, self)?;
         Ok(())

@@ -23,7 +23,7 @@ pub struct Ractor {
     invokable: Box<dyn Fn(Message) -> Option<Message>>,
 }
 
-impl  Ractor {
+impl Ractor {
     //Create an actor passing a Message -> Message closure
     pub fn new(name: &str, invokable: Box<dyn Fn(Message) -> Option<Message>>) -> Self {
         Self {

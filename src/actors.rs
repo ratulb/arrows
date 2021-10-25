@@ -53,7 +53,7 @@ pub(crate) fn start() {
 pub(crate) struct ActorInitializer {
     addr: Address,
 }
-impl  ActorInitializer {
+impl ActorInitializer {
     pub(crate) fn new() -> Self {
         println!(
             "Actor initializer starting with assumed name of \"{}\"",

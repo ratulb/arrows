@@ -47,7 +47,7 @@ pub(crate) struct BoxStore {
     pub(crate) sys_actors: SysActors,
 }
 
-impl  BoxStore {
+impl BoxStore {
     pub async fn init() -> BoxStore {
         let sys_actors = SysActors::new();
         let directory = Self::process_dir().await;
