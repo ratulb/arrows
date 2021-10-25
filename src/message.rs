@@ -289,6 +289,11 @@ impl Message {
             Message::Blank => &0,
         }
     }
+
+    pub fn id_as_string(&self) -> String {
+        self.get_id().to_string()
+    }
+
     //Callers would be better served by cloning the returned &u64
     pub fn get_to_id(&self) -> u64 {
         match self {

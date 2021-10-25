@@ -2,7 +2,8 @@ use crate::{from_byte_array, option_of_bytes, Message};
 use constants::*;
 
 use rusqlite::{
-    named_params, types::ValueRef, CachedStatement, Connection, Result, Row, Statement,
+    named_params, types::ValueRef, CachedStatement, Connection, DropBehavior, Result, Statement,
+    ToSql,
 };
 use std::collections::{HashMap, VecDeque};
 use std::str::FromStr;
@@ -46,7 +47,7 @@ impl<'a> StorageContext<'a> {
     }
     pub(crate) fn inbox_of(&mut self, actor_id: u64) -> Result<()> {
         let stmt = format!(
-            "CREATE TABLE IF NOT EXISTS inbox_{} (msg_id INTEGER PRIMARY KEY, msg BLOB)",
+            "CREATE TABLE IF NOT EXISTS inbox_{} (msg_id TEXT PRIMARY KEY, msg BLOB)",
             &actor_id.to_string()[..]
         );
         self.conn.execute(&stmt, [])?;
@@ -178,8 +179,7 @@ pub(crate) fn remove_db() -> std::io::Result<()> {
     std::fs::remove_file(DATABASE)
 }
 
-use crate::type_of;
-use rusqlite::types::{FromSql, FromSqlError, FromSqlResult};
+use rusqlite::types::{FromSql, FromSqlResult};
 impl FromSql for Message {
     fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
         match value {
