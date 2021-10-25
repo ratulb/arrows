@@ -3,7 +3,7 @@ use core::fmt::Debug;
 use std::time::Duration;
 
 pub trait Actor {
-    fn receive<'i: 'o, 'o>(&mut self, message: &mut Message<'i>) -> Option<Message<'o>>;
+    fn receive(&mut self, message: &mut Message) -> Option<Message>;
     //Count of unread messages held in memory for the actor
     fn max_in_memory_msg_count(&self) -> u64 {
         1000

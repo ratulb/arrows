@@ -61,7 +61,7 @@ impl<'a> StorageContext<'a> {
         Ok(())
     }
 
-    pub(crate) fn into_outbox(&mut self, actor_id: u64, msg: Message<'_>) -> Result<()> {
+    pub(crate) fn into_outbox(&mut self, actor_id: u64, msg: Message) -> Result<()> {
         let stmt = self.outbox_insert_stmts.entry(actor_id).or_insert_with(|| {
             self.conn
                 .prepare_cached(&format!(
@@ -80,7 +80,7 @@ impl<'a> StorageContext<'a> {
         Ok(())
     }
 
-    pub(crate) fn into_inbox(&mut self, actor_id: u64, msg: Message<'_>) -> Result<()> {
+    pub(crate) fn into_inbox(&mut self, actor_id: u64, msg: Message) -> Result<()> {
         let stmt = self.inbox_insert_stmts.entry(actor_id).or_insert_with(|| {
             self.conn
                 .prepare_cached(&format!(
@@ -99,7 +99,7 @@ impl<'a> StorageContext<'a> {
         Ok(())
     }
 
-    pub(crate) fn drain_inbox(&mut self, actor_id: u64) -> Result<VecDeque<Message<'a>>> {
+    pub(crate) fn drain_inbox(&mut self, actor_id: u64) -> Result<VecDeque<Message>> {
         let stmt = self.inbox_select_stmts.entry(actor_id).or_insert_with(|| {
             self.conn
                 .prepare_cached(&format!(
@@ -112,7 +112,7 @@ impl<'a> StorageContext<'a> {
         let mut messages = VecDeque::with_capacity(usize::from_str(FETCH_LIMIT).unwrap());
         match stmt {
             Some(ref mut s) => {
-                let rows = s.query_and_then([], |row| row.get::<_, Message<'_>>(0))?;
+                let rows = s.query_and_then([], |row| row.get::<_, Message>(0))?;
                 for row in rows {
                     messages.push_front(row?);
                 }
@@ -158,13 +158,13 @@ pub(crate) fn create_actor_outbox(actor_id: u64) -> Result<()> {
     ctx.outbox_of(actor_id)
 }
 
-pub(crate) fn into_inbox(actor_id: u64, msg: Message<'_>) -> Result<()> {
+pub(crate) fn into_inbox(actor_id: u64, msg: Message) -> Result<()> {
     let conn = Connection::open(DATABASE)?;
     let mut ctx = StorageContext::new(&conn);
     ctx.setup();
     ctx.into_inbox(actor_id, msg)
 }
-pub(crate) fn into_outbox(actor_id: u64, msg: Message<'_>) -> Result<()> {
+pub(crate) fn into_outbox(actor_id: u64, msg: Message) -> Result<()> {
     let conn = Connection::open(DATABASE)?;
     let mut ctx = StorageContext::new(&conn);
     ctx.setup();
@@ -177,7 +177,7 @@ pub(crate) fn remove_db() -> std::io::Result<()> {
 
 use crate::type_of;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult};
-impl FromSql for Message<'_> {
+impl FromSql for Message {
     fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
         Ok(Message::Blank)
     }
@@ -255,7 +255,7 @@ mod tests {
             type_of(&row.get_ref_unwrap(0));
             if let ValueRef::Blob(b) = row.get_ref_unwrap(0) {
                 type_of(&b);
-                let r: std::io::Result<Message<'_>> = from_byte_array(b);
+                let r: std::io::Result<Message> = from_byte_array(b);
                 println!("{:?}", r.unwrap());
             }
         }

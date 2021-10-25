@@ -29,32 +29,26 @@ pub enum Scheme {
 }
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Hash)]
-pub struct Address<'a> {
+pub struct Address {
     id: u64,
-    #[serde(borrow)]
-    name: &'a str,
-    class: Option<&'a str>,
-    #[serde(borrow)]
-    ns: Option<&'a str>,
-    #[serde(borrow)]
-    host: Option<&'a str>,
+    name: String,
+    class: Option<String>,
+    ns: Option<String>,
+    host: Option<String>,
     port: Option<u16>,
     proto: Option<Scheme>,
-    #[serde(borrow)]
-    parent: Option<&'a str>,
 }
 
-impl<'a> Address<'a> {
-    pub fn new(name: &'a str) -> Self {
+impl Address {
+    pub fn new(name: &str) -> Self {
         let mut addr = Self {
             id: 0,
-            name,
-            class: Some("default"),
-            ns: Some("system"),
-            host: Some(&ADDR),
+            name: name.to_string(),
+            class: Some("default".to_string()),
+            ns: Some("system".to_string()),
+            host: Some((&ADDR).to_string()),
             port: Some(*PORT),
             proto: Some(Scheme::Inprocess),
-            parent: None,
         };
         Self::addr_hash(&mut addr);
         addr
@@ -63,28 +57,28 @@ impl<'a> Address<'a> {
         self.port = Some(port);
         Self::addr_hash(self);
     }
-    pub fn with_ip(&mut self, ip: &'a str) {
+    pub fn with_ip(&mut self, ip: &str) {
         let parseable: Result<IpAddr, _> = ip.parse();
         if parseable.is_ok() {
-            self.host = Some(ip);
+            self.host = Some(ip.to_string());
             Self::addr_hash(self);
         } else {
             eprintln!("Could not parse given ip: {:?}", ip);
         }
     }
-    fn addr_hash(addr: &mut Address<'_>) {
+    fn addr_hash(addr: &mut Address) {
         addr.id = 0;
         addr.id = compute_hash(&addr);
     }
-    pub fn get_name(&'a self) -> &'a str {
-        self.name
+    pub fn get_name(&self) -> &String {
+        &self.name
     }
     pub fn get_id(&self) -> u64 {
         self.id
     }
     pub fn get_socket_addr(&self) -> Option<SocketAddr> {
-        if let Some(h) = self.host {
-            return Some(SocketAddr::new(h.parse().ok().unwrap(), self.port.unwrap()));
+        if let Some(h) = &self.host {
+            return Some(SocketAddr::new(h[..].parse().ok().unwrap(), self.port.unwrap()));
         }
         None
     }
@@ -102,25 +96,24 @@ impl<'a> Address<'a> {
         }
     }
 
-    pub fn get_host(&self) -> Option<&str> {
-        self.host
+    pub fn get_host(&self) -> Option<&String> {
+        self.host.as_ref()
     }
     pub fn get_port(&self) -> Option<u16> {
         self.port
     }
 }
 
-impl<'a> Default for Address<'a> {
+impl Default for Address {
     fn default() -> Self {
         Self {
             id: 0,
-            name: "",
+            name: String::new(),
             class: None,
             ns: None,
             host: None,
             port: None,
             proto: None,
-            parent: None,
         }
     }
 }

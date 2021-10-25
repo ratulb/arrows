@@ -6,41 +6,34 @@ use std::time::SystemTime;
 use uuid::Uuid;
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum Message<'a> {
+pub enum Message {
     Custom {
         id: u64,
-        #[serde(borrow)]
-        from: Option<Address<'a>>,
-        #[serde(borrow)]
-        to: Option<Address<'a>>,
+        from: Option<Address>,
+        to: Option<Address>,
         content: Option<Vec<u8>>,
-        #[serde(borrow)]
-        recipients: Option<AdditionalRecipients<'a>>,
+        recipients: Option<AdditionalRecipients>,
         created: SystemTime,
     },
     Internal {
         id: u64,
-        #[serde(borrow)]
-        from: Option<Address<'a>>,
-        #[serde(borrow)]
-        to: Option<Address<'a>>,
+        from: Option<Address>,
+        to: Option<Address>,
         content: Option<Vec<u8>>,
-        #[serde(borrow)]
-        recipients: Option<AdditionalRecipients<'a>>,
+        recipients: Option<AdditionalRecipients>,
         created: SystemTime,
     },
     Blank,
 }
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum AdditionalRecipients<'a> {
+pub enum AdditionalRecipients {
     All,
-    #[serde(borrow)]
-    OnlySome(Vec<Address<'a>>),
+    OnlySome(Vec<Address>),
 }
 
-impl<'a> Message<'a> {
-    pub fn new(content: Option<Vec<u8>>, from: &'a str, to: &'a str) -> Self {
+impl  Message {
+    pub fn new(content: Option<Vec<u8>>, from: &str, to: &str) -> Self {
         Self::Custom {
             id: compute_hash(&Uuid::new_v4()),
             from: Some(Address::new(from)),
@@ -50,7 +43,7 @@ impl<'a> Message<'a> {
             created: SystemTime::now(),
         }
     }
-    pub fn new_with_text(content: &str, from: &'a str, to: &'a str) -> Self {
+    pub fn new_with_text(content: &str, from: &str, to: &str) -> Self {
         Self::Custom {
             id: compute_hash(&Uuid::new_v4()),
             from: Some(Address::new(from)),
@@ -120,7 +113,7 @@ impl<'a> Message<'a> {
         }
     }
 
-    pub fn with_content_and_to(&mut self, new_content: Vec<u8>, new_to: &'a str) {
+    pub fn with_content_and_to(&mut self, new_content: Vec<u8>, new_to: &str) {
         match self {
             Message::Custom {
                 ref mut content,
@@ -158,7 +151,7 @@ impl<'a> Message<'a> {
         }
     }
 
-    pub fn set_recipient(&mut self, new_to: &'a str) {
+    pub fn set_recipient(&mut self, new_to: &str) {
         match self {
             Message::Custom { ref mut to, .. } => {
                 *to = Some(Address::new(new_to));
@@ -169,7 +162,7 @@ impl<'a> Message<'a> {
             Message::Blank => (),
         }
     }
-    pub fn set_recipient_ip(&mut self, new_to_ip: &'a str) {
+    pub fn set_recipient_ip(&mut self, new_to_ip: &str) {
         match self {
             Message::Custom { to, .. } => match to {
                 Some(ref mut addr) => addr.with_ip(new_to_ip),
@@ -220,7 +213,7 @@ impl<'a> Message<'a> {
         }
     }
 
-    pub fn with_recipients(&mut self, new_recipients: Vec<&'a str>) {
+    pub fn with_recipients(&mut self, new_recipients: Vec<&str>) {
         match self {
             Message::Custom {
                 ref mut recipients, ..
@@ -282,7 +275,7 @@ impl<'a> Message<'a> {
         }
     }
 
-    pub fn get_to(&self) -> &Option<Address<'a>> {
+    pub fn get_to(&self) -> &Option<Address> {
         match self {
             Message::Custom { to, .. } => to,
             Message::Internal { to, .. } => to,
@@ -311,7 +304,7 @@ impl<'a> Message<'a> {
         }
     }
 
-    pub fn get_from(&self) -> &Option<Address<'a>> {
+    pub fn get_from(&self) -> &Option<Address> {
         match self {
             Message::Custom { from, .. } => from,
             Message::Internal { from, .. } => from,
@@ -332,7 +325,7 @@ impl<'a> Message<'a> {
         }
     }
 
-    pub fn get_recipients(&'a self) -> &'a Option<AdditionalRecipients<'a>> {
+    pub fn get_recipients(&self) -> &Option<AdditionalRecipients> {
         match self {
             Message::Custom { recipients, .. } => recipients,
             Message::Internal { recipients, .. } => recipients,
@@ -352,7 +345,7 @@ impl<'a> Message<'a> {
         }
     }
 
-    pub(crate) fn internal(content: Option<Vec<u8>>, from: &'a str, to: &'a str) -> Self {
+    pub(crate) fn internal(content: Option<Vec<u8>>, from: &str, to: &str) -> Self {
         Self::Internal {
             id: compute_hash(&Uuid::new_v4()),
             from: Some(Address::new(from)),
@@ -364,20 +357,20 @@ impl<'a> Message<'a> {
     }
 }
 
-impl<'a> Default for Message<'a> {
+impl Default for Message {
     fn default() -> Self {
         Message::Blank
     }
 }
 
-impl<'a> Message<'a> {
-    pub async fn write<W: Seek + Write>(&'a self, w: &mut W) -> Result<()> {
+impl  Message {
+    pub async fn write<W: Seek + Write>(&self, w: &mut W) -> Result<()> {
         serde_json::to_writer(w, self)?;
         Ok(())
     }
 }
-impl<'a> Message<'a> {
-    pub fn write_sync<W: Seek + Write>(&'a self, w: &mut W) -> Result<()> {
+impl  Message {
+    pub fn write_sync<W: Seek + Write>(&self, w: &mut W) -> Result<()> {
         serde_json::to_writer(w, self)?;
         Ok(())
     }

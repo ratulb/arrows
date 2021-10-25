@@ -50,10 +50,10 @@ pub(crate) fn start() {
         .add(initializer.identity(), Rc::new(RefCell::new(initializer)));
 }
 
-pub(crate) struct ActorInitializer<'a> {
-    addr: Address<'a>,
+pub(crate) struct ActorInitializer {
+    addr: Address,
 }
-impl<'a> ActorInitializer<'a> {
+impl  ActorInitializer {
     pub(crate) fn new() -> Self {
         println!(
             "Actor initializer starting with assumed name of \"{}\"",
@@ -71,7 +71,7 @@ impl<'a> ActorInitializer<'a> {
 pub(crate) struct ActorInvoker;
 
 impl ActorInvoker {
-    pub(crate) fn invoke(mut incoming: Message<'_>) -> Result<()> {
+    pub(crate) fn invoke(mut incoming: Message) -> Result<()> {
         if incoming.is_outbound() {
             return RemoteRouter::route(incoming);
         }
@@ -101,7 +101,7 @@ impl ActorInvoker {
 }
 pub(crate) struct Router;
 impl Router {
-    pub(crate) fn route(msg: Message<'_>) -> Result<()> {
+    pub(crate) fn route(msg: Message) -> Result<()> {
         if !msg.is_outbound() {
             LocalRouter::route(msg)
         } else {
@@ -112,23 +112,23 @@ impl Router {
 
 struct LocalRouter;
 impl LocalRouter {
-    pub(crate) fn route(_msg: Message<'_>) -> Result<()> {
+    pub(crate) fn route(_msg: Message) -> Result<()> {
         Ok(())
     }
 }
 
 struct RemoteRouter;
 impl RemoteRouter {
-    pub(crate) fn route(_msg: Message<'_>) -> Result<()> {
+    pub(crate) fn route(_msg: Message) -> Result<()> {
         Ok(())
     }
 }
 
-pub(crate) struct RequestValidator<'a> {
-    addr: Address<'a>,
+pub(crate) struct RequestValidator {
+    addr: Address,
 }
 
-impl<'a> RequestValidator<'a> {
+impl RequestValidator {
     pub(crate) fn new() -> Self {
         println!(
             "Request validator starting with assumed name of \"{}\"",
@@ -144,16 +144,16 @@ impl<'a> RequestValidator<'a> {
     }
 }
 
-impl<'a> Actor for RequestValidator<'a> {
-    fn receive<'i: 'o, 'o>(&mut self, incoming: &mut Message<'i>) -> Option<Message<'o>> {
+impl Actor for RequestValidator {
+    fn receive(&mut self, incoming: &mut Message) -> Option<Message> {
         println!("Received validation message - allowing to proceed");
         incoming.uturn_with_text("Request validation passed");
         let outgoing = std::mem::replace(incoming, Message::Blank);
         Some(outgoing)
     }
 }
-impl<'a> Actor for ActorInitializer<'a> {
-    fn receive<'i: 'o, 'o>(&mut self, _incoming: &mut Message<'i>) -> Option<Message<'o>> {
+impl Actor for ActorInitializer {
+    fn receive(&mut self, _incoming: &mut Message) -> Option<Message> {
         None
     }
 }

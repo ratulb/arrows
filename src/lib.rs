@@ -1,4 +1,4 @@
-/***#![deny(rust_2018_idioms)]***/
+#![deny(rust_2018_idioms)]
 pub use crate::actor::Actor;
 pub use crate::address::Address;
 pub(crate) use crate::boxes::STORE;
