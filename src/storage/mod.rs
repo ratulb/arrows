@@ -311,7 +311,7 @@ mod tests {
     }
     #[test]
     fn insert_message_batch_test_1() {
-        let num = 100000;
+        let num = 100;
         let actor_id = 1000;
         //InvalidParameterCount
         //Err(SqliteFailure(
