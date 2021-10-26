@@ -2,8 +2,7 @@ use crate::{from_byte_array, option_of_bytes, Message};
 use constants::*;
 
 use rusqlite::{
-    named_params, types::ValueRef, CachedStatement, Connection, DropBehavior, Result, Statement,
-    ToSql,
+    named_params, types::ValueRef, CachedStatement, Connection, Result, Statement, ToSql,
 };
 use std::collections::{HashMap, VecDeque};
 use std::str::FromStr;
@@ -143,6 +142,35 @@ impl<'a> StorageContext<'a> {
             self.conn.execute(&stmnt, [])?;
             self.create_outbox_stmnts.insert(actor_id, Some(true));
         }
+        Ok(())
+    }
+
+    pub(crate) fn into_inbox_batch(
+        &mut self,
+        actor_id: u64,
+        msgItr: impl Iterator<Item = Message>,
+    ) -> Result<()> {
+        self.conn.execute_batch(BEGIN_TRANSACTION)?;
+        let stmt = self.inbox_insert_stmts.entry(actor_id).or_insert_with(|| {
+            self.conn
+                .prepare_cached(&format!(
+                    "INSERT INTO inbox_{} (msg_id, msg) VALUES (:msg_id, :msg)",
+                    &actor_id.to_string()[..]
+                ))
+                .ok()
+        });
+
+        match stmt {
+            Some(ref mut s) => {
+                for msg in msgItr {
+                    let bytes = option_of_bytes(&msg);
+                    let status = s.execute(named_params! { ":msg_id": &msg.id_as_string() as &dyn ToSql, ":msg": &bytes as &dyn ToSql })?;
+                    println!("Batch statement execution status: {:?}", status);
+                }
+            }
+            None => panic!(),
+        };
+        self.conn.execute_batch(COMMIT_TRANSACTION)?;
         Ok(())
     }
 }
@@ -288,7 +316,26 @@ mod tests {
         }
     }
 
-    fn insert_message_batch(num: u32, actor_id: u64) -> Result<()> {
+    fn insert_message_many_batching(num: u32, actor_id: u64) -> Result<()> {
+        let conn = Connection::open(DATABASE)?;
+        let mut ctx = StorageContext::new(&conn);
+        ctx.setup();
+        ctx.inbox_of(actor_id);
+        let mut messages = Vec::<Message>::with_capacity(num.try_into().unwrap());
+        let mut rng = thread_rng();
+        for _ in 0..num {
+            let random_num: u64 = rng.gen();
+            let msg_content = format!("The test msg-{}", random_num.to_string());
+            let msg = Message::new_with_text(&msg_content, "from", "to");
+            messages.push(msg);
+        }
+        let status = ctx.into_inbox_batch(actor_id, messages.into_iter());
+        println!("Batch insert final status: {:?}", status);
+
+        Ok(())
+    }
+
+    fn insert_message_many_no_batching(num: u32, actor_id: u64) -> Result<()> {
         let conn = Connection::open(DATABASE)?;
         let mut ctx = StorageContext::new(&conn);
         ctx.setup();
@@ -299,23 +346,31 @@ mod tests {
             let random_num: u64 = rng.gen();
             let msg_content = format!("The test msg-{}", random_num.to_string());
             let msg = Message::new_with_text(&msg_content, "from", "to");
-            let result = ctx.into_inbox(actor_id, msg);
-            println!("Batch insert result: {:?}", result);
+            let status = ctx.into_inbox(actor_id, msg);
+            println!("Many inserts no batching each status: {:?}", status);
         }
-
         Ok(())
     }
+
     #[test]
-    fn insert_message_batch_test_1() {
-        let num = 1000;
+    fn insert_message_many_no_batch_test_1() {
+        let num = 5000;
         let actor_id = 1000;
         //InvalidParameterCount
         //Err(SqliteFailure(
         //Err(ToSqlConversionFailure(TryFromIntError
         //Err(SqliteFailure(Error { code: ReadOnly, extended_code: 1032 }
         //Err(SqliteFailure(Error { code: TypeMismatch
-        let r = insert_message_batch(num, actor_id);
-        println!("What is the matter? {:?}", r);
+        let status = insert_message_many_no_batching(num, actor_id);
+        println!("Insert status each ? {:?}", status);
+    }
+
+    #[test]
+    fn insert_message_many_batch_test_1() {
+        let num = 5000;
+        let actor_id = 1000;
+        let status = insert_message_many_batching(num, actor_id);
+        println!("Insert status all? {:?}", status);
     }
 }
 
