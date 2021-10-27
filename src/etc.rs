@@ -1,5 +1,5 @@
 use crate::Mailbox;
-use arrow_commons::{Actor, Addr, Message};
+use arrows_common::{Actor, Addr, Message};
 use serde::Serialize;
 use std::io::Result;
 

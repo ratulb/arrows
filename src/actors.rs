@@ -1,5 +1,5 @@
 use crate::STORE;
-use arrow_commons::{Actor, Addr, Message};
+use arrows_common::{Actor, Addr, Message};
 use std::cell::RefCell;
 use std::cell::RefMut;
 use std::collections::HashMap;

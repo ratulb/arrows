@@ -2,9 +2,9 @@
 pub(crate) use crate::boxes::STORE;
 pub use crate::boxes::*;
 pub use crate::etc::*;
-pub use arrow_commons::Actor;
-pub use arrow_commons::Addr;
-pub use arrow_commons::Message;
+pub use arrows_common::Actor;
+pub use arrows_common::Addr;
+pub use arrows_common::Message;
 
 pub mod actors;
 pub mod boxes;

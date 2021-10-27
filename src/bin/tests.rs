@@ -1,4 +1,4 @@
-use arrow_commons::utils::{from_bytes, option_of_bytes, type_of};
+use arrows_common::utils::{from_bytes, option_of_bytes, type_of};
 use arrows::etc::Ractor;
 use arrows::{Actor, Message};
 use serde::{Deserialize, Serialize};
