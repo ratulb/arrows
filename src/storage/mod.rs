@@ -1,4 +1,4 @@
-use crate::{from_byte_array, option_of_bytes, Message};
+use arrow_commons::{from_byte_array, option_of_bytes, Message};
 use constants::*;
 
 use rusqlite::{named_params, CachedStatement, Connection, Result, Statement, ToSql};
@@ -242,7 +242,7 @@ impl CustomFromSql for Message {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{from_byte_array, from_file_sync, option_of_bytes, type_of, Message};
+    use arrow_commons::{from_byte_array, from_file_sync, option_of_bytes, type_of, Message};
     use rand::{thread_rng, Rng};
     use rusqlite::types::ValueRef;
     use rusqlite::{params, DropBehavior, Result};

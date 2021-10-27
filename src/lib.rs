@@ -2,9 +2,6 @@
 pub(crate) use crate::boxes::STORE;
 pub use crate::boxes::*;
 pub use crate::etc::*;
-pub use arrow_commons::utils::{
-    from_byte_array, from_file, from_file_sync, option_of_bytes, type_of,
-};
 pub use arrow_commons::Actor;
 pub use arrow_commons::Addr;
 pub use arrow_commons::Message;
