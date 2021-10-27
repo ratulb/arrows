@@ -8,10 +8,10 @@ authors = ["Ratul Buragohain <ratul75@hotmail.com>"]
 
 
 [dependencies]
+arrows_common = { git = "https://github.com/ratulb/arrows_common.git", branch = "main" }
 async-std = {version="1.10.0",features = ["attributes"]}
 futures = "0.3.17"
 lazy_static = "1.4.0"
-arrows_common = { git = "https://github.com/ratulb/arrows_common", branch = "main" }
 rusqlite = {version="0.26.1", features = ["bundled", "blob", "serde_json"]}
 serde = { version = "1.0.130", features = ["derive"]}
 serde_json = {version="1.0.68"}
