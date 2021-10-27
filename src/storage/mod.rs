@@ -1,9 +1,7 @@
 use crate::{from_byte_array, option_of_bytes, Message};
 use constants::*;
 
-use rusqlite::{
-    named_params, types::ValueRef, CachedStatement, Connection, Result, Statement, ToSql,
-};
+use rusqlite::{named_params, CachedStatement, Connection, Result, Statement, ToSql};
 use std::collections::{HashMap, VecDeque};
 use std::str::FromStr;
 
@@ -97,14 +95,32 @@ impl<'a> StorageContext<'a> {
         };
         Ok(())
     }
-
     pub(crate) fn drain_inbox(&mut self, actor_id: u64) -> Result<VecDeque<Message>> {
         let stmt = self.inbox_select_stmts.entry(actor_id).or_insert_with(|| {
             self.conn
-                /***                .prepare_cached(&format!(
-                "SELECT msg FROM inbox_{} ORDER BY rowid ASC LIMIT {}",
-                &actor_id.to_string()[..],
-                FETCH_LIMIT***/
+                .prepare_cached(&format!(
+                    "SELECT msg FROM inbox_{} ORDER BY rowid ASC LIMIT {}",
+                    &actor_id.to_string()[..],
+                    FETCH_LIMIT
+                ))
+                .ok()
+        });
+        let mut messages = VecDeque::with_capacity(usize::from_str(FETCH_LIMIT).unwrap());
+        match stmt {
+            Some(ref mut s) => {
+                let rows = s.query_and_then([], |row| row.get::<_, Message>(0))?;
+                for row in rows {
+                    messages.push_front(row?);
+                }
+            }
+            None => panic!("Error draining inbox - CachedStatement not found"),
+        }
+        return Ok(messages);
+    }
+
+    pub(crate) fn drain_inbox_full(&mut self, actor_id: u64) -> Result<VecDeque<Message>> {
+        let stmt = self.inbox_select_stmts.entry(actor_id).or_insert_with(|| {
+            self.conn
                 .prepare_cached(&format!(
                     "SELECT msg FROM inbox_{} ORDER BY rowid ASC",
                     &actor_id.to_string()[..]
@@ -205,9 +221,11 @@ pub(crate) fn into_outbox(actor_id: u64, msg: Message) -> Result<()> {
 pub(crate) fn remove_db() -> std::io::Result<()> {
     std::fs::remove_file(DATABASE)
 }
+/***
+use rusqlite::types::{FromSql, FromSqlResult, ValueRef};
+type CustomFromSql = dyn FromSql;
 
-use rusqlite::types::{FromSql, FromSqlResult};
-impl FromSql for Message {
+impl CustomFromSql for Message {
     fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
         match value {
             ValueRef::Blob(byte_arr) if byte_arr.len() > 0 => {
@@ -219,21 +237,52 @@ impl FromSql for Message {
             _ => Ok(Message::Blank),
         }
     }
-}
+}***/
 //.map_err(|err| FromSqlError::Other(Box::new(err)))
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{from_byte_array, option_of_bytes, type_of, Message};
+    use crate::{from_byte_array, from_file_sync, option_of_bytes, type_of, Message};
     use rand::{thread_rng, Rng};
     use rusqlite::types::ValueRef;
     use rusqlite::{params, DropBehavior, Result};
+    use std::fs::File;
+    use std::io::BufWriter;
     use std::{thread, time};
 
     #[test]
     fn setup_test_1() {
         let _actor_id: u64 = 1000;
+    }
+    #[test]
+    fn read_inbox_write_out_msg_test_1() -> std::io::Result<()> {
+        let actor_id = 1000;
+        let mut read_count = 0;
+        let conn = Connection::open(DATABASE).unwrap();
+        let mut ctx = StorageContext::new(&conn);
+        ctx.setup();
+        let messages = ctx.drain_inbox_full(actor_id).unwrap();
+
+        for msg in &messages {
+            read_count += 1;
+            if read_count == messages.len() - 1 {
+                println!("The msg last msg: {:?}", msg);
+                let file = File::create(msg.id_as_string()).expect("Failed to create file!");
+                let mut writer = BufWriter::new(file);
+                msg.write_sync(&mut writer)
+                    .expect("Write failed - post reading inbox!");
+                std::fs::rename(msg.id_as_string(), "last_message.txt")?;
+            }
+        }
+        println!("The msg read count: {:?}", read_count);
+        Ok(())
+    }
+
+    #[test]
+    fn message_from_file_test_1() -> std::io::Result<()> {
+        let msg: Message = from_file_sync("last_message.txt")?;
+        println!("Message txt: {:?}", msg.content_as_text());
+        Ok(())
     }
 
     #[test]
@@ -288,7 +337,7 @@ mod tests {
         Ok(())
     }
     #[test]
-    fn read_from_inbox() -> Result<()> {
+    fn read_from_inbox_test_1() -> Result<()> {
         let mut conn = Connection::open(DATABASE)?;
         let mut tx = conn.transaction()?;
         tx.set_drop_behavior(DropBehavior::Commit);
@@ -354,7 +403,7 @@ mod tests {
 
     #[test]
     fn insert_message_many_no_batch_test_1() {
-        let num = 5000;
+        let num = 500;
         let actor_id = 1000;
         //InvalidParameterCount
         //Err(SqliteFailure(
@@ -367,7 +416,7 @@ mod tests {
 
     #[test]
     fn insert_message_many_batch_test_1() {
-        let num = 5000;
+        let num = 500;
         let actor_id = 1000;
         let status = insert_message_many_batching(num, actor_id);
         println!("Insert status all? {:?}", status);
