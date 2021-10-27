@@ -29,7 +29,7 @@ pub enum Scheme {
 }
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Hash)]
-pub struct Address {
+pub struct Addr {
     id: u64,
     name: String,
     class: Option<String>,
@@ -39,7 +39,7 @@ pub struct Address {
     proto: Option<Scheme>,
 }
 
-impl Address {
+impl Addr {
     pub fn new(name: &str) -> Self {
         let mut addr = Self {
             id: 0,
@@ -66,7 +66,7 @@ impl Address {
             eprintln!("Could not parse given ip: {:?}", ip);
         }
     }
-    fn addr_hash(addr: &mut Address) {
+    fn addr_hash(addr: &mut Addr) {
         addr.id = 0;
         addr.id = compute_hash(&addr);
     }
@@ -107,7 +107,7 @@ impl Address {
     }
 }
 
-impl Default for Address {
+impl Default for Addr {
     fn default() -> Self {
         Self {
             id: 0,
@@ -126,13 +126,13 @@ mod tests {
     use super::*;
     #[test]
     fn create_addr_test1() {
-        let addr1 = Address::new("add1");
-        let addr2 = Address::new("add1");
+        let addr1 = Addr::new("add1");
+        let addr2 = Addr::new("add1");
         assert_eq!(addr1.id, addr2.id);
     }
     #[test]
     fn create_addr_test2() {
-        let addr1 = Address::new("add1");
+        let addr1 = Addr::new("add1");
         println!(
             "address is local: {}",
             addr1.get_socket_addr().unwrap().ip().is_loopback()
@@ -140,14 +140,14 @@ mod tests {
     }
     #[test]
     fn create_addr_test3() {
-        let addr2 = Address::new("add2");
+        let addr2 = Addr::new("add2");
         assert_eq!(addr2.is_local(), true);
     }
     #[test]
     fn create_addr_change_port_test_1() {
         use std::env;
         env::set_var("port", "7171");
-        let mut addr = Address::new("addr");
+        let mut addr = Addr::new("addr");
         let id = addr.get_id();
         assert_eq!(addr.is_local(), true);
         addr.with_port(7171);
@@ -157,7 +157,7 @@ mod tests {
     }
     #[test]
     fn create_addr_change_ip_test1() {
-        let mut addr = Address::new("add");
+        let mut addr = Addr::new("add");
         assert_eq!(addr.is_local(), true);
         let id = addr.get_id();
         addr.with_ip("300.300.300.300");
@@ -168,7 +168,7 @@ mod tests {
 
     #[test]
     fn check_hostip_and_port_test1() {
-        let addr = Address::new("add");
+        let addr = Addr::new("add");
         println!("{:?}", addr);
     }
 }

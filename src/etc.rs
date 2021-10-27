@@ -1,4 +1,4 @@
-use crate::{Actor, Address, Mailbox, Message};
+use crate::{Actor, Addr, Mailbox, Message};
 use serde::Serialize;
 use std::io::Result;
 
@@ -9,7 +9,7 @@ impl Actors {
         name: &str,
         invokable: F,
     ) -> Ractor {
-        let _addr = Address::new(name);
+        let _addr = Addr::new(name);
         Ractor::new(name, Box::new(invokable))
     }
     pub fn ractor_of(_name: &str, _ractor: impl Actor) -> Result<ActorArrow> {
@@ -18,7 +18,7 @@ impl Actors {
 }
 
 pub struct Ractor {
-    addr: Address,
+    addr: Addr,
     mailbox: Option<Mailbox>,
     invokable: Box<dyn Fn(Message) -> Option<Message>>,
 }
@@ -27,7 +27,7 @@ impl Ractor {
     //Create an actor passing a Message -> Message closure
     pub fn new(name: &str, invokable: Box<dyn Fn(Message) -> Option<Message>>) -> Self {
         Self {
-            addr: Address::new(name),
+            addr: Addr::new(name),
             mailbox: None,
             invokable,
         }

@@ -1,6 +1,6 @@
+use arrow_commons::utils::{from_bytes, option_of_bytes, type_of};
 use arrows::etc::Ractor;
-use arrows::{from_bytes, option_of_bytes, type_of, Actor, Message};
-
+use arrows::{Actor, Message};
 use serde::{Deserialize, Serialize};
 
 #[async_std::main]

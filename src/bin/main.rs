@@ -1,10 +1,10 @@
+use arrow_commons::utils::type_of;
 use async_std::net::TcpListener;
 use async_std::net::TcpStream;
 use async_std::prelude::*;
 use async_std::task;
 use futures::stream::StreamExt;
 use std::time::Duration;
-
 #[async_std::main]
 async fn main() -> std::io::Result<()> {
     //let store = &arrows::STORE;
@@ -48,7 +48,7 @@ async fn handle_request(mut stream: TcpStream) {
         ("HTTP/1.1 404 NOT FOUND\r\n\r\n", "404.html")
     };
     let contents = std::fs::read_to_string(filename).unwrap();
-    arrows::type_of(&contents);
+    type_of(&contents);
     //let response = format!("{}{:?}", status_line, contents);
     let response = format!(
         "{}\r\nContent-Length: {}\r\n\r\n{}",

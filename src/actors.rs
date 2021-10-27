@@ -1,4 +1,4 @@
-use crate::{Actor, Address, Message, STORE};
+use crate::{Actor, Addr, Message, STORE};
 use std::cell::RefCell;
 use std::cell::RefMut;
 use std::collections::HashMap;
@@ -51,7 +51,7 @@ pub(crate) fn start() {
 }
 
 pub(crate) struct ActorInitializer {
-    addr: Address,
+    addr: Addr,
 }
 impl ActorInitializer {
     pub(crate) fn new() -> Self {
@@ -60,7 +60,7 @@ impl ActorInitializer {
             ACTOR_INITIALIZER
         );
         Self {
-            addr: Address::new(ACTOR_INITIALIZER),
+            addr: Addr::new(ACTOR_INITIALIZER),
         }
     }
     pub(crate) fn identity(&self) -> u64 {
@@ -125,7 +125,7 @@ impl RemoteRouter {
 }
 
 pub(crate) struct RequestValidator {
-    addr: Address,
+    addr: Addr,
 }
 
 impl RequestValidator {
@@ -135,7 +135,7 @@ impl RequestValidator {
             REQUEST_VALIDATOR
         );
         Self {
-            addr: Address::new(REQUEST_VALIDATOR),
+            addr: Addr::new(REQUEST_VALIDATOR),
         }
     }
 
