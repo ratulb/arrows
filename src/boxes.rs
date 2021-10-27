@@ -1,5 +1,5 @@
 use crate::actors::SysActors;
-use crate::Message;
+use arrow_commons::Message;
 use async_std::{fs::DirBuilder, path::PathBuf, task::block_on};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
