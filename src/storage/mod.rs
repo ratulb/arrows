@@ -96,7 +96,7 @@ impl<'a> StorageContext<'a> {
         &mut self,
         actor_id: &String,
         msg_ids: Vec<&str>,
-    ) -> std::io::Result<()> {
+    ) -> Result<VecDeque<Message>> {
         let mut count = 0;
         let size = msg_ids.len();
         let msg_ids_in = msg_ids
@@ -116,20 +116,14 @@ impl<'a> StorageContext<'a> {
             "SELECT msg FROM inbox_{} WHERE msg_id in ({})",
             actor_id, msg_ids_in
         );
-        let mut stmt = self.conn.prepare(&stmt).map_err(sql_to_io)?;
-        let mut rows = stmt.query([]).map_err(sql_to_io)?;
-        while let Some(row) = rows.next().map_err(sql_to_io)? {
-            let value: Value = row.get(0).map_err(sql_to_io)?;
-            if let Value::Blob(bytes) = value {
-                match from_byte_array::<'_, Message>(&bytes)? {
-                    Message::Custom { .. } => println!("The msg is back 1"),
-                    Message::Internal { .. } => println!("The msg is back2"),
-                    Message::Blank => println!("The msg is back3"),
-                    _ => (),
-                }
-            }
+        let mut stmt = self.conn.prepare(&stmt)?;
+        let mut rows = stmt.query([])?;
+        let mut messages = VecDeque::new();
+        while let Some(row) = rows.next()? {
+            let value: Value = row.get(0)?;
+            messages.push_front(value_to_msg(value));
         }
-        Ok(())
+        Ok(messages)
     }
 
     pub(crate) fn outbox_of(&mut self, actor_id: &String) -> Result<()> {
@@ -188,7 +182,6 @@ impl<'a> StorageContext<'a> {
         Ok(())
     }
     pub(crate) fn read_inbox(&mut self, actor_id: &String) -> Result<VecDeque<Message>> {
-        println!("{:?}", self.inbox_select_stmts.keys());
         let stmt = self
             .inbox_select_stmts
             .entry(actor_id.to_string())
@@ -205,15 +198,13 @@ impl<'a> StorageContext<'a> {
         match stmt {
             Some(ref mut s) => {
                 //let rows = s.query_and_then([], |row| row.get::<_, Message>(0))?;
-                let mut rows = s.query([])?;
-                for row in rows.next()? {
-                    let value: Value = row.get(0)?;
+                let mut rows = s.query_map([], |row| row.get(0))?;
+                for row in rows {
+                    let value: Value = row?;
                     messages.push_front(value_to_msg(value));
                 }
             }
             None => {
-                println!("{:?}", self.inbox_select_stmts.keys());
-
                 panic!("Error draining inbox - CachedStatement not found")
             }
         }
@@ -235,14 +226,10 @@ impl<'a> StorageContext<'a> {
         let mut messages = VecDeque::with_capacity(usize::from_str(FETCH_LIMIT).unwrap());
         match stmt {
             Some(ref mut s) => {
-                let mut rows = s.query([])?;
-                for row in rows.next()? {
-                    println!("****************");
-                    println!("****************");
-                    println!("****************");
-                    let value: Value = row.get(0)?;
+                let mut rows = s.query_map([], |row| row.get(0))?;
+                for row in rows {
+                    let value: Value = row?;
                     messages.push_front(value_to_msg(value));
-                    println!("**************** {:?}", messages);
                 }
             }
             None => panic!("Error draining inbox - CachedStatement not found"),
@@ -273,7 +260,6 @@ impl<'a> StorageContext<'a> {
                 for msg in msg_itr {
                     let bytes = option_of_bytes(&msg);
                     let status = s.execute(named_params! { ":msg_id": &msg.id_as_string() as &dyn ToSql, ":msg": &bytes as &dyn ToSql })?;
-                    println!("Batch statement execution status: {:?}", status);
                 }
             }
             None => panic!(),
@@ -282,7 +268,6 @@ impl<'a> StorageContext<'a> {
         Ok(())
     }
 }
-
 pub(crate) fn sql_to_io(err: rusqlite::Error) -> std::io::Error {
     eprintln!("rusqlite::Error has occured: {:?}", err);
     Error::new(ErrorKind::Other, "rusqlite error")
@@ -328,29 +313,6 @@ pub(crate) fn into_outbox(actor_id: &String, msg: Message) -> Result<()> {
 pub(crate) fn remove_db() -> std::io::Result<()> {
     std::fs::remove_file(DATABASE)
 }
-/***use rusqlite::types::{FromSql, FromSqlResult, ValueRef};
-
-impl FromSql for Boxed {
-    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
-        match value {
-            ValueRef::Blob(byte_arr) if byte_arr.len() > 0 => {
-                let r = from_byte_array::<'_, Message>(byte_arr);
-                println!("The r is: {:?}", r);
-                match r {
-                    Ok(boxed) => {
-                        println!("Sure here");
-                        Ok(boxed)
-                    }
-                    Err(err) => {
-                        println!("Sure there {:?}", err);
-                        Ok(Message::Blank)
-                    }
-                }
-            }
-            _ => Ok(Message::Blank),
-        }
-    }
-}***/
 
 #[cfg(test)]
 mod tests {
@@ -361,22 +323,26 @@ mod tests {
     use std::fs::File;
     use std::io::BufWriter;
 
-    fn composite_test() {
-        create_actor_inbox_test1();
-    }
+    fn composite_test() {}
     #[test]
-    fn select_from_inbox_test_1() {
+    fn select_from_inbox_test_1() -> Result<()> {
         let actor_id = "1000".to_string();
         let msg_ids = vec![
-            "14276069798136004507",
-            "10549311741772951054",
-            "8193871662861266268",
+            "12973981928118750491",
+            "14312566721778882611",
+            "4058720503399076582",
+            "3311787687830812909",
         ];
         let conn = Connection::open(DATABASE).unwrap();
         let mut ctx = StorageContext::new(&conn);
         ctx.setup();
-        //assert_eq!(ctx.select_from_inbox(&actor_id, msg_ids), Ok(()));
-        ctx.select_from_inbox(&actor_id, msg_ids);
+        let messages = ctx.select_from_inbox(&actor_id, msg_ids)?;
+        let messages: Vec<_> = messages
+            .iter()
+            .map(|msg| msg.id_as_string().to_string())
+            .collect();
+        println!("The messages: {:?}", messages);
+        Ok(())
     }
     #[test]
     fn delete_from_inbox_test1() {
@@ -530,27 +496,10 @@ mod tests {
         println!("Insert status all? {:?}", status);
     }
 }
-/***
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-enum Boxed {
-    Inner(Message),
-}
-impl Boxed {
-    fn value(boxed: Self) -> Message {
-        println!("Check here! {:?} ", boxed);
-        match boxed {
-            Self::Inner(value) => {
-                println!("The returned value : {:?}", value);
-                value
-            }
-            _ => unreachable!(),
-        }
-    }
-}
-***/
+
 mod constants {
     pub(super) const DATABASE: &str = "arrows.db";
-    pub(super) const FETCH_LIMIT: &str = "2";
+    pub(super) const FETCH_LIMIT: &str = "100";
     pub(super) const BEGIN_TRANSACTION: &str = "BEGIN TRANSACTION;";
     pub(super) const COMMIT_TRANSACTION: &str = "COMMIT TRANSACTION;";
     pub(super) const SELECT_ACTORS: &str = "SELECT actor_id FROM actors";
