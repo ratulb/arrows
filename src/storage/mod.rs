@@ -105,9 +105,9 @@ impl<'a> StorageContext<'a> {
                 count += 1;
                 let mut s = String::from("'");
                 s.push_str(id);
-                s.push_str("'");
+                s.push('\'');
                 if count < size {
-                    s.push_str(",");
+                    s.push(',');
                 }
                 s
             })
@@ -198,7 +198,7 @@ impl<'a> StorageContext<'a> {
         match stmt {
             Some(ref mut s) => {
                 //let rows = s.query_and_then([], |row| row.get::<_, Message>(0))?;
-                let mut rows = s.query_map([], |row| row.get(0))?;
+                let rows = s.query_map([], |row| row.get(0))?;
                 for row in rows {
                     let value: Value = row?;
                     messages.push_front(value_to_msg(value));
@@ -208,7 +208,7 @@ impl<'a> StorageContext<'a> {
                 panic!("Error draining inbox - CachedStatement not found")
             }
         }
-        return Ok(messages);
+        Ok(messages)
     }
 
     pub(crate) fn read_inbox_full(&mut self, actor_id: &String) -> Result<VecDeque<Message>> {
@@ -226,7 +226,7 @@ impl<'a> StorageContext<'a> {
         let mut messages = VecDeque::with_capacity(usize::from_str(FETCH_LIMIT).unwrap());
         match stmt {
             Some(ref mut s) => {
-                let mut rows = s.query_map([], |row| row.get(0))?;
+                let rows = s.query_map([], |row| row.get(0))?;
                 for row in rows {
                     let value: Value = row?;
                     messages.push_front(value_to_msg(value));
@@ -234,7 +234,7 @@ impl<'a> StorageContext<'a> {
             }
             None => panic!("Error draining inbox - CachedStatement not found"),
         }
-        return Ok(messages);
+        Ok(messages)
     }
 
     pub(crate) fn into_inbox_batch(
@@ -259,7 +259,7 @@ impl<'a> StorageContext<'a> {
             Some(ref mut s) => {
                 for msg in msg_itr {
                     let bytes = option_of_bytes(&msg);
-                    let status = s.execute(named_params! { ":msg_id": &msg.id_as_string() as &dyn ToSql, ":msg": &bytes as &dyn ToSql })?;
+                    let _status = s.execute(named_params! { ":msg_id": &msg.id_as_string() as &dyn ToSql, ":msg": &bytes as &dyn ToSql })?;
                 }
             }
             None => panic!(),
@@ -339,7 +339,7 @@ mod tests {
         let messages = ctx.select_from_inbox(&actor_id, msg_ids)?;
         let messages: Vec<_> = messages
             .iter()
-            .map(|msg| msg.id_as_string().to_string())
+            .map(|msg| msg.id_as_string())
             .collect();
         println!("The messages: {:?}", messages);
         Ok(())
@@ -403,9 +403,9 @@ mod tests {
         let messages = ctx.read_inbox(&actor_id).unwrap();
         for msg in messages {
             println!("The msg: {:?}", msg);
-            println!("");
-            println!("");
-            println!("");
+            println!();
+            println!();
+            println!();
             read_count += 1;
         }
         println!("The msg read count: {:?}", read_count);
@@ -420,9 +420,9 @@ mod tests {
         let messages = ctx.read_inbox_full(&actor_id).unwrap();
         for msg in messages {
             println!("The msg: {:?}", msg);
-            println!("");
-            println!("");
-            println!("");
+            println!();
+            println!();
+            println!();
             read_count += 1;
         }
         println!("The msg read count: {:?}", read_count);
@@ -448,7 +448,7 @@ mod tests {
         let mut rng = thread_rng();
         for _ in 0..num {
             let random_num: u64 = rng.gen();
-            let msg_content = format!("The test msg-{}", random_num.to_string());
+            let msg_content = format!("The test msg-{}", random_num);
             let msg = Message::new_with_text(&msg_content, "from", "to");
             messages.push(msg);
         }
@@ -467,7 +467,7 @@ mod tests {
         let mut rng = thread_rng();
         for _ in 0..num {
             let random_num: u64 = rng.gen();
-            let msg_content = format!("The test msg-{}", random_num.to_string());
+            let msg_content = format!("The test msg-{}", random_num);
             let msg = Message::new_with_text(&msg_content, "from", "to");
             let status = ctx.into_inbox(actor_id, msg);
             println!("Many inserts no batching each status: {:?}", status);
