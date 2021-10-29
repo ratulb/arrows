@@ -337,10 +337,7 @@ mod tests {
         let mut ctx = StorageContext::new(&conn);
         ctx.setup();
         let messages = ctx.select_from_inbox(&actor_id, msg_ids)?;
-        let messages: Vec<_> = messages
-            .iter()
-            .map(|msg| msg.id_as_string())
-            .collect();
+        let messages: Vec<_> = messages.iter().map(|msg| msg.id_as_string()).collect();
         println!("The messages: {:?}", messages);
         Ok(())
     }
