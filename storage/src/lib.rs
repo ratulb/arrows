@@ -317,7 +317,7 @@ pub(crate) fn remove_db() -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arrows_common::{from_file_sync, Msg};
+    use common::{from_file_sync, Msg};
     use rand::{thread_rng, Rng};
     use rusqlite::Connection;
     use std::fs::File;

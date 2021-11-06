@@ -1,15 +1,14 @@
 #![deny(rust_2018_idioms)]
-pub use actor::{Actor, FakeActorBuilder};
+pub use actor::{Actor, ActorBuilder, FakeActorBuilder};
 pub use addr::Addr;
 pub use errs::{Error, Result};
 pub use msg::Msg;
 pub use utils::*;
-pub mod actor;
-pub mod addr;
+mod actor;
+mod addr;
 mod errs;
-pub mod msg;
-pub mod utils;
-
+mod msg;
+mod utils;
 #[cfg(test)]
 mod tests {
     #[test]
