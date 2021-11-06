@@ -123,7 +123,7 @@ macro_rules! register {
         let creator: fn() -> $actor_type = $creator;
         let actor = creator();
         println!("I am getting called here");
-        let boxed_actor: Box<dyn arrows_common::Actor> = Box::new(actor);
+        let boxed_actor: Box<dyn common::Actor> = Box::new(actor);
         //Box::into_raw(boxed_actor)
         // let write_lock_result = ARROWS.write();
         //let mut arrows = write_lock_result.unwrap();

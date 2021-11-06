@@ -60,7 +60,7 @@ pub trait ActorBuilder {
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct FakeActorBuilder;
-#[typetag::serde(name = "fake_build_actor")]
+#[typetag::serde(name = "fake_actor_builder")]
 impl ActorBuilder for FakeActorBuilder {
     fn build(&mut self) -> Box<dyn Actor> {
         panic!("Should not be called on FakeActorBuilder");
