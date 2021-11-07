@@ -1,9 +1,8 @@
 [workspace]
 
 members = [
-    "registry",
     "common",
+    "registry",
     "samples",
-    "storage",
 ]
 
