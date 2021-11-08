@@ -2,8 +2,7 @@ use common::{from_byte_array, option_of_bytes, Msg};
 use constants::*;
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use rusqlite::{
-    named_params, params, types::Value, CachedStatement, Connection, Error::InvalidQuery, Result,
-    Statement, ToSql,
+    named_params, params, types::Value, Connection, Error::InvalidQuery, Result, ToSql,
 };
 use std::collections::{HashMap, VecDeque};
 use std::io::{Error, ErrorKind};
@@ -19,7 +18,7 @@ impl WrappedConnection {
             let inner = result.unwrap();
             //TODO check this value
             inner.set_prepared_statement_cache_capacity(100);
-            Self { inner: inner }
+            Self { inner }
         } else {
             panic!("Failed to obtain db connection");
         }
@@ -71,6 +70,10 @@ impl StorageContext {
         let existing_actors = self.select_existing_actors()?;
         self.setup_inboxes(&existing_actors)?;
         self.setup_outboxes(&existing_actors)?;
+        println!(
+            "Setting up actors - existing count {}",
+            existing_actors.len()
+        );
         Ok(())
     }
     pub(crate) fn select_existing_actors(&mut self) -> Result<Vec<String>> {
@@ -96,7 +99,7 @@ impl StorageContext {
     pub(crate) fn setup_inboxes(&mut self, actor_ids: &Vec<String>) -> Result<()> {
         self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
         for actor_id in actor_ids {
-            self.inbox_of(&actor_id)?;
+            self.inbox_of(actor_id)?;
         }
         self.conn.inner.execute_batch(COMMIT_TRANSACTION)?;
         Ok(())
@@ -105,7 +108,7 @@ impl StorageContext {
     pub(crate) fn setup_outboxes(&mut self, actor_ids: &Vec<String>) -> Result<()> {
         self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
         for actor_id in actor_ids {
-            self.outbox_of(&actor_id)?;
+            self.outbox_of(actor_id)?;
         }
         self.conn.inner.execute_batch(COMMIT_TRANSACTION)?;
         Ok(())
@@ -237,7 +240,7 @@ impl StorageContext {
         };
         Ok(())
     }
-    pub(crate) fn delete_actor(&mut self, identity: &String) -> Result<()> {
+    pub(crate) fn remove_actor_permanent(&mut self, identity: &String) -> Result<()> {
         let mut stmt = self.conn.inner.prepare_cached(DELETE_ACTOR)?;
         stmt.execute(params![identity]).and_then(
             |c| {
@@ -276,7 +279,7 @@ impl StorageContext {
                     actor_id
                 )
             });
-        let mut stmt = self.conn.inner.prepare_cached(&stmt).ok();
+        let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
         let msg_id = msg.id_as_string();
         let bytes = option_of_bytes(&msg);
         match stmt {
@@ -298,7 +301,7 @@ impl StorageContext {
                 )
             });
 
-        let mut stmt = self.conn.inner.prepare_cached(&stmt).ok();
+        let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
         let mut messages = VecDeque::with_capacity(usize::from_str(FETCH_LIMIT).unwrap());
         match stmt {
             Some(ref mut s) => {
@@ -321,7 +324,7 @@ impl StorageContext {
             .inbox_select_stmts
             .entry(actor_id.to_string())
             .or_insert_with(|| format!("SELECT msg FROM inbox_{} ORDER BY rowid ASC", actor_id));
-        let mut stmt = self.conn.inner.prepare_cached(&stmt).ok();
+        let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
         let mut messages = VecDeque::with_capacity(usize::from_str(FETCH_LIMIT).unwrap());
         match stmt {
             Some(ref mut s) => {
@@ -351,7 +354,7 @@ impl StorageContext {
                     actor_id
                 )
             });
-        let mut stmt = self.conn.inner.prepare_cached(&stmt).ok();
+        let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
         match stmt {
             Some(ref mut s) => {
                 for msg in msg_itr {
@@ -393,7 +396,7 @@ pub(crate) fn create_actor_outbox(actor_id: &String) -> Result<()> {
 }
 pub(crate) fn into_inbox(actor_id: &String, msg: Msg) -> Result<()> {
     let mut ctx = StorageContext::new();
-    let res = ctx.setup();
+    let _res = ctx.setup();
     ctx.into_inbox(actor_id, msg)
 }
 
@@ -589,13 +592,13 @@ mod tests {
         Ok(())
     }
     #[test]
-    fn delete_actor_1001_test_1() -> Result<()> {
+    fn remove_actor_permanent_1001_test_1() -> Result<()> {
         let mut ctx = StorageContext::new();
         ctx.setup();
         let actor_id = "1001".to_string();
-        let delete = ctx.delete_actor(&actor_id);
-        println!("delete = {:?}", delete);
-        assert!(delete.is_ok());
+        let remove = ctx.remove_actor_permanent(&actor_id);
+        println!("remove = {:?}", remove);
+        assert!(remove.is_ok());
         Ok(())
     }
 

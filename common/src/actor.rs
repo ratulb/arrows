@@ -7,30 +7,48 @@ use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::PathBuf;
 
 pub trait Actor: Any + Send + Sync {
+    //The method by which actors receive their messages(_msg - being ignored here). Messages are
+    //durable - An actor may fail - but when it comes back - it will start receiving message -along
+    //with any piled up message that it may have missed
     fn receive(&mut self, _msg: Msg) -> Option<Msg> {
         Some(Msg::Blank)
     }
-    fn name(&self) -> &'static str {
+    //The type implenmenting the this trait
+    fn type_name(&self) -> &'static str {
         any::type_name::<Self>()
     }
+    //The very first message(_msg) sent to the actor instance prior to its normal msg processing
     fn post_start(&mut self, _msg: Msg) -> Option<Msg> {
-        Some(Msg::new_internal("Actor loading", self.name(), "system"))
+        Some(Msg::new_internal(
+            "Actor loading",
+            self.type_name(),
+            "system",
+        ))
     }
+    //Message(_msg - being ingnored)  sent to the actor instance prior to shutdown
     fn pre_shutdown(&mut self, _msg: Msg) -> Option<Msg> {
-        Some(Msg::new_internal("Actor unloading", self.name(), "system"))
+        Some(Msg::new_internal(
+            "Actor unloading",
+            self.type_name(),
+            "system",
+        ))
     }
 }
 
 impl Debug for dyn Actor {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let debug_msg = format!("Actor impl({:?})", self.name());
+        let debug_msg = format!("Actor impl({:?})", self.type_name());
         write!(f, "{}", debug_msg)
     }
 }
 
 #[typetag::serde]
 pub trait ActorBuilder {
-    //Only the following needs to be implemented
+    //This method must be implemented to register an actor implementation. There is a one-to-one
+    //corresponds between an 'Actor implementation' and its builder('ActorBuilder'). ActorBuilders are
+    //persisted so that actors can be resurrected after a failure or restart. Actor builders are
+    //identified by their #[typetag::serde(name = "an_actor_builder")] name. These names should not
+    //collide in a running system. In reality - they are peristed to sqlite db.
     fn build(&mut self) -> Box<dyn Actor>;
 
     fn persist(&self, path: PathBuf) -> Result<()>
@@ -57,13 +75,15 @@ pub trait ActorBuilder {
         Ok(builder)
     }
 }
+//BuilderResurrector is used to rebuild actor builders from their serialized state.
 
 #[derive(Debug, Serialize, Deserialize, Default)]
-pub struct FakeActorBuilder;
-#[typetag::serde(name = "fake_actor_builder")]
-impl ActorBuilder for FakeActorBuilder {
+pub struct BuilderResurrector;
+
+#[typetag::serde(name = "builder_resurrector")]
+impl ActorBuilder for BuilderResurrector {
     fn build(&mut self) -> Box<dyn Actor> {
-        panic!("Should not be called on FakeActorBuilder");
+        panic!("Should not be called on BuilderResurrector");
     }
 }
 
@@ -85,8 +105,10 @@ mod tests {
                 }
             }
         }
+        //A demo actor implementation which responds by blank replies. Its ignoring the incoming
+        //message(_msg)
         impl Actor for MyActor {
-            fn receive(&mut self, _message: Msg) -> Option<Msg> {
+            fn receive(&mut self, _msg: Msg) -> Option<Msg> {
                 Some(Msg::Blank)
             }
         }
@@ -103,7 +125,8 @@ mod tests {
         #[derive(Clone, Debug, Serialize, Deserialize, Default)]
         struct MyActorBuilder1;
 
-        //Tag the impl with distinguishable name
+        //Tag the impl with distinguishable name - actor builder's name should not collide in
+        //each specific running system
         #[typetag::serde(name = "my_actor_builder1")]
         impl ActorBuilder for MyActorBuilder1 {
             fn build(&mut self) -> Box<dyn Actor> {
@@ -137,7 +160,7 @@ mod tests {
             .persist(PathBuf::from("my_actor_builder"))
             .is_ok(),);
         //Pull the actor builder back from disk and create an actor instance
-        let mut builder: Box<dyn ActorBuilder> = FakeActorBuilder::default()
+        let mut builder: Box<dyn ActorBuilder> = BuilderResurrector::default()
             .from_file(PathBuf::from("my_actor_builder"))
             .unwrap();
         let mut actor: Box<dyn Actor> = builder.build();
