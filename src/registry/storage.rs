@@ -1,4 +1,5 @@
-use common::{from_byte_array, option_of_bytes, Msg};
+use crate::common::msg::Msg;
+use crate::common::utils::{from_byte_array, option_of_bytes};
 use constants::*;
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use rusqlite::{
@@ -122,6 +123,14 @@ impl StorageContext {
         self.conn.inner.execute(&stmt, [])?;
         Ok(())
     }
+    pub(crate) fn outbox_of(&mut self, actor_id: &String) -> Result<()> {
+        let stmt = format!(
+            "CREATE TABLE IF NOT EXISTS outbox_{} (msg_id TEXT PRIMARY KEY, msg BLOB)",
+            actor_id
+        );
+        self.conn.inner.execute(&stmt, [])?;
+        Ok(())
+    }
 
     pub(crate) fn purge_inbox_of(&mut self, actor_id: &String) -> Result<()> {
         let stmt = format!(
@@ -200,15 +209,6 @@ impl StorageContext {
         Ok(messages)
     }
 
-    pub(crate) fn outbox_of(&mut self, actor_id: &String) -> Result<()> {
-        let stmt = format!(
-            "CREATE TABLE IF NOT EXISTS outbox_{} (msg_id TEXT PRIMARY KEY, msg BLOB)",
-            actor_id
-        );
-        self.conn.inner.execute(&stmt, [])?;
-        Ok(())
-    }
-
     pub(crate) fn into_outbox(&mut self, actor_id: &String, msg: Msg) -> Result<()> {
         let stmt = self
             .outbox_insert_stmts
@@ -231,7 +231,7 @@ impl StorageContext {
         Ok(())
     }
 
-    pub(crate) fn persist_actor(&mut self, identity: &String, build_def: &String) -> Result<()> {
+    pub(crate) fn persist_builder(&mut self, identity: &String, build_def: &String) -> Result<()> {
         let mut stmt = self.conn.inner.prepare_cached(BUILD_DEF_INSERT).ok();
         match stmt {
             Some(ref mut s) => s.execute(
@@ -413,12 +413,9 @@ pub(crate) fn remove_db() -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use common::{from_file_sync, Msg};
+    use crate::common::msg::Msg;
     use rand::{thread_rng, Rng};
-    use std::fs::File;
-    use std::io::BufWriter;
 
-    fn composite_test() {}
     #[test]
     fn select_from_inbox_test_1() -> Result<()> {
         let actor_id = "1000".to_string();
@@ -452,7 +449,7 @@ mod tests {
         assert_eq!(ctx.purge_inbox_of(&actor_id), Ok(()));
     }
     #[test]
-    fn read_inbox_write_out_msg_test_1() -> std::io::Result<()> {
+    fn read_inbox_write_out_msg_test_1() {
         let actor_id = "1000".to_string();
         let mut read_count = 0;
         let mut ctx = StorageContext::new();
@@ -461,24 +458,8 @@ mod tests {
 
         for msg in &messages {
             read_count += 1;
-            if read_count == messages.len() {
-                println!("The msg last msg: {:?}", msg);
-                let file = File::create(msg.id_as_string()).expect("Failed to create file!");
-                let mut writer = BufWriter::new(file);
-                msg.write_sync(&mut writer)
-                    .expect("Write failed - post reading inbox!");
-                std::fs::rename(msg.id_as_string(), "last_message.txt")?;
-            }
         }
         println!("The msg read count: {:?}", read_count);
-        Ok(())
-    }
-
-    #[test]
-    fn message_from_file_test_1() -> std::io::Result<()> {
-        let msg: Msg = from_file_sync("last_message.txt")?;
-        println!("Msg txt: {:?}", msg.content_as_text());
-        Ok(())
     }
 
     #[test]
@@ -583,11 +564,11 @@ mod tests {
     }
 
     #[test]
-    fn persist_actor_1001_test_1() -> Result<()> {
+    fn persist_builder_1001_test_1() -> Result<()> {
         let mut ctx = StorageContext::new();
         ctx.setup();
         let identity = "1001".to_string();
-        let insert = ctx.persist_actor(&identity, &r#"{"new_actor_builder":null}"#.to_string());
+        let insert = ctx.persist_builder(&identity, &r#"{"new_actor_builder":null}"#.to_string());
         println!("insert = {:?}", insert);
         assert!(insert.is_ok());
         Ok(())

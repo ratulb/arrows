@@ -1,4 +1,4 @@
-use crate::utils::compute_hash;
+use crate::common::utils::compute_hash;
 use lazy_static::lazy_static;
 use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};

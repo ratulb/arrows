@@ -1,15 +1,12 @@
-use crate::registry::ctxops::*;
-use crate::storage::StorageContext;
-use chrono::offset::Utc;
-use chrono::DateTime;
-use common::{Actor, ActorBuilder, Error, Msg};
+use crate::common::{actor::Actor, actor::ActorBuilder, msg::Msg};
+use crate::registry::registry::ctxops::*;
+use crate::registry::storage::StorageContext;
+use crate::Error;
 use lazy_static::lazy_static;
-use serde::{Deserialize, Serialize};
 use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::RwLock;
-use std::time::{Duration, SystemTime};
 
 lazy_static! {
     pub(crate) static ref CTX: RwLock<Context> = RwLock::new(Context::init());
@@ -43,13 +40,13 @@ impl Arrows {
             wrappers: HashMap::new(),
         }
     }
-    pub(crate) fn get(&self, identity: u64) -> Option<RefMut<'_, Box<dyn Actor>>> {
+    pub(crate) fn get_actor(&self, identity: u64) -> Option<RefMut<'_, Box<dyn Actor>>> {
         self.wrappers
             .get(&identity)
             .as_mut()
             .map(|entry| entry.borrow_mut())
     }
-    pub(crate) fn add(&mut self, identity: u64, rc_actor: Rc<RefCell<Box<dyn Actor>>>) {
+    pub(crate) fn add_actor(&mut self, identity: u64, rc_actor: Rc<RefCell<Box<dyn Actor>>>) {
         self.wrappers.insert(identity, rc_actor.clone());
     }
     pub(crate) fn remove_actor(&mut self, identity: u64) -> Option<Rc<RefCell<Box<dyn Actor>>>> {
@@ -57,8 +54,6 @@ impl Arrows {
         self.wrappers.remove(&identity)
     }
 }
-
-//#[no_mangle]
 
 pub fn register(
     addr: u64,
@@ -72,36 +67,78 @@ pub fn register(
     //Will send post_start message - configure post start message
 
     let identity = addr.to_string();
-    remove_actor(addr).and_then(shutdown);
+    remove_actor(addr).and_then(pre_shutdown);
     remove_actor_permanent(&identity);
 
-    let new_actor: Box<dyn Actor> = builder.build();
-    let builder_def = serde_json::to_string(&builder as &dyn ActorBuilder)?;
-    CTX.write()
-        .unwrap()
-        .storage
-        .persist_actor(&identity, &builder_def);
-    let new_actor = Rc::new(RefCell::new(new_actor));
-    CTX.write().unwrap().arrows.add(addr, new_actor.clone());
-    //Startup msg
-    let _reply = new_actor.borrow_mut().receive(Msg::Blank);
-    Ok(new_actor)
+    persist_builder(&identity, &builder)?;
+
+    let actor: Box<dyn Actor> = builder.build();
+    add_actor(addr, actor)
+        .and_then(post_start)
+        .ok_or(Error::RegistrationError)
 }
-pub(super) mod ctxops {
+
+pub fn send(identity: u64, msg: Msg) {
+    send_msg(identity, msg);
+}
+
+pub(in crate::registry::registry) mod ctxops {
     use super::*;
+    pub(super) fn send_msg(identity: u64, msg: Msg) {
+        let ctx = CTX.write().unwrap();
+        let actor = ctx.arrows.get_actor(identity);
+        if let Some(mut actor) = actor {
+            actor.receive(msg);
+            println!("Msg delivered");
+        } else {
+            eprintln!("Actor not found");
+        }
+    }
+
     pub(super) fn remove_actor(identity: u64) -> Option<Rc<RefCell<Box<dyn Actor>>>> {
         CTX.write().unwrap().arrows.remove_actor(identity)
     }
+
     //Send a shutdown msg to the actor that is being removed
-    pub(super) fn shutdown(actor: Rc<RefCell<Box<dyn Actor>>>) -> Option<()> {
+    pub(super) fn pre_shutdown(actor: Rc<RefCell<Box<dyn Actor>>>) -> Option<()> {
         let _ignored = actor.borrow_mut().receive(Msg::Blank);
         None
     }
-    pub(super) fn remove_actor_permanent(identity: &String) -> Result<(), rusqlite::Error> {
+
+    pub(super) fn remove_actor_permanent(identity: &String) -> Result<(), Error> {
         CTX.write()
             .unwrap()
             .storage
             .remove_actor_permanent(identity)
+            .map_err(|err| Error::Other(Box::new(err)))
+    }
+
+    pub(super) fn persist_builder(
+        identity: &String,
+        builder: &impl ActorBuilder,
+    ) -> Result<(), Error> {
+        let builder_def = serde_json::to_string(builder as &dyn ActorBuilder)?;
+        CTX.write()
+            .unwrap()
+            .storage
+            .persist_builder(identity, &builder_def)
+            .map_err(|err| Error::Other(Box::new(err)))
+    }
+
+    pub(super) fn add_actor(
+        addr: u64,
+        actor: Box<dyn Actor>,
+    ) -> Option<Rc<RefCell<Box<dyn Actor>>>> {
+        let actor = Rc::new(RefCell::new(actor));
+        CTX.write().unwrap().arrows.add_actor(addr, actor.clone());
+        Some(actor)
+    }
+
+    pub(super) fn post_start(
+        actor: Rc<RefCell<Box<dyn Actor>>>,
+    ) -> Option<Rc<RefCell<Box<dyn Actor>>>> {
+        let _ignored = actor.borrow_mut().receive(Msg::Blank);
+        Some(actor)
     }
 }
 /***#[macro_export]
@@ -125,7 +162,7 @@ macro_rules! register {
         create_actor()
     }};
 }***/
-#[macro_export]
+/***#[macro_export]
 macro_rules! register {
     ($actor_type:ty, $creator:path) => {{
         //pub extern "C" fn create_actor() -> *mut dyn arrows_common::Actor {
@@ -143,7 +180,7 @@ macro_rules! register {
         //}
         //create_actor()
     }};
-}
+}***/
 
 pub(crate) struct Arrow {
     inner: Option<Box<dyn Actor>>,
@@ -159,40 +196,5 @@ impl Arrow {
     pub(crate) fn set(&mut self, actor: Box<dyn Actor>) {
         //let _ignored = replace(&mut self.inner, Some(actor));
         self.inner.as_mut().map(|_| actor);
-    }
-}
-
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub struct ActorImpl;
-
-impl Actor for ActorImpl {
-    fn receive(&mut self, _: Msg) -> std::option::Option<Msg> {
-        let received_time = SystemTime::now();
-        let respond_time = received_time.checked_add(Duration::from_millis(2000));
-        let datetime: DateTime<Utc> = received_time.into();
-        let respond_time: DateTime<Utc> = respond_time.unwrap().into();
-        let datetime = datetime.format("%d/%m/%Y %T");
-        println!("Now the time is :{}", datetime);
-        let mut reply = String::from(&datetime.to_string());
-        reply += " and reply time: ";
-        reply += &respond_time.to_string();
-        Some(Msg::new_with_text(&reply, "from", "to"))
-    }
-}
-struct ActorCreator;
-impl ActorCreator {
-    fn create_actor() -> ActorImpl {
-        ActorImpl
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn register_test_1() {
-        let mut actor: Box<dyn Actor> = register!(ActorImpl, ActorCreator::create_actor);
-        let response = actor.receive(Msg::Blank);
-        println!("Response: {:?}", response);
     }
 }

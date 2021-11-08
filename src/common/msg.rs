@@ -1,5 +1,5 @@
-use crate::addr::Addr;
-use crate::utils::{compute_hash, from_bytes, option_of_bytes};
+use crate::common::addr::Addr;
+use crate::common::utils::{compute_hash, from_bytes, option_of_bytes};
 use serde::{Deserialize, Serialize};
 use std::io::{Result, Seek, Write};
 use std::mem::{replace, swap};

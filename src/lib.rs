@@ -1,22 +1,16 @@
 #![deny(rust_2018_idioms)]
-pub(crate) use crate::boxes::STORE;
-pub use crate::boxes::*;
-pub use crate::etc::*;
-pub use arrows_common::Actor;
-pub use arrows_common::Addr;
-pub use arrows_common::Msg;
+pub use common::actor::{Actor, ActorBuilder, BuilderResurrector};
+pub use common::addr::Addr;
+pub use common::errs::{Error, Result};
+pub use common::msg::Msg;
+pub use common::utils::*;
+pub use registry::registry::register;
 
-pub mod actors;
-pub mod boxes;
-mod storage;
+pub mod common;
+pub mod registry;
 
-pub mod etc;
-pub async fn start() {
-    use crate::actors::REQUEST_VALIDATOR;
-    println!("System startup check1");
-    actors::start();
-    for _ in 0..3 {
-        let welcome = Msg::internal(None, "actor-invoker", REQUEST_VALIDATOR);
-        actors::ActorInvoker::invoke(welcome);
-    }
-}
+/***mod actor;
+mod addr;
+mod errs;
+mod msg;
+mod utils;***/
