@@ -1,5 +1,5 @@
 use crate::STORE;
-use arrows_common::{Actor, Addr, Message};
+use arrows_common::{Actor, Addr, Msg};
 use std::cell::RefCell;
 use std::cell::RefMut;
 use std::collections::HashMap;
@@ -72,7 +72,7 @@ impl ActorInitializer {
 pub(crate) struct ActorInvoker;
 
 impl ActorInvoker {
-    pub(crate) fn invoke(mut incoming: Message) -> Result<()> {
+    pub(crate) fn invoke(mut incoming: Msg) -> Result<()> {
         if incoming.is_outbound() {
             return RemoteRouter::route(incoming);
         }
@@ -83,7 +83,7 @@ impl ActorInvoker {
             let store = read_lock_result.unwrap();
             let mut actor = store.sys_actors.get(to_addr_id);
             if let Some(ref mut actor_ref) = actor {
-                let outcome = actor_ref.receive(&mut incoming);
+                let outcome = actor_ref.receive(incoming);
                 println!(
                     "System startup check 5(1) - got hold of actor - outcome {:?}",
                     outcome.unwrap().content_as_text()
@@ -102,7 +102,7 @@ impl ActorInvoker {
 }
 pub(crate) struct Router;
 impl Router {
-    pub(crate) fn route(msg: Message) -> Result<()> {
+    pub(crate) fn route(msg: Msg) -> Result<()> {
         if !msg.is_outbound() {
             LocalRouter::route(msg)
         } else {
@@ -113,14 +113,14 @@ impl Router {
 
 struct LocalRouter;
 impl LocalRouter {
-    pub(crate) fn route(_msg: Message) -> Result<()> {
+    pub(crate) fn route(_msg: Msg) -> Result<()> {
         Ok(())
     }
 }
 
 struct RemoteRouter;
 impl RemoteRouter {
-    pub(crate) fn route(_msg: Message) -> Result<()> {
+    pub(crate) fn route(_msg: Msg) -> Result<()> {
         Ok(())
     }
 }
@@ -146,15 +146,16 @@ impl RequestValidator {
 }
 
 impl Actor for RequestValidator {
-    fn receive(&mut self, incoming: &mut Message) -> Option<Message> {
+    fn receive(&mut self, incoming: Msg) -> Option<Msg> {
         println!("Received validation message - allowing to proceed");
+        let mut incoming = incoming;
         incoming.uturn_with_text("Request validation passed");
-        let outgoing = std::mem::replace(incoming, Message::Blank);
+        let outgoing = std::mem::replace(&mut incoming, Msg::Blank);
         Some(outgoing)
     }
 }
 impl Actor for ActorInitializer {
-    fn receive(&mut self, _incoming: &mut Message) -> Option<Message> {
+    fn receive(&mut self, _incoming: Msg) -> Option<Msg> {
         None
     }
 }

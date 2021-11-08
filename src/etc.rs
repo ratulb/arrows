@@ -1,12 +1,12 @@
 use crate::Mailbox;
-use arrows_common::{Actor, Addr, Message};
+use arrows_common::{Actor, Addr, Msg};
 use serde::Serialize;
 use std::io::Result;
 
 pub struct Actors;
 pub struct ActorArrow;
 impl Actors {
-    pub fn actor_from<F: 'static + Serialize + Fn(Message) -> Option<Message>>(
+    pub fn actor_from<F: 'static + Serialize + Fn(Msg) -> Option<Msg>>(
         name: &str,
         invokable: F,
     ) -> Ractor {
@@ -21,19 +21,19 @@ impl Actors {
 pub struct Ractor {
     addr: Addr,
     mailbox: Option<Mailbox>,
-    invokable: Box<dyn Fn(Message) -> Option<Message>>,
+    invokable: Box<dyn Fn(Msg) -> Option<Msg>>,
 }
 
 impl Ractor {
-    //Create an actor passing a Message -> Message closure
-    pub fn new(name: &str, invokable: Box<dyn Fn(Message) -> Option<Message>>) -> Self {
+    //Create an actor passing a Msg -> Msg closure
+    pub fn new(name: &str, invokable: Box<dyn Fn(Msg) -> Option<Msg>>) -> Self {
         Self {
             addr: Addr::new(name),
             mailbox: None,
             invokable,
         }
     }
-    pub async fn receive(&mut self, msg: Message) -> Option<Message> {
+    pub async fn receive(&mut self, msg: Msg) -> Option<Msg> {
         println!("Actor received message");
         (self.invokable)(msg)
     }

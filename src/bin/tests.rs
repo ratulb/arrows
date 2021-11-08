@@ -1,5 +1,5 @@
 use arrows::etc::Ractor;
-use arrows::{Actor, Message};
+use arrows::{Actor, Msg};
 use arrows_common::utils::{from_bytes, option_of_bytes, type_of};
 use serde::{Deserialize, Serialize};
 
@@ -23,9 +23,9 @@ async fn actor_test_with_closure() {
     struct Output {
         result: String,
     }
-    let invokable = |param: Message| -> Option<Message> {
+    let invokable = |param: Msg| -> Option<Msg> {
         let output = match param {
-            Message::Custom {
+            Msg::Custom {
                 id: _,
                 from: _,
                 to: _,
@@ -44,7 +44,7 @@ async fn actor_test_with_closure() {
                 result: "".to_string(),
             },
         };
-        Some(Message::Custom {
+        Some(Msg::Custom {
             id: 1000,
             from: None,
             to: None,
@@ -57,7 +57,7 @@ async fn actor_test_with_closure() {
     let mut actor1 = Ractor::new("actor1", boxed_invokable);
 
     let reply = actor1
-        .receive(Message::Custom {
+        .receive(Msg::Custom {
             id: 1000,
             from: None,
             to: None,
@@ -75,7 +75,7 @@ async fn actor_test_with_closure() {
 }
 
 async fn create_actor_from_from_fn_test1() {
-    fn receiver(_msg: Message) -> Option<Message> {
+    fn receiver(_msg: Msg) -> Option<Msg> {
         None
     }
     let ractor1: Ractor = Ractor::new("ractor1", Box::new(receiver));
@@ -120,32 +120,31 @@ async fn send_msg_within_msg_test_1() {
         elems: vec![simple],
     };
     let complex_as_opt = option_of_bytes(&complex);
-    let msg = Message::new(complex_as_opt, "addr_from", "addr_to");
-    let mut msg_container = Message::new(option_of_bytes(&msg), "addr_from", "addr_to");
+    let msg = Msg::new(complex_as_opt, "addr_from", "addr_to");
+    let msg_container = Msg::new(option_of_bytes(&msg), "addr_from", "addr_to");
 
     struct NewActor;
 
     impl Actor for NewActor {
-        fn receive(&mut self, msg: &mut Message) -> Option<Message> {
+        fn receive(&mut self, mut msg: Msg) -> Option<Msg> {
             //println!("New actor received msg ->");
             //println!();
             //println!("{:?}", msg);
-            let msg = msg;
             let inner_msg_option: Option<Vec<u8>> = msg.get_content_out();
             let inner_vec = inner_msg_option.unwrap();
-            let mut inner_msg: Message = from_bytes(&inner_vec).ok().unwrap();
+            let mut inner_msg: Msg = from_bytes(&inner_vec).ok().unwrap();
             let inner_content_option = inner_msg.get_content_out();
             let bytes_for_complex = inner_content_option.unwrap();
             let nested_complex: Complex<Inner> = from_bytes(&bytes_for_complex).ok().unwrap();
 
             //println!("The nested complex: {:?}", nested_complex);
             let returned_complex_bytes = option_of_bytes(&nested_complex);
-            let returned_msg = Message::new(returned_complex_bytes, "addr_from", "addr_to");
+            let returned_msg = Msg::new(returned_complex_bytes, "addr_from", "addr_to");
             Some(returned_msg)
         }
     }
     let mut new_actor = NewActor;
-    let call_result = new_actor.receive(&mut msg_container);
+    let call_result = new_actor.receive(msg_container);
     let call_result = call_result.unwrap().get_content_out().unwrap();
     let result_complex: Complex<Inner> = from_bytes(&call_result).ok().unwrap();
     assert_eq!(result_complex, complex);

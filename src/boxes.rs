@@ -1,5 +1,5 @@
 use crate::actors::SysActors;
-use arrows_common::Message;
+use arrows_common::Msg;
 use async_std::{fs::DirBuilder, path::PathBuf, task::block_on};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -8,28 +8,28 @@ use std::sync::RwLock;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Mailbox {
-    outbox: VecDeque<Message>,
-    inbox: VecDeque<Message>,
+    outbox: VecDeque<Msg>,
+    inbox: VecDeque<Msg>,
 }
 
 impl Mailbox {
-    pub(crate) fn add_to_inbox(&mut self, msg: Message) {
+    pub(crate) fn add_to_inbox(&mut self, msg: Msg) {
         self.inbox.push_back(msg);
     }
     pub(crate) fn unread_count(&self) -> usize {
         self.inbox.len()
     }
 
-    pub(crate) fn read_inbox(&mut self) -> Option<Message> {
+    pub(crate) fn read_inbox(&mut self) -> Option<Msg> {
         self.inbox.pop_front()
     }
-    pub(crate) fn add_to_outbox(&mut self, msg: Message) {
+    pub(crate) fn add_to_outbox(&mut self, msg: Msg) {
         self.outbox.push_back(msg);
     }
     pub(crate) fn outgoing_count(&self) -> usize {
         self.outbox.len()
     }
-    pub(crate) fn send_outgoing(&mut self) -> Option<Message> {
+    pub(crate) fn send_outgoing(&mut self) -> Option<Msg> {
         self.outbox.pop_front()
     }
 }

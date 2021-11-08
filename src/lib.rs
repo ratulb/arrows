@@ -4,7 +4,7 @@ pub use crate::boxes::*;
 pub use crate::etc::*;
 pub use arrows_common::Actor;
 pub use arrows_common::Addr;
-pub use arrows_common::Message;
+pub use arrows_common::Msg;
 
 pub mod actors;
 pub mod boxes;
@@ -16,7 +16,7 @@ pub async fn start() {
     println!("System startup check1");
     actors::start();
     for _ in 0..3 {
-        let welcome = Message::internal(None, "actor-invoker", REQUEST_VALIDATOR);
+        let welcome = Msg::internal(None, "actor-invoker", REQUEST_VALIDATOR);
         actors::ActorInvoker::invoke(welcome);
     }
 }

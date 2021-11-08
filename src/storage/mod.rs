@@ -1,4 +1,4 @@
-use arrows_common::{from_byte_array, option_of_bytes, Message};
+use arrows_common::{from_byte_array, option_of_bytes, Msg};
 use constants::*;
 use rusqlite::{
     named_params, params, types::Value, CachedStatement, Connection, Result, Statement, ToSql,
@@ -96,7 +96,7 @@ impl<'a> StorageContext<'a> {
         &mut self,
         actor_id: &String,
         msg_ids: Vec<&str>,
-    ) -> Result<VecDeque<Message>> {
+    ) -> Result<VecDeque<Msg>> {
         let mut count = 0;
         let size = msg_ids.len();
         let msg_ids_in = msg_ids
@@ -135,7 +135,7 @@ impl<'a> StorageContext<'a> {
         Ok(())
     }
 
-    pub(crate) fn into_outbox(&mut self, actor_id: &String, msg: Message) -> Result<()> {
+    pub(crate) fn into_outbox(&mut self, actor_id: &String, msg: Msg) -> Result<()> {
         let stmt = self
             .outbox_insert_stmts
             .entry(actor_id.to_string())
@@ -159,7 +159,7 @@ impl<'a> StorageContext<'a> {
         Ok(())
     }
 
-    pub(crate) fn into_inbox(&mut self, actor_id: &String, msg: Message) -> Result<()> {
+    pub(crate) fn into_inbox(&mut self, actor_id: &String, msg: Msg) -> Result<()> {
         let stmt = self
             .inbox_insert_stmts
             .entry(actor_id.to_string())
@@ -181,7 +181,7 @@ impl<'a> StorageContext<'a> {
         };
         Ok(())
     }
-    pub(crate) fn read_inbox(&mut self, actor_id: &String) -> Result<VecDeque<Message>> {
+    pub(crate) fn read_inbox(&mut self, actor_id: &String) -> Result<VecDeque<Msg>> {
         let stmt = self
             .inbox_select_stmts
             .entry(actor_id.to_string())
@@ -197,7 +197,7 @@ impl<'a> StorageContext<'a> {
         let mut messages = VecDeque::with_capacity(usize::from_str(FETCH_LIMIT).unwrap());
         match stmt {
             Some(ref mut s) => {
-                //let rows = s.query_and_then([], |row| row.get::<_, Message>(0))?;
+                //let rows = s.query_and_then([], |row| row.get::<_, Msg>(0))?;
                 let rows = s.query_map([], |row| row.get(0))?;
                 for row in rows {
                     let value: Value = row?;
@@ -211,7 +211,7 @@ impl<'a> StorageContext<'a> {
         Ok(messages)
     }
 
-    pub(crate) fn read_inbox_full(&mut self, actor_id: &String) -> Result<VecDeque<Message>> {
+    pub(crate) fn read_inbox_full(&mut self, actor_id: &String) -> Result<VecDeque<Msg>> {
         let stmt = self
             .inbox_select_stmts
             .entry(actor_id.to_string())
@@ -240,7 +240,7 @@ impl<'a> StorageContext<'a> {
     pub(crate) fn into_inbox_batch(
         &mut self,
         actor_id: &String,
-        msg_itr: impl Iterator<Item = Message>,
+        msg_itr: impl Iterator<Item = Msg>,
     ) -> Result<()> {
         self.conn.execute_batch(BEGIN_TRANSACTION)?;
         let stmt = self
@@ -273,14 +273,14 @@ pub(crate) fn sql_to_io(err: rusqlite::Error) -> std::io::Error {
     Error::new(ErrorKind::Other, "rusqlite error")
 }
 
-pub(crate) fn value_to_msg(v: Value) -> Message {
+pub(crate) fn value_to_msg(v: Value) -> Msg {
     if let Value::Blob(bytes) = v {
-        return match from_byte_array::<'_, Message>(&bytes) {
+        return match from_byte_array::<'_, Msg>(&bytes) {
             Ok(msg) => msg,
-            _ => Message::Blank,
+            _ => Msg::Blank,
         };
     }
-    Message::Blank
+    Msg::Blank
 }
 
 pub(crate) fn create_actor_inbox(actor_id: &String) -> Result<()> {
@@ -297,13 +297,13 @@ pub(crate) fn create_actor_outbox(actor_id: &String) -> Result<()> {
     ctx.outbox_of(actor_id)
 }
 
-pub(crate) fn into_inbox(actor_id: &String, msg: Message) -> Result<()> {
+pub(crate) fn into_inbox(actor_id: &String, msg: Msg) -> Result<()> {
     let conn = Connection::open(DATABASE)?;
     let mut ctx = StorageContext::new(&conn);
     ctx.setup();
     ctx.into_inbox(actor_id, msg)
 }
-pub(crate) fn into_outbox(actor_id: &String, msg: Message) -> Result<()> {
+pub(crate) fn into_outbox(actor_id: &String, msg: Msg) -> Result<()> {
     let conn = Connection::open(DATABASE)?;
     let mut ctx = StorageContext::new(&conn);
     ctx.setup();
@@ -317,7 +317,7 @@ pub(crate) fn remove_db() -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arrows_common::{from_file_sync, Message};
+    use arrows_common::{from_file_sync, Msg};
     use rand::{thread_rng, Rng};
     use rusqlite::Connection;
     use std::fs::File;
@@ -385,8 +385,8 @@ mod tests {
 
     #[test]
     fn message_from_file_test_1() -> std::io::Result<()> {
-        let msg: Message = from_file_sync("last_message.txt")?;
-        println!("Message txt: {:?}", msg.content_as_text());
+        let msg: Msg = from_file_sync("last_message.txt")?;
+        println!("Msg txt: {:?}", msg.content_as_text());
         Ok(())
     }
 
@@ -441,12 +441,12 @@ mod tests {
         let mut ctx = StorageContext::new(&conn);
         ctx.setup();
         ctx.inbox_of(actor_id);
-        let mut messages = Vec::<Message>::with_capacity(num.try_into().unwrap());
+        let mut messages = Vec::<Msg>::with_capacity(num.try_into().unwrap());
         let mut rng = thread_rng();
         for _ in 0..num {
             let random_num: u64 = rng.gen();
             let msg_content = format!("The test msg-{}", random_num);
-            let msg = Message::new_with_text(&msg_content, "from", "to");
+            let msg = Msg::new_with_text(&msg_content, "from", "to");
             messages.push(msg);
         }
         let status = ctx.into_inbox_batch(actor_id, messages.into_iter());
@@ -465,7 +465,7 @@ mod tests {
         for _ in 0..num {
             let random_num: u64 = rng.gen();
             let msg_content = format!("The test msg-{}", random_num);
-            let msg = Message::new_with_text(&msg_content, "from", "to");
+            let msg = Msg::new_with_text(&msg_content, "from", "to");
             let status = ctx.into_inbox(actor_id, msg);
             println!("Many inserts no batching each status: {:?}", status);
         }
