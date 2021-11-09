@@ -69,14 +69,14 @@ impl Msg {
         match self {
             Msg::Custom { ref content, .. } => match content {
                 Some(ref value) => {
-                    let text: Result<&str> = from_bytes(value);
+                    let text: crate::Result<&str> = from_bytes(value);
                     text.ok()
                 }
                 None => None,
             },
             Msg::Internal { ref content, .. } => match content {
                 Some(ref value) => {
-                    let text: Result<&str> = from_bytes(value);
+                    let text: crate::Result<&str> = from_bytes(value);
                     text.ok()
                 }
                 None => None,

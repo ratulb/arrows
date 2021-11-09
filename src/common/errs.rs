@@ -4,6 +4,7 @@ pub enum Error {
     SerdeJson(serde_json::Error),
     Other(Box<dyn std::error::Error>),
     RegistrationError,
+    Bincode(bincode::ErrorKind),
 }
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Error {
@@ -13,6 +14,12 @@ impl From<std::io::Error> for Error {
 impl From<serde_json::Error> for Error {
     fn from(err: serde_json::Error) -> Error {
         Error::SerdeJson(err)
+    }
+}
+
+impl From<bincode::ErrorKind> for Error {
+    fn from(err: bincode::ErrorKind) -> Error {
+        Error::Bincode(err)
     }
 }
 

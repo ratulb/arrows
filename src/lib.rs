@@ -4,7 +4,6 @@ pub use common::addr::Addr;
 pub use common::errs::{Error, Result};
 pub use common::msg::Msg;
 pub use common::utils::*;
-pub(crate) use registry::register_builder;
 
 pub mod common;
 pub mod macros;

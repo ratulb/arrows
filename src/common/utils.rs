@@ -1,3 +1,4 @@
+use crate::Result as ArrowsResult;
 use bincode::{deserialize, serialize};
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
@@ -85,7 +86,6 @@ pub fn from_file_sync<T: for<'de> Deserialize<'de>>(file: &str) -> Result<T> {
 }
 
 pub fn option_of_bytes<T: ?Sized + std::fmt::Debug + Serialize>(t: &T) -> Option<Vec<u8>> {
-    println!("The incoming t: {:?}", t);
     match serialize(t) {
         Ok(bytes) => Some(bytes),
         Err(err) => {
@@ -95,27 +95,24 @@ pub fn option_of_bytes<T: ?Sized + std::fmt::Debug + Serialize>(t: &T) -> Option
     }
 }
 
-pub fn from_bytes<'a, T: std::fmt::Debug + Deserialize<'a>>(bytes: &'a [u8]) -> Result<T> {
-    //use std::io::{Error, ErrorKind};
-    use std::io::Error;
+pub fn from_bytes<'a, T: std::fmt::Debug + Deserialize<'a>>(bytes: &'a [u8]) -> ArrowsResult<T> {
     match deserialize(bytes) {
         Ok(t) => Ok(t),
         Err(err) => {
             eprintln!("Error derializing: {:?}", err);
-            //Err(Error::new(ErrorKind::Other, "Failed deserializing"))
-            Err(Error::last_os_error())
+            let err = Into::<bincode::ErrorKind>::into(*err);
+            let err: crate::Error = err.into();
+            Err(err)
         }
     }
 }
 
 pub fn from_byte_array<'a, T: std::fmt::Debug + Deserialize<'a>>(bytes: &'a [u8]) -> Result<T> {
-    //use std::io::{Error, ErrorKind};
     use std::io::Error;
     match deserialize(bytes) {
         Ok(t) => Ok(t),
         Err(err) => {
             eprintln!("Error derializing: {:?}", err);
-            //Err(Error::new(ErrorKind::Other, "Failed deserializing"))
             Err(Error::last_os_error())
         }
     }

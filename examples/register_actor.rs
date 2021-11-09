@@ -26,6 +26,9 @@ fn main() {
     register!("1000", actor_builer);
     let actor_builer = NewActorBuilder::default();
     register!("2000", actor_builer);
+    let m = Msg::Blank;
+    send!("2000", m);
     send!("2000", Msg::Blank);
-    send!("3000", Msg::Blank);
+    let not_blank = Msg::new_with_text("Reply from new actor", "from", "to");
+    send!("3000", not_blank);
 }
