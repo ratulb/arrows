@@ -4,9 +4,24 @@ macro_rules! register_actor {
         //use crate::registry::registry::register;
         //let mut builder: Box<dyn ActorBuilder> = Box::new($actor_builder);
         let identity = $crate::Addr::new($actor_name).get_id();
+        //TODO Collapse registry.registry
         $crate::registry::registry::register(identity, $actor_builder);
     };
 }
+
+/***
+ * 1) Fix location of arrows.db
+2) Event loop
+3) Send macro
+4) cfg to check selected scheme
+5) Message routing to inbox/outbox
+6) Binaries for server/Client
+7) Message exchange format for client and server
+8) Make everything async
+8) Multithreading
+9) Json message out from stream
+10) db trimming
+***/
 
 #[cfg(test)]
 mod tests {

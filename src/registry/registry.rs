@@ -50,7 +50,6 @@ impl Arrows {
         self.wrappers.insert(identity, rc_actor.clone());
     }
     pub(crate) fn remove_actor(&mut self, identity: u64) -> Option<Rc<RefCell<Box<dyn Actor>>>> {
-        println!("System startup check 7  - Removing actor");
         self.wrappers.remove(&identity)
     }
 }
@@ -141,25 +140,6 @@ pub(in crate::registry::registry) mod ctxops {
         Some(actor)
     }
 }
-/***#[macro_export]
-macro_rules! register {
-    ($actor_type:ty, $creator:path) => {{
-        //pub extern "C" fn create_actor() -> *mut dyn arrows_common::Actor {
-        //pub fn create_actor() -> Box<dyn arrows_common::Actor> {
-        let creator: fn() -> $actor_type = $creator;
-        let actor = creator();
-        println!("I am getting called here");
-        let boxed_actor: Box<dyn common::Actor> = Box::new(actor);
-        //Box::into_raw(boxed_actor)
-        // let write_lock_result = ARROWS.write();
-        //let mut arrows = write_lock_result.unwrap();
-        //println!("The arrows: {:?}", arrows);
-        // println!("The arrows: {:?}", arrows);
-        boxed_actor
-        //}
-        //create_actor()
-    }};
-}***/
 
 pub(crate) struct Arrow {
     inner: Option<Box<dyn Actor>>,
@@ -175,5 +155,50 @@ impl Arrow {
     pub(crate) fn set(&mut self, actor: Box<dyn Actor>) {
         //let _ignored = replace(&mut self.inner, Some(actor));
         self.inner.as_mut().map(|_| actor);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Actor, Msg};
+    //use serde::{Deserialize, Serialize};
+    pub struct NewActor;
+    impl Actor for NewActor {
+        fn receive(&mut self, _incoming: Msg) -> std::option::Option<Msg> {
+            Some(Msg::new_with_text("Reply from new actor", "from", "to"))
+        }
+    }
+
+    #[test]
+    fn context_add_get_remove_test1() {
+        use rand::{thread_rng, Rng};
+        let mut rng = thread_rng();
+
+        for _ in 0..1000000 {
+            let x: u32 = rng.gen();
+            if x > 1000 {
+                let mut ctx = CTX.write().unwrap();
+                println!("Yes it is");
+            }
+        }
+    }
+    #[test]
+    fn arrows_add_get_remove_test1() {
+        use rand::{thread_rng, Rng};
+        let mut rng = thread_rng();
+        let mut arrows = Arrows::new();
+        for _ in 0..1000000 {
+            let x: u32 = rng.gen();
+            let identity = 10000;
+            arrows.remove_actor(identity);
+            let actor: Box<dyn Actor> = Box::new(NewActor);
+            let actor = Rc::new(RefCell::new(actor));
+            arrows.add_actor(identity, actor.clone());
+            let actor = arrows.get_actor(identity);
+            if x > 1000 {
+                println!("Yes it is");
+            }
+        }
     }
 }
