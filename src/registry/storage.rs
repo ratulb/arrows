@@ -7,6 +7,7 @@ use rusqlite::{
 };
 use std::collections::{HashMap, VecDeque};
 use std::io::{Error, ErrorKind};
+use std::path::PathBuf;
 use std::str::FromStr;
 
 pub(crate) struct WrappedConnection {
@@ -14,7 +15,11 @@ pub(crate) struct WrappedConnection {
 }
 impl WrappedConnection {
     pub(crate) fn new() -> Self {
-        let result = Connection::open(DATABASE);
+        let path = std::env::var(ARROWS_DB_PATH)
+            .expect("Please set ARROWS_DB_PATH pointing to an existing directory!");
+        let mut path = PathBuf::from(path);
+        path.push(DATABASE);
+        let result = Connection::open(path);
         if result.is_ok() {
             let inner = result.unwrap();
             //TODO check this value
@@ -407,9 +412,6 @@ pub(crate) fn into_outbox(actor_id: &String, msg: Msg) -> Result<()> {
     ctx.into_outbox(actor_id, msg)
 }
 
-pub(crate) fn remove_db() -> std::io::Result<()> {
-    std::fs::remove_file(DATABASE)
-}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -609,6 +611,7 @@ mod tests {
 
 pub(crate) mod constants {
     pub(crate) const DATABASE: &str = "arrows.db";
+    pub(crate) const ARROWS_DB_PATH: &str = "ARROWS_DB_PATH";
     pub(super) const FETCH_LIMIT: &str = "100";
     pub(super) const BEGIN_TRANSACTION: &str = "BEGIN TRANSACTION;";
     pub(super) const COMMIT_TRANSACTION: &str = "COMMIT TRANSACTION;";

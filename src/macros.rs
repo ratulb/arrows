@@ -18,7 +18,7 @@ macro_rules! send {
 /***
  * 1) Fix location of arrows.db
 2) Event loop
-3) Send macro
+3) Send macro - done
 4) cfg to check selected scheme
 5) Message routing to inbox/outbox
 6) Binaries for server/Client
@@ -27,6 +27,7 @@ macro_rules! send {
 8) Multithreading
 9) Json message out from stream
 10) db trimming
+11) Documentation
 ***/
 
 #[cfg(test)]
