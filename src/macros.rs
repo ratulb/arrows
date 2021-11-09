@@ -1,11 +1,10 @@
 #[macro_export]
 macro_rules! register_actor {
     ($actor_name:literal, $actor_builder:path) => {
-        //use crate::registry::registry::register;
+        //use crate::registry::register;
         //let mut builder: Box<dyn ActorBuilder> = Box::new($actor_builder);
         let identity = $crate::Addr::new($actor_name).get_id();
-        //TODO Collapse registry.registry
-        $crate::registry::registry::register(identity, $actor_builder);
+        $crate::registry::register(identity, $actor_builder);
     };
 }
 
@@ -50,7 +49,7 @@ mod tests {
         let actor_builder = NewActorBuilder::default();
         register_actor!("new_actor", actor_builder);
         let identity = crate::Addr::new("new_actor").get_id();
-        use crate::registry::registry::send;
+        use crate::registry::send;
         send(identity, Msg::Blank);
     }
 }

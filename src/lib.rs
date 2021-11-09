@@ -4,8 +4,9 @@ pub use common::addr::Addr;
 pub use common::errs::{Error, Result};
 pub use common::msg::Msg;
 pub use common::utils::*;
-pub use registry::registry::register;
+pub use registry::register;
 
 pub mod common;
 pub mod macros;
 pub mod registry;
+mod remoting;

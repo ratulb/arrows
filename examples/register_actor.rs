@@ -1,5 +1,5 @@
 use arrows::register_actor;
-use arrows::registry::registry::send;
+use arrows::registry::send;
 use arrows::{Actor, ActorBuilder, Msg};
 use serde::{Deserialize, Serialize};
 
