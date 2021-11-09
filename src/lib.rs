@@ -7,10 +7,5 @@ pub use common::utils::*;
 pub use registry::registry::register;
 
 pub mod common;
+pub mod macros;
 pub mod registry;
-
-/***mod actor;
-mod addr;
-mod errs;
-mod msg;
-mod utils;***/
