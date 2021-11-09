@@ -55,7 +55,7 @@ impl Arrows {
     }
 }
 
-pub fn register(
+pub fn register_builder(
     addr: u64,
     mut builder: impl ActorBuilder,
 ) -> Result<Rc<RefCell<Box<dyn Actor>>>, Error> {
@@ -163,7 +163,6 @@ impl Arrow {
 mod tests {
     use super::*;
     use crate::{Actor, Msg};
-    //use serde::{Deserialize, Serialize};
     pub struct NewActor;
     impl Actor for NewActor {
         fn receive(&mut self, _incoming: Msg) -> std::option::Option<Msg> {

@@ -1,5 +1,5 @@
-use arrows::register_actor;
-use arrows::registry::send;
+use arrows::register;
+use arrows::send;
 use arrows::{Actor, ActorBuilder, Msg};
 use serde::{Deserialize, Serialize};
 
@@ -23,11 +23,9 @@ impl ActorBuilder for NewActorBuilder {
 
 fn main() {
     let actor_builer = NewActorBuilder::default();
-    register_actor!("1000", actor_builer);
-    //println!("1000 reg result: {:?}", reg_result);
+    register!("1000", actor_builer);
     let actor_builer = NewActorBuilder::default();
-    register_actor!("2000", actor_builer);
-    //println!("2000 reg result: {:?}", reg_result);
-    send(2000, Msg::Blank);
-    send(3000, Msg::Blank);
+    register!("2000", actor_builer);
+    send!("2000", Msg::Blank);
+    send!("3000", Msg::Blank);
 }
