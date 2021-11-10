@@ -1,6 +1,6 @@
-use arrows::register;
-use arrows::send;
-use arrows::{Actor, ActorBuilder, Msg};
+use arrows::builder_of;
+use arrows::send_to;
+use arrows::{Actor, ActorBuilder, Addr, Msg};
 use serde::{Deserialize, Serialize};
 
 pub struct NewActor;
@@ -22,13 +22,19 @@ impl ActorBuilder for NewActorBuilder {
 }
 
 fn main() {
-    let actor_builer = NewActorBuilder::default();
-    register!("1000", actor_builer);
-    let actor_builer = NewActorBuilder::default();
-    register!("2000", actor_builer);
+    let builder = NewActorBuilder::default();
+
+    let rs = builder_of!("new_actor", builder);
+    println!("The reg result is = {:?}", rs);
+
+    let builder = NewActorBuilder::default();
+    builder_of!(Addr::new("new_actor"), builder);
+
     let m = Msg::Blank;
-    send!("2000", m);
-    send!("2000", Msg::Blank);
-    let not_blank = Msg::new_with_text("Reply from new actor", "from", "to");
-    send!("3000", not_blank);
+    send_to!("new_actor", m);
+
+    send_to!(Addr::new("new_actor"), Msg::Blank);
+
+    let msg_to_unregisterd = Msg::new_with_text("Mis-directed message", "from", "to");
+    send_to!("Unknown actor", msg_to_unregisterd);
 }

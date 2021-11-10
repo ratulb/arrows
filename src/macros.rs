@@ -1,22 +1,36 @@
 #[macro_export]
-macro_rules! register {
-    ($actor_name:literal, $actor_builder:path) => {
+macro_rules! builder_of {
+    ($actor_name:literal, $actor_builder:path) => {{
         let identity = $crate::Addr::new($actor_name).get_id();
-        $crate::registry::register_builder(identity, $actor_builder);
-    };
+        let res = $crate::registry::register_builder(identity, $actor_builder);
+        //println!("Res result is = {:?}", res);
+        res
+    }};
+    ($actor_addr:expr, $actor_builder:path) => {{
+        let actor_addr: $crate::Addr = $actor_addr;
+        let identity = actor_addr.get_id();
+        let res = $crate::registry::register_builder(identity, $actor_builder);
+        res
+    }};
 }
 
 #[macro_export]
-macro_rules! send {
+macro_rules! send_to {
     ($actor_name:literal, $msg:expr) => {
         let msg: $crate::Msg = $msg;
         let identity = $crate::Addr::new($actor_name).get_id();
         $crate::registry::send(identity, msg);
     };
+    ($actor_addr:expr, $msg:expr) => {
+        let msg: $crate::Msg = $msg;
+        let actor_addr: $crate::Addr = $actor_addr;
+        let identity = actor_addr.get_id();
+        $crate::registry::send(identity, msg);
+    };
 }
 
 /***
- * 1) Fix location of arrows.db
+1) Fix location of arrows.db
 2) Event loop
 3) Send macro - done
 4) cfg to check selected scheme
@@ -28,11 +42,14 @@ macro_rules! send {
 9) Json message out from stream
 10) db trimming
 11) Documentation
+12) Error handling
+13) Macro output
+14) Logging
 ***/
 
 #[cfg(test)]
 mod tests {
-    use crate::{Actor, ActorBuilder, Msg};
+    use crate::{Actor, ActorBuilder, Addr, Msg};
     use serde::{Deserialize, Serialize};
 
     pub struct NewActor;
@@ -54,8 +71,19 @@ mod tests {
     }
     #[test]
     fn macro_register_actor_test1() {
-        let actor_builder = NewActorBuilder::default();
-        register!("new_actor", actor_builder);
-        send!("new_actor", Msg::Blank);
+        let builder = NewActorBuilder::default();
+        builder_of!("new_actor", builder);
+
+        let builder = NewActorBuilder::default();
+        builder_of!(Addr::new("new_actor"), builder);
+
+        let builder = NewActorBuilder::default();
+        let addr = Addr::new("new_actor");
+        builder_of!(addr, builder);
+
+        send_to!("new_actor", Msg::Blank);
+        send_to!(Addr::new("new_actor"), Msg::Blank);
+        let addr = Addr::new("new_actor");
+        send_to!(addr, Msg::Blank);
     }
 }
