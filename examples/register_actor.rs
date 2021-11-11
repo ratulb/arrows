@@ -27,7 +27,7 @@ fn main() {
     let rs = builder_of!("new_actor", builder);
     println!("The reg result is = {:?}", rs);
 
-    let builder = NewActorBuilder::default();
+    let builder = NewActorBuilder;
     builder_of!(Addr::new("new_actor"), builder);
 
     let m = Msg::Blank;
