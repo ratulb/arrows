@@ -3,41 +3,187 @@ use crate::common::utils::{from_byte_array, option_of_bytes};
 use constants::*;
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use rusqlite::{
-    named_params, params, types::Value, Connection, Error::InvalidQuery, Result, ToSql,
+    hooks::Action, named_params, params, types::Value, CachedStatement, Connection,
+    Error::InvalidQuery, Result, ToSql,
 };
+use serde::{Deserialize, Serialize, Serializer};
 use std::collections::{HashMap, VecDeque};
+use std::fs::OpenOptions;
+use std::io::{BufWriter, Write};
 use std::io::{Error, ErrorKind};
+
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::sync::Arc;
 
-pub(crate) struct WrappedConnection {
-    inner: Connection,
+unsafe impl Send for DBEventRecorder {}
+unsafe impl Sync for DBEventRecorder {}
+
+pub(crate) struct DBEventRecorder {
+    conn: Connection,
 }
-impl WrappedConnection {
+
+impl DBEventRecorder {
+    pub(crate) fn new() -> Self {
+        let path = std::env::var(ARROWS_DB_PATH)
+            .expect("Please set ARROWS_DB_PATH pointing to an existing directory!");
+        let mut path = PathBuf::from(path);
+        path.push(DATABASE_EVENTS);
+        let conn = match Connection::open(path) {
+            Ok(conn) => conn,
+            Err(err) => panic!("{}", err),
+        };
+        Self { conn: conn }
+    }
+    pub(crate) fn record_event(&mut self, event: DBEvent) -> Result<usize> {
+        let stmt = self.conn.prepare(INBOUND_INSERT).ok();
+        let DBEvent(tbl, row_id) = event;
+        let actor_id = match tbl.find('_') {
+            None => return Ok(0),
+            Some(idx) => &tbl[..idx],
+        };
+        println!("Recoding event post transaction = {:?}", actor_id);
+        /***match stmt {
+                    Some(mut s) => Ok(s.execute(
+                named_params! { ":row_id": &row_id as &dyn ToSql, ":actor_id": &actor_id as &dyn ToSql
+        },
+                        )?),
+                    None => Ok(0),
+                }***/
+
+        Ok(self.conn.execute(
+            INBOUND_INSERT,
+            &[&row_id as &dyn ToSql, &actor_id as &dyn ToSql],
+        )?)
+    }
+}
+
+pub(crate) struct DBConnection {
+    primary: Connection,
+}
+
+impl DBConnection {
     pub(crate) fn new() -> Self {
         let path = std::env::var(ARROWS_DB_PATH)
             .expect("Please set ARROWS_DB_PATH pointing to an existing directory!");
         let mut path = PathBuf::from(path);
         path.push(DATABASE);
         let result = Connection::open(path);
-        if result.is_ok() {
-            let inner = result.unwrap();
-            //TODO check this value
-            inner.set_prepared_statement_cache_capacity(100);
-            Self { inner }
+
+        if let Ok(primary) = result {
+            primary.set_prepared_statement_cache_capacity(100);
+            Self { primary: primary }
         } else {
-            panic!("Failed to obtain db connection");
+            panic!("Failed to obtain primary db connection");
         }
     }
+    /***pub(crate) fn update_hook<'c, F>(&'c mut self, hook: Option<F>)
+    where
+        F: FnMut(Action, &str, &str, i64) + Send + 'c,
+    {
+        self.primary.update_hook(hook);
+    }***/
 }
-unsafe impl Send for WrappedConnection {}
-unsafe impl Sync for WrappedConnection {}
+
+impl DBEvent {
+    /***fn persist(&self) /
+    {
+        let DBEvent(_, path, _) = self;
+        let mut path_buf = PathBuf::from("/tmp");
+        path_buf.push(path);
+        let json = serde_json::to_string(self).unwrap();
+        let file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .append(true)
+            .open(path_buf.as_os_str())
+            .unwrap();
+        let mut writer = BufWriter::new(file);
+        writer.write_all(json.as_bytes()).unwrap();
+        //Ok(())
+    }***/
+    pub(crate) fn persist(&self) -> Result<usize> {
+        //let mut stmt = conn.prepare_cached(INBOUND_INSERT).ok();
+        let DBEvent(tbl, row_id) = self;
+        let actor_id = match tbl.find('_') {
+            None => return Ok(0),
+            Some(idx) => &tbl[..idx],
+        };
+        /***match stmt {
+                Some(ref mut s) => s.execute(
+        named_params! { ":row_id": row_id as &dyn ToSql, ":actor_id": &actor_id as &dyn ToSql },
+                )?,
+                None => panic!(),
+            };***/
+
+        /***conn.execute(
+            INBOUND_INSERT,
+            &[row_id as &dyn ToSql, &actor_id as &dyn ToSql],
+        )?;***/
+        /***println!("But you even come here$$$$$$$$$$$!");
+        let rs = match &self.2 {
+            Some(c) => c.inner.execute(
+                INBOUND_INSERT,
+                &[row_id as &dyn ToSql, &actor_id as &dyn ToSql],
+            ),
+
+            None => Ok(0),
+        };
+        println!("But you even come here*******#######!");
+        rs***/
+        Ok(0)
+    }
+}
+unsafe impl Send for DBConnection {}
+unsafe impl Sync for DBConnection {}
 
 unsafe impl Send for StorageContext {}
 unsafe impl Sync for StorageContext {}
 
+pub(crate) struct DBEvent(String, i64);
+
+impl std::fmt::Debug for DBEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DBEvent")
+            .field("table", &self.0)
+            .field("row_id", &self.1)
+            .finish()
+    }
+}
+use serde::ser::SerializeTupleStruct;
+impl Serialize for DBEvent {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut event = serializer.serialize_tuple_struct("DBEvent", 2)?;
+        event.serialize_field(&self.0)?;
+        event.serialize_field(&self.1)?;
+        event.end()
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub(crate) enum DBAction {
+    Insert,
+    Delete,
+    Update,
+    Unknown,
+}
+impl From<Action> for DBAction {
+    fn from(action: Action) -> Self {
+        match action {
+            Action::SQLITE_DELETE => DBAction::Delete,
+            Action::SQLITE_INSERT => DBAction::Insert,
+            Action::SQLITE_UPDATE => DBAction::Update,
+            _ => DBAction::Unknown,
+        }
+    }
+}
+
 pub(crate) struct StorageContext {
-    conn: WrappedConnection,
+    conn: DBConnection,
+    recorder: DBEventRecorder,
     inbox_insert_stmts: HashMap<String, String>,
     inbox_select_stmts: HashMap<String, String>,
     outbox_insert_stmts: HashMap<String, String>,
@@ -57,7 +203,8 @@ impl std::fmt::Debug for StorageContext {
 impl StorageContext {
     pub(crate) fn new() -> Self {
         Self {
-            conn: WrappedConnection::new(),
+            conn: DBConnection::new(),
+            recorder: DBEventRecorder::new(),
             inbox_insert_stmts: HashMap::new(),
             outbox_insert_stmts: HashMap::new(),
             inbox_select_stmts: HashMap::new(),
@@ -65,14 +212,20 @@ impl StorageContext {
             actor_create_stmts: HashMap::new(),
         }
     }
+
     pub(crate) fn crate_actors_table(&mut self) -> Result<()> {
-        self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
-        self.conn.inner.execute(ACTORS, [])?;
-        self.conn.inner.execute_batch(COMMIT_TRANSACTION)?;
+        self.conn.primary.execute(ACTORS, [])?;
         Ok(())
     }
+
+    pub(crate) fn crate_inbounds_table(&mut self) -> Result<()> {
+        self.conn.primary.execute(INBOUNDS, [])?;
+        Ok(())
+    }
+
     pub(crate) fn setup(&mut self) -> Result<()> {
         self.crate_actors_table()?;
+        self.crate_inbounds_table()?;
         let existing_actors = self.select_existing_actors()?;
         self.setup_inboxes(&existing_actors)?;
         self.setup_outboxes(&existing_actors)?;
@@ -80,12 +233,38 @@ impl StorageContext {
             "Setting up actors - existing count {}",
             existing_actors.len()
         );
+
+        self.conn
+            .primary
+            .update_hook(Some(|action: Action, _db: &str, tbl: &str, row_id| {
+                if action == Action::SQLITE_INSERT {
+                    let event = DBEvent(String::from(tbl), row_id);
+                    //self.recorder.record_event(event);
+                }
+            }));
         Ok(())
     }
+
+    /*** pub(crate) fn update_hook(&mut self, activate: bool) {
+        if activate {
+            let helper = self.conn.helper.as_ref();
+            self.conn
+                .update_hook(Some(|action: Action, _db: &str, tbl: &str, row_id| {
+                    if action == Action::SQLITE_INSERT {
+                        let event = DBEvent(String::from(tbl), row_id);
+                        if let Some(safe_conn) = helper {
+                            event.persist(safe_conn.inner.clone());
+                        }
+                    }
+                }));
+        } else {
+            self.conn.update_hook(None::<fn(Action, &str, &str, i64)>);
+        }
+    }***/
     pub(crate) fn select_existing_actors(&mut self) -> Result<Vec<String>> {
         let mut stmt = self
             .conn
-            .inner
+            .primary
             .prepare_cached("SELECT actor_id FROM actors")
             .ok();
         //TODO check capacity
@@ -102,21 +281,21 @@ impl StorageContext {
         }
         Ok(actors)
     }
-    pub(crate) fn setup_inboxes(&mut self, actor_ids: &Vec<String>) -> Result<()> {
-        self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
+    pub(crate) fn setup_inboxes(&mut self, actor_ids: &[String]) -> Result<()> {
+        self.conn.primary.execute_batch(BEGIN_TRANSACTION)?;
         for actor_id in actor_ids {
             self.inbox_of(actor_id)?;
         }
-        self.conn.inner.execute_batch(COMMIT_TRANSACTION)?;
+        self.conn.primary.execute_batch(COMMIT_TRANSACTION)?;
         Ok(())
     }
 
-    pub(crate) fn setup_outboxes(&mut self, actor_ids: &Vec<String>) -> Result<()> {
-        self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
+    pub(crate) fn setup_outboxes(&mut self, actor_ids: &[String]) -> Result<()> {
+        self.conn.primary.execute_batch(BEGIN_TRANSACTION)?;
         for actor_id in actor_ids {
             self.outbox_of(actor_id)?;
         }
-        self.conn.inner.execute_batch(COMMIT_TRANSACTION)?;
+        self.conn.primary.execute_batch(COMMIT_TRANSACTION)?;
         Ok(())
     }
 
@@ -125,7 +304,7 @@ impl StorageContext {
             "CREATE TABLE IF NOT EXISTS inbox_{} (msg_id TEXT PRIMARY KEY, msg BLOB)",
             actor_id
         );
-        self.conn.inner.execute(&stmt, [])?;
+        self.conn.primary.execute(&stmt, [])?;
         Ok(())
     }
     pub(crate) fn outbox_of(&mut self, actor_id: &String) -> Result<()> {
@@ -133,7 +312,7 @@ impl StorageContext {
             "CREATE TABLE IF NOT EXISTS outbox_{} (msg_id TEXT PRIMARY KEY, msg BLOB)",
             actor_id
         );
-        self.conn.inner.execute(&stmt, [])?;
+        self.conn.primary.execute(&stmt, [])?;
         Ok(())
     }
 
@@ -142,14 +321,14 @@ impl StorageContext {
             "SELECT count(1) FROM sqlite_master WHERE type='table' AND name='inbox_{}'",
             actor_id
         );
-        let mut stmt = self.conn.inner.prepare(&stmt)?;
+        let mut stmt = self.conn.primary.prepare(&stmt)?;
         let mut rows = stmt.query([])?;
         if let Some(row) = rows.next()? {
             let value: usize = row.get(0)?;
             if value == 1 {
                 println!("Table exists");
                 let stmt = format!("DELETE FROM inbox_{}", actor_id);
-                match self.conn.inner.execute(&stmt, []) {
+                match self.conn.primary.execute(&stmt, []) {
                     Ok(deleted) => println!("Rows deleted: {:?}", deleted),
                     Err(err) => println!("Error occured: {:?}", err),
                 }
@@ -167,15 +346,15 @@ impl StorageContext {
     ) -> std::io::Result<()> {
         let stmt = format!("DELETE FROM inbox_{} WHERE msg_id = ?", actor_id);
         self.conn
-            .inner
+            .primary
             .execute_batch(BEGIN_TRANSACTION)
             .map_err(sql_to_io);
-        let mut stmt = self.conn.inner.prepare_cached(&stmt).map_err(sql_to_io)?;
+        let mut stmt = self.conn.primary.prepare_cached(&stmt).map_err(sql_to_io)?;
         for msg_id in msg_ids {
             stmt.execute(params![msg_id]).map_err(sql_to_io);
         }
         self.conn
-            .inner
+            .primary
             .execute_batch(COMMIT_TRANSACTION)
             .map_err(sql_to_io);
         Ok(())
@@ -204,7 +383,7 @@ impl StorageContext {
             "SELECT msg FROM inbox_{} WHERE msg_id in ({})",
             actor_id, msg_ids_in
         );
-        let mut stmt = self.conn.inner.prepare(&stmt)?;
+        let mut stmt = self.conn.primary.prepare(&stmt)?;
         let mut rows = stmt.query([])?;
         let mut messages = VecDeque::new();
         while let Some(row) = rows.next()? {
@@ -224,7 +403,7 @@ impl StorageContext {
                     actor_id
                 )
             });
-        let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
+        let mut stmt = self.conn.primary.prepare_cached(stmt).ok();
         let msg_id = msg.id_as_string();
         let bytes = option_of_bytes(&msg);
         match stmt {
@@ -237,7 +416,7 @@ impl StorageContext {
     }
 
     pub(crate) fn persist_builder(&mut self, identity: &String, build_def: &String) -> Result<()> {
-        let mut stmt = self.conn.inner.prepare_cached(BUILD_DEF_INSERT).ok();
+        let mut stmt = self.conn.primary.prepare_cached(BUILD_DEF_INSERT).ok();
         match stmt {
             Some(ref mut s) => s.execute(
                 named_params! { ":actor_id": identity as &dyn ToSql, ":build_def": build_def as &dyn ToSql },
@@ -247,7 +426,7 @@ impl StorageContext {
         Ok(())
     }
     pub(crate) fn remove_actor_permanent(&mut self, identity: &String) -> Result<()> {
-        let mut stmt = self.conn.inner.prepare_cached(DELETE_ACTOR)?;
+        let mut stmt = self.conn.primary.prepare_cached(DELETE_ACTOR)?;
         stmt.execute(params![identity]).and_then(
             |c| {
                 if c == 1 {
@@ -259,7 +438,7 @@ impl StorageContext {
         )
     }
     pub(crate) fn actor_is_present(&mut self, actor_id: &String) -> Result<()> {
-        let mut stmt = self.conn.inner.prepare_cached(ACTOR_ROWID)?;
+        let mut stmt = self.conn.primary.prepare_cached(ACTOR_ROWID)?;
         let status = stmt
             .query(rusqlite::params![actor_id])?
             .count()
@@ -267,7 +446,7 @@ impl StorageContext {
         status
     }
     pub(crate) fn retrieve_build_def(&mut self, actor_id: &String) -> Result<Option<String>> {
-        let mut stmt = self.conn.inner.prepare_cached(BUILD_DEF)?;
+        let mut stmt = self.conn.primary.prepare_cached(BUILD_DEF)?;
         let mut rows = stmt.query(rusqlite::params![actor_id])?;
         if let Some(row) = rows.next()? {
             return Ok(Some(row.get(0)?));
@@ -285,7 +464,7 @@ impl StorageContext {
                     actor_id
                 )
             });
-        let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
+        let mut stmt = self.conn.primary.prepare_cached(stmt).ok();
         let msg_id = msg.id_as_string();
         let bytes = option_of_bytes(&msg);
         match stmt {
@@ -307,7 +486,7 @@ impl StorageContext {
                 )
             });
 
-        let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
+        let mut stmt = self.conn.primary.prepare_cached(stmt).ok();
         let mut messages = VecDeque::with_capacity(usize::from_str(FETCH_LIMIT).unwrap());
         match stmt {
             Some(ref mut s) => {
@@ -330,7 +509,7 @@ impl StorageContext {
             .inbox_select_stmts
             .entry(actor_id.to_string())
             .or_insert_with(|| format!("SELECT msg FROM inbox_{} ORDER BY rowid ASC", actor_id));
-        let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
+        let mut stmt = self.conn.primary.prepare_cached(stmt).ok();
         let mut messages = VecDeque::with_capacity(usize::from_str(FETCH_LIMIT).unwrap());
         match stmt {
             Some(ref mut s) => {
@@ -350,7 +529,7 @@ impl StorageContext {
         actor_id: &String,
         msg_itr: impl Iterator<Item = Msg>,
     ) -> Result<()> {
-        self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
+        self.conn.primary.execute_batch(BEGIN_TRANSACTION)?;
         let stmt = self
             .inbox_insert_stmts
             .entry(actor_id.to_string())
@@ -360,7 +539,7 @@ impl StorageContext {
                     actor_id
                 )
             });
-        let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
+        let mut stmt = self.conn.primary.prepare_cached(stmt).ok();
         match stmt {
             Some(ref mut s) => {
                 for msg in msg_itr {
@@ -370,7 +549,7 @@ impl StorageContext {
             }
             None => panic!(),
         };
-        self.conn.inner.execute_batch(COMMIT_TRANSACTION)?;
+        self.conn.primary.execute_batch(COMMIT_TRANSACTION)?;
         Ok(())
     }
 }
@@ -397,6 +576,7 @@ pub(crate) fn create_actor_inbox(actor_id: &String) -> Result<()> {
 
 pub(crate) fn create_actor_outbox(actor_id: &String) -> Result<()> {
     let mut ctx = StorageContext::new();
+
     ctx.setup();
     ctx.outbox_of(actor_id)
 }
@@ -428,7 +608,7 @@ mod tests {
             "3311787687830812909",
         ];
         let mut ctx = StorageContext::new();
-        ctx.setup();
+        let _ = ctx.setup();
         let messages = ctx.select_from_inbox(&actor_id, msg_ids)?;
         let messages: Vec<_> = messages.iter().map(|msg| msg.id_as_string()).collect();
         println!("The messages: {:?}", messages);
@@ -439,7 +619,7 @@ mod tests {
         let actor_id = "1000".to_string();
         let msg_ids = vec!["16563997168647304630", "18086766434657795389"];
         let mut ctx = StorageContext::new();
-        ctx.setup();
+        let _ = ctx.setup();
         assert_eq!(ctx.delete_from_inbox(&actor_id, msg_ids).ok(), Some(()));
     }
 
@@ -447,7 +627,7 @@ mod tests {
     fn purge_inbox_of_test_1() {
         let actor_id = "1000".to_string();
         let mut ctx = StorageContext::new();
-        ctx.setup();
+        let _ = ctx.setup();
         assert_eq!(ctx.purge_inbox_of(&actor_id), Ok(()));
     }
     #[test]
@@ -455,10 +635,10 @@ mod tests {
         let actor_id = "1000".to_string();
         let mut read_count = 0;
         let mut ctx = StorageContext::new();
-        ctx.setup();
+        let _ = ctx.setup();
         let messages = ctx.read_inbox_full(&actor_id).unwrap();
 
-        for msg in &messages {
+        for _msg in &messages {
             read_count += 1;
         }
         println!("The msg read count: {:?}", read_count);
@@ -469,7 +649,7 @@ mod tests {
         let actor_id = "1000".to_string();
         let mut read_count = 0;
         let mut ctx = StorageContext::new();
-        ctx.setup();
+        let _ = ctx.setup();
         let messages = ctx.read_inbox(&actor_id).unwrap();
         for msg in messages {
             println!("The msg: {:?}", msg);
@@ -485,7 +665,7 @@ mod tests {
         let actor_id = "1000".to_string();
         let mut read_count = 0;
         let mut ctx = StorageContext::new();
-        ctx.setup();
+        let _ = ctx.setup();
         let messages = ctx.read_inbox_full(&actor_id).unwrap();
         for msg in messages {
             println!("The msg: {:?}", msg);
@@ -510,7 +690,7 @@ mod tests {
 
     fn into_inbox_batch_func(num: u32, actor_id: &String) -> Result<()> {
         let mut ctx = StorageContext::new();
-        ctx.setup();
+        let _ = ctx.setup();
         ctx.inbox_of(actor_id);
         let mut messages = Vec::<Msg>::with_capacity(num.try_into().unwrap());
         let mut rng = thread_rng();
@@ -528,7 +708,7 @@ mod tests {
 
     fn into_inbox_no_batch_func(num: u32, actor_id: &String) -> Result<()> {
         let mut ctx = StorageContext::new();
-        ctx.setup();
+        let _ = ctx.setup();
         ctx.inbox_of(actor_id);
 
         let mut rng = thread_rng();
@@ -536,9 +716,9 @@ mod tests {
             let random_num: u64 = rng.gen();
             let msg_content = format!("The test msg-{}", random_num);
             let msg = Msg::new_with_text(&msg_content, "from", "to");
-            let status = ctx.into_inbox(actor_id, msg);
-            println!("Many inserts no batching each status: {:?}", status);
+            let _status = ctx.into_inbox(actor_id, msg);
         }
+        //println!("{:?}", update_queue);
         Ok(())
     }
 
@@ -568,7 +748,7 @@ mod tests {
     #[test]
     fn persist_builder_1001_test_1() -> Result<()> {
         let mut ctx = StorageContext::new();
-        ctx.setup();
+        let _ = ctx.setup();
         let identity = "1001".to_string();
         let insert = ctx.persist_builder(&identity, &r#"{"new_actor_builder":null}"#.to_string());
         println!("insert = {:?}", insert);
@@ -578,7 +758,7 @@ mod tests {
     #[test]
     fn remove_actor_permanent_1001_test_1() -> Result<()> {
         let mut ctx = StorageContext::new();
-        ctx.setup();
+        let _ = ctx.setup();
         let actor_id = "1001".to_string();
         let remove = ctx.remove_actor_permanent(&actor_id);
         println!("remove = {:?}", remove);
@@ -589,7 +769,7 @@ mod tests {
     #[test]
     fn actor_is_present_1001_test_1() -> Result<()> {
         let mut ctx = StorageContext::new();
-        ctx.setup();
+        let _ = ctx.setup();
         let actor_id = "1001".to_string();
         let present = ctx.actor_is_present(&actor_id);
         println!("present = {:?}", present);
@@ -600,17 +780,25 @@ mod tests {
     #[test]
     fn retrieve_build_def_1001_test_1() -> Result<()> {
         let mut ctx = StorageContext::new();
-        ctx.setup();
+        let _ = ctx.setup();
         let actor_id = "1001".to_string();
         let build_def = ctx.retrieve_build_def(&actor_id);
         println!("build_def = {:?}", build_def);
         assert!(build_def.is_ok());
         Ok(())
     }
+
+    #[test]
+    fn serialize_db_event_test1() {
+        let db_event = DBEvent("event".to_string(), 100);
+        let json = serde_json::to_string(&db_event).unwrap();
+        println!("The serialized db event = {:?}", json);
+    }
 }
 
 pub(crate) mod constants {
     pub(crate) const DATABASE: &str = "arrows.db";
+    pub(crate) const DATABASE_EVENTS: &str = "arrows_events.db";
     pub(crate) const ARROWS_DB_PATH: &str = "ARROWS_DB_PATH";
     pub(super) const FETCH_LIMIT: &str = "100";
     pub(super) const BEGIN_TRANSACTION: &str = "BEGIN TRANSACTION;";
@@ -621,8 +809,18 @@ pub(crate) mod constants {
         "SELECT count(1) FROM sqlite_master WHERE type='table' AND name=?";
     pub(super) const ACTORS: &str =
         "CREATE TABLE IF NOT EXISTS actors (actor_id TEXT PRIMARY KEY, build_def TEXT)";
+    pub(super) const INBOUNDS: &str =
+        "CREATE TABLE IF NOT EXISTS inbounds (row_id INTEGER, actor_id TEXT)";
+
+    pub(super) const OUTBOUNDS: &str =
+        "CREATE TABLE IF NOT EXISTS outbounds (row_id INTEGER, actor_id TEXT)";
+
     pub(super) const BUILD_DEF_INSERT: &str =
         "INSERT INTO actors (actor_id, build_def) VALUES (:actor_id, :build_def)";
+
+    pub(super) const INBOUND_INSERT: &str =
+        "INSERT INTO inbounds (row_id, actor_id) VALUES (:row_id, :actor_id)";
+
     pub(super) const DELETE_ACTOR: &str = "DELETE FROM actors WHERE actor_id = ?";
     pub(super) const ACTOR_ROWID: &str = "SELECT rowid FROM actors WHERE actor_id = ?";
     pub(super) const BUILD_DEF: &str = "SELECT build_def FROM actors WHERE actor_id = ?";

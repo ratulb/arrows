@@ -1,12 +1,14 @@
 pub(crate) mod storage;
 use crate::common::{actor::Actor, actor::ActorBuilder, msg::Msg};
 use crate::registry::ctxops::*;
+
 use crate::registry::storage::StorageContext;
 use crate::Error;
 use lazy_static::lazy_static;
 use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
 use std::rc::Rc;
+
 use std::sync::RwLock;
 
 lazy_static! {
@@ -169,22 +171,39 @@ mod tests {
             Some(Msg::new_with_text("Reply from new actor", "from", "to"))
         }
     }
-
+    /***
+        real    0m0.576s
+        user    0m0.562s
+        sys     0m0.014s
+    ***/
     #[test]
-    fn context_add_get_remove_test1() {
+    fn context_add_get_remove_speed_test1() {
         use rand::{thread_rng, Rng};
         let mut rng = thread_rng();
 
         for _ in 0..1000000 {
             let x: u32 = rng.gen();
             if x > 1000 {
-                let mut ctx = CTX.write().unwrap();
-                println!("Yes it is");
+                let _ctx = CTX.write().unwrap();
+                assert!(999 <= x);
             }
         }
     }
+    /***
+        n2-standard-4
+        CPU platform
+        Intel Cascade Lake
+        4 vCPUs, 16 GB memory
+
+        ubuntu-pro-1804-bionic
+
+        real    0m2.577s
+        user    0m2.555s
+        sys     0m0.022s
+
+    ***/
     #[test]
-    fn arrows_add_get_remove_test1() {
+    fn arrows_add_get_remove_speed_test1() {
         use rand::{thread_rng, Rng};
         let mut rng = thread_rng();
         let mut arrows = Arrows::new();
@@ -195,9 +214,9 @@ mod tests {
             let actor: Box<dyn Actor> = Box::new(NewActor);
             let actor = Rc::new(RefCell::new(actor));
             arrows.add_actor(identity, actor.clone());
-            let actor = arrows.get_actor(identity);
-            if x > 1000 {
-                println!("Yes it is");
+            let _actor = arrows.get_actor(identity);
+            if x >= 1000 {
+                assert!(999 <= x);
             }
         }
     }

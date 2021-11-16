@@ -2,7 +2,7 @@ use async_std::net::TcpStream;
 use async_std::net::ToSocketAddrs;
 use async_std::sync::Arc;
 use futures::channel::mpsc;
-use futures::SinkExt;
+
 type Sender<T> = mpsc::UnboundedSender<T>;
 type Receiver<T> = mpsc::UnboundedReceiver<T>;
 
@@ -30,7 +30,7 @@ async fn server(addr: impl ToSocketAddrs) -> Result<()> {
     Ok(())
 }
 
-async fn client(stream: TcpStream) -> Result<()> {
+async fn client(_stream: TcpStream) -> Result<()> {
     Ok(())
 }
 
