@@ -3,18 +3,18 @@ use crate::common::utils::{from_byte_array, option_of_bytes};
 use constants::*;
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use rusqlite::{
-    hooks::Action, named_params, params, types::Value, CachedStatement, Connection,
-    Error::InvalidQuery, Result, ToSql, Transaction,
+    hooks::Action, named_params, params, types::Value, Connection,
+    Error::InvalidQuery, Result, ToSql,
 };
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::{HashMap, VecDeque};
-use std::fs::OpenOptions;
-use std::io::{BufWriter, Write};
+
+
 use std::io::{Error, ErrorKind};
 
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::Arc;
+
 
 unsafe impl Send for DBEventRecorder {}
 unsafe impl Sync for DBEventRecorder {}
@@ -33,7 +33,7 @@ impl DBEventRecorder {
             Ok(conn) => conn,
             Err(err) => panic!("{}", err),
         };
-        Self { conn: conn }
+        Self { conn }
     }
     pub(crate) fn record_event(&mut self, event: DBEvent) -> Result<()> {
         let DBEvent(tbl, row_id) = event;
@@ -65,7 +65,7 @@ impl DBConnection {
 
         if let Ok(primary) = result {
             primary.set_prepared_statement_cache_capacity(100);
-            Self { primary: primary }
+            Self { primary }
         } else {
             panic!("Failed to obtain primary db connection");
         }
@@ -75,8 +75,8 @@ impl DBConnection {
 impl DBEvent {
     pub(crate) fn persist(&self) -> Result<usize> {
         //let mut stmt = conn.prepare_cached(INBOUND_INSERT).ok();
-        let DBEvent(tbl, row_id) = self;
-        let actor_id = match tbl.find('_') {
+        let DBEvent(tbl, _row_id) = self;
+        let _actor_id = match tbl.find('_') {
             None => return Ok(0),
             Some(idx) => &tbl[..idx],
         };
@@ -194,22 +194,6 @@ impl StorageContext {
         Ok(())
     }
 
-    /*** pub(crate) fn update_hook(&mut self, activate: bool) {
-        if activate {
-            let helper = self.conn.helper.as_ref();
-            self.conn
-                .update_hook(Some(|action: Action, _db: &str, tbl: &str, row_id| {
-                    if action == Action::SQLITE_INSERT {
-                        let event = DBEvent(String::from(tbl), row_id);
-                        if let Some(safe_conn) = helper {
-                            event.persist(safe_conn.inner.clone());
-                        }
-                    }
-                }));
-        } else {
-            self.conn.update_hook(None::<fn(Action, &str, &str, i64)>);
-        }
-    }***/
     pub(crate) fn select_existing_actors(&mut self) -> Result<Vec<String>> {
         let mut stmt = self
             .conn
@@ -667,7 +651,6 @@ mod tests {
             let msg = Msg::new_with_text(&msg_content, "from", "to");
             let _status = ctx.into_inbox(actor_id, msg);
         }
-        //println!("{:?}", update_queue);
         Ok(())
     }
 
@@ -688,7 +671,7 @@ mod tests {
 
     #[test]
     fn into_inbox_batch_test_1() {
-        let num = 1000;
+        let num = 100;
         let actor_id = "1000".to_string();
         let status = into_inbox_batch_func(num, &actor_id);
         println!("Insert status all? {:?}", status);
