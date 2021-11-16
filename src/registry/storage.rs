@@ -3,18 +3,16 @@ use crate::common::utils::{from_byte_array, option_of_bytes};
 use constants::*;
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use rusqlite::{
-    hooks::Action, named_params, params, types::Value, Connection,
-    Error::InvalidQuery, Result, ToSql,
+    hooks::Action, named_params, params, types::Value, Connection, Error::InvalidQuery, Result,
+    ToSql, Transaction,
 };
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::{HashMap, VecDeque};
-
 
 use std::io::{Error, ErrorKind};
 
 use std::path::PathBuf;
 use std::str::FromStr;
-
 
 unsafe impl Send for DBEventRecorder {}
 unsafe impl Sync for DBEventRecorder {}
@@ -36,16 +34,17 @@ impl DBEventRecorder {
         Self { conn }
     }
     pub(crate) fn record_event(&mut self, event: DBEvent) -> Result<()> {
-        let DBEvent(tbl, row_id) = event;
+        /***let DBEvent(tbl, row_id) = event;
         let actor_id = match tbl.find('_') {
             None => return Ok(()),
             Some(idx) => &tbl[..idx],
-        };
+        };***/
         let tx = self.conn.transaction()?;
-        tx.execute(
+        /***tx.execute(
             INBOUND_INSERT,
             &[&row_id as &dyn ToSql, &actor_id as &dyn ToSql],
-        )?;
+        )?;***/
+        event.persist(&tx);
         tx.commit();
         Ok(())
     }
@@ -73,14 +72,16 @@ impl DBConnection {
 }
 
 impl DBEvent {
-    pub(crate) fn persist(&self) -> Result<usize> {
-        //let mut stmt = conn.prepare_cached(INBOUND_INSERT).ok();
-        let DBEvent(tbl, _row_id) = self;
-        let _actor_id = match tbl.find('_') {
+    pub(crate) fn persist(&self, tx: &Transaction<'_>) -> Result<usize> {
+        let DBEvent(tbl, row_id) = self;
+        let actor_id = match tbl.find('_') {
             None => return Ok(0),
             Some(idx) => &tbl[..idx],
         };
-        Ok(0)
+        Ok(tx.execute(
+            INBOUND_INSERT,
+            &[&row_id as &dyn ToSql, &actor_id as &dyn ToSql],
+        )?)
     }
 }
 unsafe impl Send for DBConnection {}
@@ -169,6 +170,7 @@ impl StorageContext {
 
     pub(crate) fn crate_inbounds_table(&mut self) -> Result<()> {
         self.conn.primary.execute(INBOUNDS, [])?;
+        self.recorder.conn.execute(INBOUNDS, [])?;
         Ok(())
     }
 
