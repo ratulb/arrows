@@ -4,7 +4,7 @@ use constants::*;
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use rusqlite::{
     hooks::Action, named_params, params, types::Value, CachedStatement, Connection,
-    Error::InvalidQuery, Result, ToSql,
+    Error::InvalidQuery, Result, ToSql, Transaction,
 };
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::{HashMap, VecDeque};
@@ -35,26 +35,19 @@ impl DBEventRecorder {
         };
         Self { conn: conn }
     }
-    pub(crate) fn record_event(&mut self, event: DBEvent) -> Result<usize> {
-        let stmt = self.conn.prepare(INBOUND_INSERT).ok();
+    pub(crate) fn record_event(&mut self, event: DBEvent) -> Result<()> {
         let DBEvent(tbl, row_id) = event;
         let actor_id = match tbl.find('_') {
-            None => return Ok(0),
+            None => return Ok(()),
             Some(idx) => &tbl[..idx],
         };
-        println!("Recoding event post transaction = {:?}", actor_id);
-        /***match stmt {
-                    Some(mut s) => Ok(s.execute(
-                named_params! { ":row_id": &row_id as &dyn ToSql, ":actor_id": &actor_id as &dyn ToSql
-        },
-                        )?),
-                    None => Ok(0),
-                }***/
-
-        Ok(self.conn.execute(
+        let tx = self.conn.transaction()?;
+        tx.execute(
             INBOUND_INSERT,
             &[&row_id as &dyn ToSql, &actor_id as &dyn ToSql],
-        )?)
+        )?;
+        tx.commit();
+        Ok(())
     }
 }
 
@@ -77,31 +70,9 @@ impl DBConnection {
             panic!("Failed to obtain primary db connection");
         }
     }
-    /***pub(crate) fn update_hook<'c, F>(&'c mut self, hook: Option<F>)
-    where
-        F: FnMut(Action, &str, &str, i64) + Send + 'c,
-    {
-        self.primary.update_hook(hook);
-    }***/
 }
 
 impl DBEvent {
-    /***fn persist(&self) /
-    {
-        let DBEvent(_, path, _) = self;
-        let mut path_buf = PathBuf::from("/tmp");
-        path_buf.push(path);
-        let json = serde_json::to_string(self).unwrap();
-        let file = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .append(true)
-            .open(path_buf.as_os_str())
-            .unwrap();
-        let mut writer = BufWriter::new(file);
-        writer.write_all(json.as_bytes()).unwrap();
-        //Ok(())
-    }***/
     pub(crate) fn persist(&self) -> Result<usize> {
         //let mut stmt = conn.prepare_cached(INBOUND_INSERT).ok();
         let DBEvent(tbl, row_id) = self;
@@ -109,28 +80,6 @@ impl DBEvent {
             None => return Ok(0),
             Some(idx) => &tbl[..idx],
         };
-        /***match stmt {
-                Some(ref mut s) => s.execute(
-        named_params! { ":row_id": row_id as &dyn ToSql, ":actor_id": &actor_id as &dyn ToSql },
-                )?,
-                None => panic!(),
-            };***/
-
-        /***conn.execute(
-            INBOUND_INSERT,
-            &[row_id as &dyn ToSql, &actor_id as &dyn ToSql],
-        )?;***/
-        /***println!("But you even come here$$$$$$$$$$$!");
-        let rs = match &self.2 {
-            Some(c) => c.inner.execute(
-                INBOUND_INSERT,
-                &[row_id as &dyn ToSql, &actor_id as &dyn ToSql],
-            ),
-
-            None => Ok(0),
-        };
-        println!("But you even come here*******#######!");
-        rs***/
         Ok(0)
     }
 }
@@ -239,7 +188,7 @@ impl StorageContext {
             .update_hook(Some(|action: Action, _db: &str, tbl: &str, row_id| {
                 if action == Action::SQLITE_INSERT {
                     let event = DBEvent(String::from(tbl), row_id);
-                    //self.recorder.record_event(event);
+                    self.recorder.record_event(event);
                 }
             }));
         Ok(())
@@ -739,7 +688,7 @@ mod tests {
 
     #[test]
     fn into_inbox_batch_test_1() {
-        let num = 5;
+        let num = 1000;
         let actor_id = "1000".to_string();
         let status = into_inbox_batch_func(num, &actor_id);
         println!("Insert status all? {:?}", status);
