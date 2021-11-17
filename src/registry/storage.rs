@@ -19,6 +19,7 @@ unsafe impl Sync for DBEventRecorder {}
 
 pub(crate) struct DBEventRecorder {
     conn: Connection,
+    events: VecDeque<DBEvent>,
 }
 
 impl DBEventRecorder {
@@ -31,25 +32,70 @@ impl DBEventRecorder {
             Ok(conn) => conn,
             Err(err) => panic!("{}", err),
         };
-        Self { conn }
+        Self {
+            conn: conn,
+            events: VecDeque::with_capacity(1000),
+        }
     }
-    pub(crate) fn record_event(&mut self, event: DBEvent) -> Result<()> {
-        /***let DBEvent(tbl, row_id) = event;
+    /***pub(crate) fn record_event(&mut self, event: DBEvent) -> Result<()> {
+        let DBEvent(tbl, row_id) = event;
         let actor_id = match tbl.find('_') {
             None => return Ok(()),
             Some(idx) => &tbl[..idx],
-        };***/
+        };
         let tx = self.conn.transaction()?;
-        /***tx.execute(
+        tx.execute(
             INBOUND_INSERT,
             &[&row_id as &dyn ToSql, &actor_id as &dyn ToSql],
-        )?;***/
-        event.persist(&tx);
+        )?;
+        //event.persist(&tx);
+        tx.commit();
+        Ok(())
+    }***/
+    pub(crate) fn record_event(&mut self, event: DBEvent) -> Result<()> {
+        if self.events.len() < 1000 {
+            self.events.push_back(event);
+            return Ok(());
+        }
+        self.events.push_back(event);
+        let events = std::mem::replace(&mut self.events, VecDeque::with_capacity(1000));
+        let tx = self.conn.transaction()?;
+        for event in events {
+            let DBEvent(tbl, row_id) = event;
+            let actor_id = match tbl.find('_') {
+                None => continue,
+                Some(idx) => &tbl[..idx],
+            };
+
+            tx.execute(
+                INBOUND_INSERT,
+                &[&row_id as &dyn ToSql, &actor_id as &dyn ToSql],
+            );
+        }
         tx.commit();
         Ok(())
     }
 }
+impl Drop for DBEventRecorder {
+    fn drop(&mut self) {
+        if self.events.len() > 0 {
+            let tx = self.conn.transaction().unwrap();
+            for event in &self.events {
+                let DBEvent(tbl, row_id) = event;
+                let actor_id = match tbl.find('_') {
+                    None => continue,
+                    Some(idx) => &tbl[..idx],
+                };
 
+                tx.execute(
+                    INBOUND_INSERT,
+                    &[&row_id as &dyn ToSql, &actor_id as &dyn ToSql],
+                );
+            }
+            tx.commit();
+        }
+    }
+}
 pub(crate) struct DBConnection {
     primary: Connection,
 }
@@ -658,7 +704,7 @@ mod tests {
 
     #[test]
     fn into_inbox_no_batch_test_1() {
-        let num = 1;
+        let num = 1001;
         let actor_id = "1000".to_string();
         //InvalidParameterCount
         //Err(SqliteFailure(
@@ -668,7 +714,6 @@ mod tests {
         //Err(SqliteFailure(Error { code: ConstraintViolation, extended_code: 1555 },
         // Some("UNIQUE constraint failed: actors.actor_id")
         let status = into_inbox_no_batch_func(num, &actor_id);
-        println!("Insert status each ? {:?}", status);
     }
 
     #[test]
