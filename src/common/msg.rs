@@ -466,7 +466,6 @@ mod tests {
         let mut msg = Msg::internal(option_of_bytes(&"Content"), "addr_from", "addr_to");
         assert_eq!(msg.get_recipients(), &None);
         msg.set_recipient_all();
-        type_of(&msg.get_recipients());
         assert_eq!(msg.get_recipients(), &Some(AdditionalRecipients::All));
     }
 

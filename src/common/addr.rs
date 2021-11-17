@@ -119,10 +119,7 @@ mod tests {
     #[test]
     fn create_addr_test2() {
         let addr1 = Addr::new("add1");
-        println!(
-            "address is local: {}",
-            addr1.get_socket_addr().unwrap().ip().is_loopback()
-        );
+        assert_eq!(addr1.get_socket_addr().unwrap().ip().is_loopback(), true);
     }
     #[test]
     fn create_addr_test3() {
@@ -150,11 +147,5 @@ mod tests {
         assert_eq!(addr.get_id(), id);
         addr.with_ip("10.160.0.2");
         assert!(addr.is_local());
-    }
-
-    #[test]
-    fn check_hostip_and_port_test1() {
-        let addr = Addr::new("add");
-        println!("{:?}", addr);
     }
 }
