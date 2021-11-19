@@ -122,7 +122,7 @@ impl DBEvent {
         let DBEvent(tbl, row_id) = self;
         let actor_id = match tbl.find('_') {
             None => return Ok(0),
-            Some(idx) => &tbl[..idx],
+            Some(idx) => &tbl[(idx + 1)..],
         };
         Ok(tx.execute(
             INBOUND_INSERT,
@@ -234,7 +234,8 @@ impl StorageContext {
         self.conn
             .primary
             .update_hook(Some(|action: Action, _db: &str, tbl: &str, row_id| {
-                if action == Action::SQLITE_INSERT {
+                let tbl_of_interest = tbl.starts_with(INBOX) || tbl.starts_with(OUTBOX);
+                if action == Action::SQLITE_INSERT && tbl_of_interest {
                     let event = DBEvent(String::from(tbl), row_id);
                     self.recorder.record_event(event);
                 }

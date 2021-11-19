@@ -392,7 +392,6 @@ mod tests {
     use super::*;
     use crate::from_bytes;
     use crate::option_of_bytes;
-    use crate::type_of;
     use std::fs::OpenOptions;
     use std::io::BufWriter;
     #[test]
