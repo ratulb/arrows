@@ -37,21 +37,7 @@ impl DBEventRecorder {
             events: VecDeque::with_capacity(1000),
         }
     }
-    /***pub(crate) fn record_event(&mut self, event: DBEvent) -> Result<()> {
-        let DBEvent(tbl, row_id) = event;
-        let actor_id = match tbl.find('_') {
-            None => return Ok(()),
-            Some(idx) => &tbl[..idx],
-        };
-        let tx = self.conn.transaction()?;
-        tx.execute(
-            INBOUND_INSERT,
-            &[&row_id as &dyn ToSql, &actor_id as &dyn ToSql],
-        )?;
-        //event.persist(&tx);
-        tx.commit();
-        Ok(())
-    }***/
+
     pub(crate) fn record_event(&mut self, event: DBEvent) -> Result<()> {
         if self.events.len() < 1000 {
             self.events.push_back(event);
@@ -64,7 +50,7 @@ impl DBEventRecorder {
             let DBEvent(tbl, row_id) = event;
             let actor_id = match tbl.find('_') {
                 None => continue,
-                Some(idx) => &tbl[..idx],
+                Some(idx) => &tbl[idx + 1..],
             };
 
             tx.execute(
@@ -84,7 +70,7 @@ impl Drop for DBEventRecorder {
                 let DBEvent(tbl, row_id) = event;
                 let actor_id = match tbl.find('_') {
                     None => continue,
-                    Some(idx) => &tbl[..idx],
+                    Some(idx) => &tbl[idx + 1..],
                 };
 
                 tx.execute(
@@ -308,7 +294,6 @@ impl StorageContext {
         if let Some(row) = rows.next()? {
             let value: usize = row.get(0)?;
             if value == 1 {
-                println!("Table exists");
                 let stmt = format!("DELETE FROM inbox_{}", actor_id);
                 match self.conn.primary.execute(&stmt, []) {
                     Ok(deleted) => println!("Rows deleted: {:?}", deleted),
@@ -780,7 +765,9 @@ pub(crate) mod constants {
     pub(crate) const DATABASE: &str = "arrows.db";
     pub(crate) const DATABASE_EVENTS: &str = "arrows_events.db";
     pub(crate) const ARROWS_DB_PATH: &str = "ARROWS_DB_PATH";
-    pub(super) const FETCH_LIMIT: &str = "100";
+    pub(super) const FETCH_LIMIT: &str = "1000";
+    pub(super) const INBOX: &str = "inbox";
+    pub(super) const OUTBOX: &str = "outbox";
     pub(super) const BEGIN_TRANSACTION: &str = "BEGIN TRANSACTION;";
     pub(super) const COMMIT_TRANSACTION: &str = "COMMIT TRANSACTION;";
     pub(super) const SELECT_ACTORS: &str = "SELECT actor_id FROM actors";
