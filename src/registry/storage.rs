@@ -13,17 +13,20 @@ use std::io::{Error, ErrorKind};
 
 use std::path::PathBuf;
 use std::str::FromStr;
-
+use std::sync::mpsc::*;
+use std::thread;
+use std::thread::JoinHandle;
 unsafe impl Send for DBEventRecorder {}
 unsafe impl Sync for DBEventRecorder {}
 
 pub(crate) struct DBEventRecorder {
     conn: Connection,
     events: VecDeque<DBEvent>,
+    sender: Sender<DBEvent>,
 }
 
 impl DBEventRecorder {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(sender: Sender<DBEvent>) -> Self {
         let path = std::env::var(ARROWS_DB_PATH)
             .expect("Please set ARROWS_DB_PATH pointing to an existing directory!");
         let mut path = PathBuf::from(path);
@@ -35,19 +38,21 @@ impl DBEventRecorder {
         Self {
             conn: conn,
             events: VecDeque::with_capacity(1000),
+            sender: sender,
         }
     }
 
     pub(crate) fn record_event(&mut self, event: DBEvent) -> Result<()> {
-        if self.events.len() < 1000 {
+        /***if self.events.len() < 1000 {
             self.events.push_back(event);
             return Ok(());
-        }
-        self.events.push_back(event);
-        let events = std::mem::replace(&mut self.events, VecDeque::with_capacity(1000));
-        let tx = self.conn.transaction()?;
-        for event in events {
-            let DBEvent(tbl, row_id) = event;
+        }***/
+        //self.events.push_back(event);
+        //let events = std::mem::replace(&mut self.events, VecDeque::with_capacity(1000));
+        //let tx = self.conn.transaction()?;
+        //for event in events {
+            self.sender.send(event);
+          /***  let DBEvent(tbl, row_id) = event;
             let actor_id = match tbl.find('_') {
                 None => continue,
                 Some(idx) => &tbl[idx + 1..],
@@ -58,15 +63,16 @@ impl DBEventRecorder {
                 &[&row_id as &dyn ToSql, &actor_id as &dyn ToSql],
             );
         }
-        tx.commit();
+        tx.commit();***/
         Ok(())
     }
 }
-impl Drop for DBEventRecorder {
+/***impl Drop for DBEventRecorder {
     fn drop(&mut self) {
         if self.events.len() > 0 {
             let tx = self.conn.transaction().unwrap();
             for event in &self.events {
+                self.sender.send(event.clone());
                 let DBEvent(tbl, row_id) = event;
                 let actor_id = match tbl.find('_') {
                     None => continue,
@@ -81,7 +87,7 @@ impl Drop for DBEventRecorder {
             tx.commit();
         }
     }
-}
+}***/
 pub(crate) struct DBConnection {
     primary: Connection,
 }
@@ -121,7 +127,7 @@ unsafe impl Sync for DBConnection {}
 
 unsafe impl Send for StorageContext {}
 unsafe impl Sync for StorageContext {}
-
+#[derive(Clone)]
 pub(crate) struct DBEvent(String, i64);
 
 impl std::fmt::Debug for DBEvent {
@@ -163,14 +169,22 @@ impl From<Action> for DBAction {
     }
 }
 
+impl Drop for StorageContext {
+  fn drop(&mut self) {
+      self.recorder.take();
+      self.update_receiver.take().map(JoinHandle::join);
+  }
+}
+
 pub(crate) struct StorageContext {
     conn: DBConnection,
-    recorder: DBEventRecorder,
+    recorder: Option<DBEventRecorder>,
     inbox_insert_stmts: HashMap<String, String>,
     inbox_select_stmts: HashMap<String, String>,
     outbox_insert_stmts: HashMap<String, String>,
     outbox_select_stmts: HashMap<String, String>,
     actor_create_stmts: HashMap<String, String>,
+    update_receiver: Option<JoinHandle<()>>,
 }
 impl std::fmt::Debug for StorageContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -184,14 +198,25 @@ impl std::fmt::Debug for StorageContext {
 }
 impl StorageContext {
     pub(crate) fn new() -> Self {
+        let (sender, receiver) = channel();
+        let update_receiver = thread::spawn(move || {
+            let count = 0;
+        while let Ok(event) = receiver.recv() {
+         // println!("Receiving event = {:?}", event);
+         if count >= 1000000 {
+            println!("Received events = {:?}", count);
+         }
+        }
+     });
         Self {
             conn: DBConnection::new(),
-            recorder: DBEventRecorder::new(),
+            recorder: Some(DBEventRecorder::new(sender)),
             inbox_insert_stmts: HashMap::new(),
             outbox_insert_stmts: HashMap::new(),
             inbox_select_stmts: HashMap::new(),
             outbox_select_stmts: HashMap::new(),
             actor_create_stmts: HashMap::new(),
+            update_receiver: Some(update_receiver),
         }
     }
 
@@ -202,7 +227,9 @@ impl StorageContext {
 
     pub(crate) fn crate_inbounds_table(&mut self) -> Result<()> {
         self.conn.primary.execute(INBOUNDS, [])?;
-        self.recorder.conn.execute(INBOUNDS, [])?;
+        if let Some(ref mut evt_recorder) = self.recorder {
+           evt_recorder.conn.execute(INBOUNDS, [])?;
+        }
         Ok(())
     }
 
@@ -223,7 +250,9 @@ impl StorageContext {
                 let tbl_of_interest = tbl.starts_with(INBOX) || tbl.starts_with(OUTBOX);
                 if action == Action::SQLITE_INSERT && tbl_of_interest {
                     let event = DBEvent(String::from(tbl), row_id);
-                    self.recorder.record_event(event);
+                    if let Some(ref mut recorder) = self.recorder {
+                        recorder.record_event(event);
+                    }
                 }
             }));
         Ok(())
@@ -668,8 +697,7 @@ mod tests {
             messages.push(msg);
         }
         let status = ctx.into_inbox_batch(actor_id, messages.into_iter());
-        println!("Batch insert final status: {:?}", status);
-
+        assert!(status.is_ok());
         Ok(())
     }
 
@@ -690,7 +718,7 @@ mod tests {
 
     #[test]
     fn into_inbox_no_batch_test_1() {
-        let num = 1001;
+        let num = 100;
         let actor_id = "1000".to_string();
         //InvalidParameterCount
         //Err(SqliteFailure(
@@ -699,7 +727,7 @@ mod tests {
         //Err(SqliteFailure(Error { code: TypeMismatch
         //Err(SqliteFailure(Error { code: ConstraintViolation, extended_code: 1555 },
         // Some("UNIQUE constraint failed: actors.actor_id")
-        let status = into_inbox_no_batch_func(num, &actor_id);
+        let _status = into_inbox_no_batch_func(num, &actor_id);
     }
 
     #[test]
@@ -707,7 +735,7 @@ mod tests {
         let num = 100;
         let actor_id = "1000".to_string();
         let status = into_inbox_batch_func(num, &actor_id);
-        println!("Insert status all? {:?}", status);
+        assert!(status.is_ok());
     }
 
     #[test]
