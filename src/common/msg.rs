@@ -84,6 +84,9 @@ impl Msg {
             Msg::Blank => None,
         }
     }
+    pub fn get_bytes(&self) -> Vec<u8> {
+        option_of_bytes(self).unwrap_or(vec![])
+    }
 
     pub fn uturn_with_text(&mut self, reply: &str) {
         match self {

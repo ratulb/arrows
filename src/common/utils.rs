@@ -1,13 +1,13 @@
 use crate::Result as ArrowsResult;
 use bincode::{deserialize, serialize};
+use mktemp::Temp;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
-use std::fs::{File, OpenOptions};
-use std::hash::{Hash, Hasher};
-use std::io::{BufReader, BufWriter, Result, Seek, Write};
-use std::path::Path;
-
 use std::convert::TryInto;
+use std::fs::{self, File, OpenOptions};
+use std::hash::{Hash, Hasher};
+use std::io::{copy, BufReader, BufWriter, Result, Seek, Write};
+use std::path::Path;
 
 #[macro_export]
 macro_rules! function {
@@ -48,7 +48,7 @@ pub async fn to_file<T: Serialize>(value: T, file: &str) -> Result<()> {
     let file = OpenOptions::new()
         .create(true)
         .write(true)
-        .append(true)
+        .append(false)
         .open(file)?;
     let mut writer = BufWriter::new(file);
     serde_json::to_writer(&mut writer, &value)?;
@@ -59,14 +59,24 @@ pub fn to_file_sync<T: Serialize>(value: T, file: &str) -> Result<()> {
     let file = OpenOptions::new()
         .create(true)
         .write(true)
-        .append(true)
+        .append(false)
         .open(file)?;
     let mut writer = BufWriter::new(file);
     serde_json::to_writer(&mut writer, &value)?;
     writer.flush()?;
     Ok(())
 }
-
+pub fn bytes_to_file(bytes: &[u8], file: &str, append: bool) -> Result<()> {
+    let file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .append(append)
+        .open(file)?;
+    let mut writer = BufWriter::new(file);
+    writer.write_all(bytes)?;
+    writer.flush()?;
+    Ok(())
+}
 pub async fn to_stream<W: Seek + Write, T: Serialize>(value: T, writer: &mut W) -> Result<()> {
     serde_json::to_writer(writer, &value)?;
     Ok(())
@@ -93,6 +103,18 @@ pub fn option_of_bytes<T: ?Sized + std::fmt::Debug + Serialize>(t: &T) -> Option
             None
         }
     }
+}
+
+pub fn prepend_bytes(bytes: &[u8], file: &str) -> Result<()> {
+    let mut tmp_file = Temp::new_file()?;
+    let tmp_file = tmp_file.release();
+    let mut tmp = File::create(&tmp_file)?;
+    let mut src = File::open(file)?;
+    tmp.write_all(&bytes)?;
+    copy(&mut src, &mut tmp)?;
+    fs::remove_file(file)?;
+    fs::rename(&tmp_file, file)?;
+    Ok(())
 }
 
 pub fn from_bytes<'a, T: std::fmt::Debug + Deserialize<'a>>(bytes: &'a [u8]) -> ArrowsResult<T> {

@@ -17,7 +17,7 @@ lazy_static! {
     );
 }
 
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Hash)]
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum Scheme {
     Email,
     Inprocess,
@@ -28,7 +28,7 @@ pub enum Scheme {
     Udp,
 }
 
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Hash, Default)]
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize, Hash, Default)]
 pub struct Addr {
     id: u64,
     name: String,
