@@ -106,7 +106,7 @@ pub fn option_of_bytes<T: ?Sized + std::fmt::Debug + Serialize>(t: &T) -> Option
 }
 
 pub fn prepend_bytes(bytes: &[u8], file: &str) -> Result<()> {
-    let mut tmp_file = Temp::new_file()?;
+    let tmp_file = Temp::new_file()?;
     let tmp_file = tmp_file.release();
     let mut tmp = File::create(&tmp_file)?;
     let mut src = File::open(file)?;
