@@ -1,3 +1,4 @@
+//#![deny(unsafe_code)]
 #![deny(rust_2018_idioms)]
 pub use common::actor::{Actor, ActorBuilder, BuilderResurrector};
 pub use common::addr::Addr;
@@ -10,3 +11,4 @@ pub mod macros;
 pub mod registry;
 mod remoting;
 mod routers;
+mod sender;
