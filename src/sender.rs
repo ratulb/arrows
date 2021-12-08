@@ -31,7 +31,7 @@ macro_rules! send {
                         msgs.push(msg);
                     )*
             )*
-                $crate::recv(actor_msgs);
+            $crate::recv(actor_msgs);
     };
 
     (@SIZE; $($msg:expr),*) => {
