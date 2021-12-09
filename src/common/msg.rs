@@ -14,7 +14,7 @@ pub enum Msg {
         to: Option<Addr>,
         content: Option<Vec<u8>>,
         recipients: Option<AdditionalRecipients>,
-        created: SystemTime,
+        dispatched: Option<SystemTime>,
     },
     Internal {
         id: u64,
@@ -22,7 +22,7 @@ pub enum Msg {
         to: Option<Addr>,
         content: Option<Vec<u8>>,
         recipients: Option<AdditionalRecipients>,
-        created: SystemTime,
+        dispatched: Option<SystemTime>,
     },
     Blank,
 }
@@ -41,7 +41,7 @@ impl Msg {
             to: Some(Addr::new(to)),
             content,
             recipients: None,
-            created: SystemTime::now(),
+            dispatched: None,
         }
     }
     pub fn new_with_text(content: &str, from: &str, to: &str) -> Self {
@@ -51,7 +51,7 @@ impl Msg {
             to: Some(Addr::new(to)),
             content: option_of_bytes(&String::from(content)),
             recipients: None,
-            created: SystemTime::now(),
+            dispatched: None,
         }
     }
     pub fn new_internal(content: &str, from: &str, to: &str) -> Self {
@@ -61,7 +61,7 @@ impl Msg {
             to: Some(Addr::new(to)),
             content: option_of_bytes(&String::from(content)),
             recipients: None,
-            created: SystemTime::now(),
+            dispatched: None,
         }
     }
 
@@ -366,7 +366,7 @@ impl Msg {
             to: Some(Addr::new(to)),
             content,
             recipients: None,
-            created: SystemTime::now(),
+            dispatched: None,
         }
     }
 }
