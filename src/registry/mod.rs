@@ -87,6 +87,19 @@ pub fn send(identity: u64, msg: Msg) {
     send_msg(identity, msg);
 }
 
+pub fn reload_actor(addr: u64) -> Result<Rc<RefCell<Box<dyn Actor>>>, Error> {
+    match retrieve_build_def(&addr.to_string()) {
+        Some(ref s) => {
+            let mut builder: Box<dyn ActorBuilder> = serde_json::from_str(s)?;
+            let actor: Box<dyn Actor> = builder.build();
+            add_actor(addr, actor)
+                .and_then(post_start)
+                .ok_or(Error::ActorReloadError)
+        }
+        None => Err(Error::ActorReloadError),
+    }
+}
+
 pub(in crate::registry) mod ctxops {
     use super::*;
     pub(super) fn send_msg(identity: u64, msg: Msg) {
@@ -129,7 +142,21 @@ pub(in crate::registry) mod ctxops {
             .persist_builder(identity, &builder_def)
             .map_err(|err| Error::Other(Box::new(err)))
     }
+    pub(super) fn retrieve_build_def(identity: &String) -> Option<String> {
+        let rs = CTX.write().unwrap().storage.retrieve_build_def(identity);
+        match rs {
+            Ok(build_def) => match build_def {
+                Some(s) => Some(s),
+                None => None,
+            },
+            Err(err) => {
+                eprintln!("Error fetching build def = {:?}", err);
+                None
+            }
+        }
+    }
 
+    //retrieve_build_def
     pub(super) fn add_actor(
         addr: u64,
         actor: Box<dyn Actor>,

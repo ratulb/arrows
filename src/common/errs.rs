@@ -4,6 +4,7 @@ pub enum Error {
     SerdeJson(serde_json::Error),
     Other(Box<dyn std::error::Error>),
     RegistrationError,
+    ActorReloadError,
     Bincode(bincode::ErrorKind),
 }
 impl From<std::io::Error> for Error {
