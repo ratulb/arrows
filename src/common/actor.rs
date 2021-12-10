@@ -11,24 +11,10 @@ pub trait Actor: Any + Send + Sync {
         any::type_name::<Self>()
     }
     fn post_start(&mut self, _mail: Mail) -> Option<Mail> {
-        Some(
-            Msg::new(
-                Some("Actor loading".as_bytes().to_vec()),
-                self.type_name(),
-                "system",
-            )
-            .into(),
-        )
+        Some(Msg::new_with_text("Actor loading", self.type_name(), "system").into())
     }
     fn pre_shutdown(&mut self, _mail: Mail) -> Option<Mail> {
-        Some(
-            Msg::new(
-                Some("Actor unloading".as_bytes().to_vec()),
-                self.type_name(),
-                "system",
-            )
-            .into(),
-        )
+        Some(Msg::new_with_text("Actor unloading", self.type_name(), "system").into())
     }
 }
 
