@@ -5,7 +5,7 @@ use crate::common::{
     mail::{Mail, Msg},
 };
 use crate::registry::ctxops::*;
-use crate::registry::storage::StorageContext;
+use crate::registry::storage::Storage;
 use crate::BuilderDeserializer;
 use crate::Error;
 use lazy_static::lazy_static;
@@ -20,43 +20,43 @@ lazy_static! {
 
 #[derive(Debug)]
 pub(crate) struct Context {
-    pub(crate) arrows: Arrows,
-    pub(crate) storage: StorageContext,
+    pub(crate) actors: Actors,
+    pub(crate) storage: Storage,
 }
 
 impl Context {
     pub fn init() -> Context {
-        let arrows = Arrows::new();
-        let mut storage = StorageContext::new();
+        let actors = Actors::new();
+        let mut storage = Storage::new();
         storage.setup();
-        Self { arrows, storage }
+        Self { actors, storage }
     }
 }
 
 #[derive(Debug)]
-pub(crate) struct Arrows {
-    pub(crate) wrappers: HashMap<u64, Rc<RefCell<Box<dyn Actor>>>>,
+pub(crate) struct Actors {
+    pub(crate) cached_actors: HashMap<u64, Rc<RefCell<Box<dyn Actor>>>>,
 }
-unsafe impl Send for Arrows {}
-unsafe impl Sync for Arrows {}
+unsafe impl Send for Actors {}
+unsafe impl Sync for Actors {}
 
-impl Arrows {
+impl Actors {
     pub(crate) fn new() -> Self {
         Self {
-            wrappers: HashMap::new(),
+            cached_actors: HashMap::new(),
         }
     }
     pub(crate) fn get_actor(&self, identity: u64) -> Option<RefMut<'_, Box<dyn Actor>>> {
-        self.wrappers
+        self.cached_actors
             .get(&identity)
             .as_mut()
             .map(|entry| entry.borrow_mut())
     }
     pub(crate) fn add_actor(&mut self, identity: u64, rc_actor: Rc<RefCell<Box<dyn Actor>>>) {
-        self.wrappers.insert(identity, rc_actor.clone());
+        self.cached_actors.insert(identity, rc_actor.clone());
     }
     pub(crate) fn remove_actor(&mut self, identity: u64) -> Option<Rc<RefCell<Box<dyn Actor>>>> {
-        self.wrappers.remove(&identity)
+        self.cached_actors.remove(&identity)
     }
 }
 
@@ -90,7 +90,6 @@ pub fn send(identity: u64, msg: Msg) {
 pub fn reload_actor(addr: u64) -> Result<Rc<RefCell<Box<dyn Actor>>>, Error> {
     match retrieve_build_def(&addr.to_string()) {
         Some(s) => {
-            let builder_deserializer = BuilderDeserializer::default();
             let mut builder: Box<dyn ActorBuilder> =
                 BuilderDeserializer::default().from_string(s)?;
             let actor: Box<dyn Actor> = builder.build();
@@ -106,7 +105,7 @@ pub(in crate::registry) mod ctxops {
     use super::*;
     pub(super) fn send_msg(identity: u64, msg: Msg) {
         let ctx = CTX.write().unwrap();
-        let actor = ctx.arrows.get_actor(identity);
+        let actor = ctx.actors.get_actor(identity);
         if let Some(mut actor) = actor {
             actor.receive(msg.into());
             println!("Msg delivered");
@@ -116,7 +115,7 @@ pub(in crate::registry) mod ctxops {
     }
 
     pub(super) fn remove_actor(identity: u64) -> Option<Rc<RefCell<Box<dyn Actor>>>> {
-        CTX.write().unwrap().arrows.remove_actor(identity)
+        CTX.write().unwrap().actors.remove_actor(identity)
     }
 
     //Send a shutdown msg to the actor that is being removed
@@ -158,13 +157,12 @@ pub(in crate::registry) mod ctxops {
         }
     }
 
-    //retrieve_build_def
     pub(super) fn add_actor(
         addr: u64,
         actor: Box<dyn Actor>,
     ) -> Option<Rc<RefCell<Box<dyn Actor>>>> {
         let actor = Rc::new(RefCell::new(actor));
-        CTX.write().unwrap().arrows.add_actor(addr, actor.clone());
+        CTX.write().unwrap().actors.add_actor(addr, actor.clone());
         Some(actor)
     }
 
@@ -173,23 +171,6 @@ pub(in crate::registry) mod ctxops {
     ) -> Option<Rc<RefCell<Box<dyn Actor>>>> {
         let _post_start_msg = actor.borrow_mut().receive(Mail::Blank);
         Some(actor)
-    }
-}
-
-pub(crate) struct Arrow {
-    inner: Option<Box<dyn Actor>>,
-}
-
-impl Arrow {
-    pub(crate) fn new() -> Self {
-        Self { inner: None }
-    }
-    /*** pub(crate) fn inner(&self) -> Option<&dyn Actor> {
-        self.inner.as_ref()
-    }***/
-    pub(crate) fn set(&mut self, actor: Box<dyn Actor>) {
-        //let _ignored = replace(&mut self.inner, Some(actor));
-        self.inner.as_mut().map(|_| actor);
     }
 }
 
@@ -235,18 +216,18 @@ mod tests {
 
     ***/
     #[test]
-    fn arrows_add_get_remove_speed_test1() {
+    fn actors_add_get_remove_speed_test1() {
         use rand::{thread_rng, Rng};
         let mut rng = thread_rng();
-        let mut arrows = Arrows::new();
+        let mut actors = Actors::new();
         for _ in 0..1000000 {
             let x: u32 = rng.gen();
             let identity = 10000;
-            arrows.remove_actor(identity);
+            actors.remove_actor(identity);
             let actor: Box<dyn Actor> = Box::new(NewActor);
             let actor = Rc::new(RefCell::new(actor));
-            arrows.add_actor(identity, actor.clone());
-            let _actor = arrows.get_actor(identity);
+            actors.add_actor(identity, actor.clone());
+            let _actor = actors.get_actor(identity);
             if x >= 1000 {
                 assert!(999 <= x);
             }
