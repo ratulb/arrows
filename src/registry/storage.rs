@@ -16,6 +16,7 @@ use std::str::FromStr;
 use std::sync::mpsc::*;
 use std::thread;
 use std::thread::JoinHandle;
+
 unsafe impl Send for DBEventRecorder {}
 unsafe impl Sync for DBEventRecorder {}
 
@@ -51,8 +52,8 @@ impl DBEventRecorder {
         //let events = std::mem::replace(&mut self.events, VecDeque::with_capacity(1000));
         //let tx = self.conn.transaction()?;
         //for event in events {
-            self.sender.send(event);
-          /***  let DBEvent(tbl, row_id) = event;
+        self.sender.send(event);
+        /***  let DBEvent(tbl, row_id) = event;
             let actor_id = match tbl.find('_') {
                 None => continue,
                 Some(idx) => &tbl[idx + 1..],
@@ -170,10 +171,10 @@ impl From<Action> for DBAction {
 }
 
 impl Drop for StorageContext {
-  fn drop(&mut self) {
-      self.recorder.take();
-      self.update_receiver.take().map(JoinHandle::join);
-  }
+    fn drop(&mut self) {
+        self.recorder.take();
+        self.update_receiver.take().map(JoinHandle::join);
+    }
 }
 
 pub(crate) struct StorageContext {
@@ -201,13 +202,13 @@ impl StorageContext {
         let (sender, receiver) = channel();
         let update_receiver = thread::spawn(move || {
             let count = 0;
-        while let Ok(event) = receiver.recv() {
-         // println!("Receiving event = {:?}", event);
-         if count >= 1000000 {
-            println!("Received events = {:?}", count);
-         }
-        }
-     });
+            while let Ok(event) = receiver.recv() {
+                // println!("Receiving event = {:?}", event);
+                if count >= 1000000 {
+                    println!("Received events = {:?}", count);
+                }
+            }
+        });
         Self {
             conn: DBConnection::new(),
             recorder: Some(DBEventRecorder::new(sender)),
@@ -228,7 +229,7 @@ impl StorageContext {
     pub(crate) fn crate_inbounds_table(&mut self) -> Result<()> {
         self.conn.primary.execute(INBOUNDS, [])?;
         if let Some(ref mut evt_recorder) = self.recorder {
-           evt_recorder.conn.execute(INBOUNDS, [])?;
+            evt_recorder.conn.execute(INBOUNDS, [])?;
         }
         Ok(())
     }
