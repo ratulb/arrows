@@ -81,23 +81,23 @@ mod tests {
 
     #[test]
     fn actor_builder_test_1() {
-        struct MyActor1;
+        struct MyActor;
 
-        impl Actor for MyActor1 {}
+        impl Actor for MyActor {}
 
         #[derive(Clone, Debug, Serialize, Deserialize, Default)]
-        struct MyActorBuilder1;
+        struct MyActorBuilder;
 
         //Tag the impl with distinguishable name - actor builder's name should not collide in
         //each specific running system
-        #[typetag::serde(name = "my_actor_builder1")]
-        impl ActorBuilder for MyActorBuilder1 {
+        #[typetag::serde(name = "my_actor_builder")]
+        impl ActorBuilder for MyActorBuilder {
             fn build(&mut self) -> Box<dyn Actor> {
-                Box::new(MyActor1)
+                Box::new(MyActor)
             }
         }
 
-        let mut builder = MyActorBuilder1::default();
+        let mut builder = MyActorBuilder::default();
         let mut built_actor = builder.build();
         //Send a blank message and get a response back
         let actor_response = built_actor.receive(Mail::Blank);
