@@ -245,17 +245,17 @@ impl StorageContext {
             existing_actors.len()
         );
 
-        self.conn
-            .primary
-            .update_hook(Some(|action: Action, _db: &str, tbl: &str, row_id| {
-                let tbl_of_interest = tbl.starts_with(INBOX) || tbl.starts_with(OUTBOX);
-                if action == Action::SQLITE_INSERT && tbl_of_interest {
-                    let event = DBEvent(String::from(tbl), row_id);
-                    if let Some(ref mut recorder) = self.recorder {
-                        recorder.record_event(event);
-                    }
+        /***self.conn
+        .primary
+        .update_hook(Some(|action: Action, _db: &str, tbl: &str, row_id| {
+            let tbl_of_interest = tbl.starts_with(INBOX) || tbl.starts_with(OUTBOX);
+            if action == Action::SQLITE_INSERT && tbl_of_interest {
+                let event = DBEvent(String::from(tbl), row_id);
+                if let Some(ref mut recorder) = self.recorder {
+                    recorder.record_event(event);
                 }
-            }));
+            }
+        }));***/
         Ok(())
     }
 

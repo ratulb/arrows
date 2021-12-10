@@ -19,16 +19,16 @@ pub trait Actor: Any + Send + Sync {
     }
     //The very first message(_msg) sent to the actor instance prior to its normal msg processing
     fn post_start(&mut self, _msg: Msg) -> Option<Msg> {
-        Some(Msg::new_internal(
-            "Actor loading",
+        Some(Msg::new(
+            Some("Actor loading".as_bytes().to_vec()),
             self.type_name(),
             "system",
         ))
     }
     //Message(_msg - being ingnored)  sent to the actor instance prior to shutdown
     fn pre_shutdown(&mut self, _msg: Msg) -> Option<Msg> {
-        Some(Msg::new_internal(
-            "Actor unloading",
+        Some(Msg::new(
+            Some("Actor unloading".as_bytes().to_vec()),
             self.type_name(),
             "system",
         ))
@@ -51,7 +51,7 @@ pub trait ActorBuilder {
     //collide in a running system. In reality - they are peristed to sqlite db.
     fn build(&mut self) -> Box<dyn Actor>;
 
-    fn persist(&self, path: PathBuf) -> Result<()>
+    /***fn persist(&self, path: PathBuf) -> Result<()>
     where
         Self: Sized,
     {
@@ -73,7 +73,7 @@ pub trait ActorBuilder {
         reader.read_to_string(&mut content)?;
         let builder: Box<dyn ActorBuilder> = serde_json::from_str(&content)?;
         Ok(builder)
-    }
+    }***/
 }
 //BuilderResurrector is used to rebuild actor builders from their serialized state.
 
@@ -141,7 +141,7 @@ mod tests {
         assert!(actor_response.is_some());
     }
 
-    #[test]
+    /***#[test]
     fn actor_builder_persist_test_1() {
         #[derive(Clone, Debug, Serialize, Deserialize, Default)]
         struct MyActorBuilder2;
@@ -166,5 +166,5 @@ mod tests {
         let mut actor: Box<dyn Actor> = builder.build();
         let response = actor.receive(Msg::Blank);
         assert!(response.is_some());
-    }
+    }***/
 }
