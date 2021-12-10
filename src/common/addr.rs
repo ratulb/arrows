@@ -119,7 +119,7 @@ mod tests {
     #[test]
     fn create_addr_test2() {
         let addr1 = Addr::new("add1");
-        assert_eq!(addr1.get_socket_addr().unwrap().ip().is_loopback(), true);
+        assert!(addr1.get_socket_addr().unwrap().ip().is_loopback());
     }
     #[test]
     fn create_addr_test3() {

@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Mail {
-    Trade(Msg),
+    Trade(Box<Msg>),
     Blank,
 }
 
@@ -86,15 +86,13 @@ impl Msg {
         self.to = Some(Addr::new(new_to));
     }
     pub fn set_recipient_ip(&mut self, new_to_ip: &str) {
-        match self.to {
-            Some(ref mut addr) => addr.with_ip(new_to_ip),
-            None => (),
+        if let Some(ref mut addr) = self.to {
+            addr.with_ip(new_to_ip);
         }
     }
     pub fn set_recipient_port(&mut self, new_port: u16) {
-        match self.to {
-            Some(ref mut addr) => addr.with_port(new_port),
-            None => (),
+        if let Some(ref mut addr) = self.to {
+            addr.with_port(new_port);
         }
     }
 
@@ -167,7 +165,7 @@ impl Default for Mail {
 
 impl From<Msg> for Mail {
     fn from(msg: Msg) -> Self {
-        Mail::Trade(msg)
+        Mail::Trade(Box::new(msg))
     }
 }
 

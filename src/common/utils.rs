@@ -3,11 +3,10 @@ use bincode::{deserialize, serialize};
 use mktemp::Temp;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
-use std::convert::TryInto;
+
 use std::fs::{self, File, OpenOptions};
 use std::hash::{Hash, Hasher};
 use std::io::{copy, BufReader, BufWriter, Result, Seek, Write};
-use std::path::Path;
 
 #[macro_export]
 macro_rules! function {
@@ -19,16 +18,6 @@ macro_rules! function {
         let name = type_name_of(f);
         &name[..name.len() - 3]
     }};
-}
-
-pub fn file_exists(file_path: &str) -> bool {
-    Path::new(file_path).exists()
-}
-
-pub fn convert_to_arr<const N: usize>(v: Vec<u8>) -> [u8; N] {
-    v.try_into().unwrap_or_else(|v: Vec<u8>| {
-        panic!("Expected a Vec of length {} but it was {}", N, v.len())
-    })
 }
 
 pub fn type_of<T>(_: &T) {

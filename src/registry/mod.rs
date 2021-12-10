@@ -146,10 +146,7 @@ pub(in crate::registry) mod ctxops {
     pub(super) fn retrieve_build_def(identity: &String) -> Option<String> {
         let rs = CTX.write().unwrap().storage.retrieve_build_def(identity);
         match rs {
-            Ok(build_def) => match build_def {
-                Some(s) => Some(s),
-                None => None,
-            },
+            Ok(build_def) => build_def,
             Err(err) => {
                 eprintln!("Error fetching build def = {:?}", err);
                 None

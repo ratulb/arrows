@@ -1,6 +1,5 @@
-use arrows::builder_of;
 use arrows::registry::reload_actor;
-use arrows::send_to;
+
 use arrows::{Actor, ActorBuilder, Addr, Mail, Msg};
 use serde::{Deserialize, Serialize};
 
