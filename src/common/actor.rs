@@ -50,30 +50,6 @@ pub trait ActorBuilder {
     //identified by their #[typetag::serde(name = "an_actor_builder")] name. These names should not
     //collide in a running system. In reality - they are peristed to sqlite db.
     fn build(&mut self) -> Box<dyn Actor>;
-
-    /***fn persist(&self, path: PathBuf) -> Result<()>
-    where
-        Self: Sized,
-    {
-        let json = serde_json::to_string(self as &dyn ActorBuilder)?;
-        let file = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .append(false)
-            .open(&path)?;
-        let mut writer = BufWriter::new(file);
-        writer.write_all(json.as_bytes())?;
-        Ok(())
-    }
-
-    fn from_file(&self, path: PathBuf) -> Result<Box<dyn ActorBuilder>> {
-        let file = File::open(&path)?;
-        let mut reader = BufReader::new(file);
-        let mut content = String::new();
-        reader.read_to_string(&mut content)?;
-        let builder: Box<dyn ActorBuilder> = serde_json::from_str(&content)?;
-        Ok(builder)
-    }***/
 }
 //BuilderResurrector is used to rebuild actor builders from their serialized state.
 
@@ -140,31 +116,4 @@ mod tests {
         let actor_response = built_actor.receive(Msg::Blank);
         assert!(actor_response.is_some());
     }
-
-    /***#[test]
-    fn actor_builder_persist_test_1() {
-        #[derive(Clone, Debug, Serialize, Deserialize, Default)]
-        struct MyActorBuilder2;
-
-        struct MyActor2;
-        impl Actor for MyActor2 {}
-
-        #[typetag::serde(name = "my_actor_builder2")]
-        impl ActorBuilder for MyActorBuilder2 {
-            fn build(&mut self) -> Box<dyn Actor> {
-                Box::new(MyActor2)
-            }
-        }
-        //Save the builder
-        assert!(MyActorBuilder2::default()
-            .persist(PathBuf::from("my_actor_builder"))
-            .is_ok(),);
-        //Pull the actor builder back from disk and create an actor instance
-        let mut builder: Box<dyn ActorBuilder> = BuilderResurrector::default()
-            .from_file(PathBuf::from("my_actor_builder"))
-            .unwrap();
-        let mut actor: Box<dyn Actor> = builder.build();
-        let response = actor.receive(Msg::Blank);
-        assert!(response.is_some());
-    }***/
 }
