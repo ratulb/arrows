@@ -31,7 +31,7 @@ pub trait ActorBuilder {
     //corresponds between an 'Actor implementation' and its builder('ActorBuilder'). ActorBuilders are
     //persisted so that actors can be resurrected after a failure or restart. Actor builders are
     //identified by their #[typetag::serde(name = "an_actor_builder")] name. These names should not
-    //collide in a running system. In reality - they are peristed to sqlite db.
+    //collide in a running system.
     fn build(&mut self) -> Box<dyn Actor>;
 }
 //BuilderDeserializer is used to rebuild actor builders from their serialized state.
