@@ -92,7 +92,7 @@ pub fn reload_actor(addr: u64) -> Result<Rc<RefCell<Box<dyn Actor>>>, Error> {
         Some(s) => {
             let builder_deserializer = BuilderDeserializer::default();
             let mut builder: Box<dyn ActorBuilder> =
-                BuilderDeserializer::default().from_string(s).unwrap();
+                BuilderDeserializer::default().from_string(s)?;
             let actor: Box<dyn Actor> = builder.build();
             add_actor(addr, actor)
                 .and_then(post_start)
@@ -172,7 +172,6 @@ pub(in crate::registry) mod ctxops {
         actor: Rc<RefCell<Box<dyn Actor>>>,
     ) -> Option<Rc<RefCell<Box<dyn Actor>>>> {
         let _post_start_msg = actor.borrow_mut().receive(Mail::Blank);
-        println!("The post start msg = {:?}", _post_start_msg);
         Some(actor)
     }
 }
