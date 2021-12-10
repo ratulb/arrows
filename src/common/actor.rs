@@ -1,5 +1,4 @@
-use crate::common::mail::Msg;
-use crate::Mail;
+use crate::{Mail, Msg};
 use serde::{Deserialize, Serialize};
 use std::any::{self, Any};
 use std::fmt::{self, Debug, Formatter};
@@ -54,7 +53,7 @@ pub trait ActorBuilder {
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct BuilderDeserializer;
 
-#[typetag::serde(name = "builder_resurrector")]
+#[typetag::serde(name = "builder_deserializer")]
 impl ActorBuilder for BuilderDeserializer {
     fn build(&mut self) -> Box<dyn Actor> {
         panic!("Should not be called on BuilderDeserializer");

@@ -1,5 +1,7 @@
-use crate::common::addr::Addr;
-use crate::common::utils::{compute_hash, from_bytes, option_of_bytes};
+use crate::{
+    common::utils::{compute_hash, from_bytes, option_of_bytes},
+    Addr,
+};
 use serde::{Deserialize, Serialize};
 use std::mem::{replace, swap};
 use std::time::SystemTime;
@@ -172,8 +174,8 @@ impl From<Msg> for Mail {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::from_bytes;
-    use crate::option_of_bytes;
+    use crate::common::utils::{from_bytes, option_of_bytes};
+
     #[test]
     fn create_trade_msg_test_content_and_to() {
         let mut msg = Msg::new(option_of_bytes(&"Content"), "addr_from", "addr_to");
