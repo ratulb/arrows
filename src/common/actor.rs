@@ -33,6 +33,10 @@ pub trait ActorBuilder {
     //identified by their #[typetag::serde(name = "an_actor_builder")] name. These names should not
     //collide in a running system.
     fn build(&mut self) -> Box<dyn Actor>;
+    fn from_string(&self, content: String) -> std::io::Result<Box<dyn ActorBuilder>> {
+        let builder: Box<dyn ActorBuilder> = serde_json::from_str(&content)?;
+        Ok(builder)
+    }
 }
 //BuilderDeserializer is used to rebuild actor builders from their serialized state.
 

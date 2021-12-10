@@ -1,10 +1,10 @@
 use arrows::builder_of;
+use arrows::registry::reload_actor;
 use arrows::send_to;
 use arrows::{Actor, ActorBuilder, Addr, Mail, Msg};
 use serde::{Deserialize, Serialize};
-use arrows::registry::reload_actor;
 
-/***pub struct NewActor;
+pub struct NewActor;
 
 impl Actor for NewActor {
     fn receive(&mut self, _incoming: Mail) -> std::option::Option<Mail> {
@@ -20,10 +20,9 @@ impl ActorBuilder for NewActorBuilder {
     fn build(&mut self) -> Box<dyn Actor> {
         Box::new(NewActor)
     }
-}***/
+}
 
 fn main() {
-
     let identity = Addr::new("new_actor").get_id();
     let rs = reload_actor(identity);
     println!("The rs = {:?}", rs);

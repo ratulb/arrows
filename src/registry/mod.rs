@@ -5,8 +5,8 @@ use crate::common::{
     mail::{Mail, Msg},
 };
 use crate::registry::ctxops::*;
-
 use crate::registry::storage::StorageContext;
+use crate::BuilderDeserializer;
 use crate::Error;
 use lazy_static::lazy_static;
 use std::cell::{RefCell, RefMut};
@@ -89,8 +89,10 @@ pub fn send(identity: u64, msg: Msg) {
 
 pub fn reload_actor(addr: u64) -> Result<Rc<RefCell<Box<dyn Actor>>>, Error> {
     match retrieve_build_def(&addr.to_string()) {
-        Some(ref s) => {
-            let mut builder: Box<dyn ActorBuilder> = serde_json::from_str(s)?;
+        Some(s) => {
+            let builder_deserializer = BuilderDeserializer::default();
+            let mut builder: Box<dyn ActorBuilder> =
+                BuilderDeserializer::default().from_string(s).unwrap();
             let actor: Box<dyn Actor> = builder.build();
             add_actor(addr, actor)
                 .and_then(post_start)
@@ -169,7 +171,8 @@ pub(in crate::registry) mod ctxops {
     pub(super) fn post_start(
         actor: Rc<RefCell<Box<dyn Actor>>>,
     ) -> Option<Rc<RefCell<Box<dyn Actor>>>> {
-        let _ignored = actor.borrow_mut().receive(Mail::Blank);
+        let _post_start_msg = actor.borrow_mut().receive(Mail::Blank);
+        println!("The post start msg = {:?}", _post_start_msg);
         Some(actor)
     }
 }
