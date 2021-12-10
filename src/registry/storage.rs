@@ -1,4 +1,4 @@
-use crate::common::msg::Msg;
+use crate::common::mail::Msg;
 use crate::common::utils::{from_byte_array, option_of_bytes};
 use constants::*;
 use fallible_streaming_iterator::FallibleStreamingIterator;
@@ -37,9 +37,9 @@ impl DBEventRecorder {
             Err(err) => panic!("{}", err),
         };
         Self {
-            conn: conn,
+            conn,
             events: VecDeque::with_capacity(1000),
-            sender: sender,
+            sender,
         }
     }
 
@@ -117,10 +117,10 @@ impl DBEvent {
             None => return Ok(0),
             Some(idx) => &tbl[(idx + 1)..],
         };
-        Ok(tx.execute(
+        tx.execute(
             INBOUND_INSERT,
             &[&row_id as &dyn ToSql, &actor_id as &dyn ToSql],
-        )?)
+        )
     }
 }
 unsafe impl Send for DBConnection {}
@@ -202,7 +202,7 @@ impl StorageContext {
         let (sender, receiver) = channel();
         let update_receiver = thread::spawn(move || {
             let count = 0;
-            while let Ok(event) = receiver.recv() {
+            while let Ok(_event) = receiver.recv() {
                 // println!("Receiving event = {:?}", event);
                 if count >= 1000000 {
                     println!("Received events = {:?}", count);
@@ -559,10 +559,10 @@ pub(crate) fn value_to_msg(v: Value) -> Msg {
     if let Value::Blob(bytes) = v {
         return match from_byte_array::<'_, Msg>(&bytes) {
             Ok(msg) => msg,
-            _ => Msg::Blank,
+            _ => Msg::default(),
         };
     }
-    Msg::Blank
+    Msg::default()
 }
 
 pub(crate) fn create_actor_inbox(actor_id: &String) -> Result<()> {
@@ -592,7 +592,7 @@ pub(crate) fn into_outbox(actor_id: &String, msg: Msg) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::common::msg::Msg;
+    use crate::common::mail::Msg;
     use rand::{thread_rng, Rng};
 
     #[test]

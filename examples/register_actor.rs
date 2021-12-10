@@ -1,13 +1,13 @@
 use arrows::builder_of;
 use arrows::send_to;
-use arrows::{Actor, ActorBuilder, Addr, Msg};
+use arrows::{Actor, ActorBuilder, Addr, Mail, Msg};
 use serde::{Deserialize, Serialize};
 
 pub struct NewActor;
 
 impl Actor for NewActor {
-    fn receive(&mut self, _incoming: Msg) -> std::option::Option<Msg> {
-        Some(Msg::new_with_text("Reply from new actor", "from", "to"))
+    fn receive(&mut self, _incoming: Mail) -> std::option::Option<Mail> {
+        Some(Msg::new_with_text("Reply from new actor", "from", "to").into())
     }
 }
 
@@ -30,10 +30,10 @@ fn main() {
     let builder = NewActorBuilder;
     builder_of!(Addr::new("new_actor"), builder);
 
-    let m = Msg::Blank;
+    let m = Msg::default();
     send_to!("new_actor", m);
 
-    send_to!(Addr::new("new_actor"), Msg::Blank);
+    send_to!(Addr::new("new_actor"), Msg::default());
 
     let msg_to_unregisterd = Msg::new_with_text("Mis-directed message", "from", "to");
     send_to!("Unknown actor", msg_to_unregisterd);

@@ -110,7 +110,7 @@ pub fn prepend_bytes(bytes: &[u8], file: &str) -> Result<()> {
     let tmp_file = tmp_file.release();
     let mut tmp = File::create(&tmp_file)?;
     let mut src = File::open(file)?;
-    tmp.write_all(&bytes)?;
+    tmp.write_all(bytes)?;
     copy(&mut src, &mut tmp)?;
     fs::remove_file(file)?;
     fs::rename(&tmp_file, file)?;

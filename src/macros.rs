@@ -49,14 +49,14 @@ macro_rules! send_to {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Actor, ActorBuilder, Addr, Msg};
+    use crate::{Actor, ActorBuilder, Addr, Mail, Msg};
     use serde::{Deserialize, Serialize};
 
     pub struct NewActor;
 
     impl Actor for NewActor {
-        fn receive(&mut self, _incoming: Msg) -> std::option::Option<Msg> {
-            Some(Msg::new_with_text("Reply from new actor", "from", "to"))
+        fn receive(&mut self, _incoming: Mail) -> std::option::Option<Mail> {
+            Some(Msg::new_with_text("Reply from new actor", "from", "to").into())
         }
     }
 
@@ -81,9 +81,9 @@ mod tests {
         let addr = Addr::new("new_actor");
         builder_of!(addr, builder);
 
-        send_to!("new_actor", Msg::Blank);
-        send_to!(Addr::new("new_actor"), Msg::Blank);
+        send_to!("new_actor", Msg::default());
+        send_to!(Addr::new("new_actor"), Msg::default());
         let addr = Addr::new("new_actor");
-        send_to!(addr, Msg::Blank);
+        send_to!(addr, Msg::default());
     }
 }

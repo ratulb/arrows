@@ -1,5 +1,9 @@
 pub(crate) mod storage;
-use crate::common::{actor::Actor, actor::ActorBuilder, msg::Msg};
+use crate::common::{
+    actor::Actor,
+    actor::ActorBuilder,
+    mail::{Mail, Msg},
+};
 use crate::registry::ctxops::*;
 
 use crate::registry::storage::StorageContext;
@@ -89,7 +93,7 @@ pub(in crate::registry) mod ctxops {
         let ctx = CTX.write().unwrap();
         let actor = ctx.arrows.get_actor(identity);
         if let Some(mut actor) = actor {
-            actor.receive(msg);
+            actor.receive(msg.into());
             println!("Msg delivered");
         } else {
             eprintln!("Actor not found");
@@ -102,7 +106,7 @@ pub(in crate::registry) mod ctxops {
 
     //Send a shutdown msg to the actor that is being removed
     pub(super) fn pre_shutdown(actor: Rc<RefCell<Box<dyn Actor>>>) -> Option<()> {
-        let _ignored = actor.borrow_mut().receive(Msg::Blank);
+        let _ignored = actor.borrow_mut().receive(Mail::Blank);
         None
     }
 
@@ -138,7 +142,7 @@ pub(in crate::registry) mod ctxops {
     pub(super) fn post_start(
         actor: Rc<RefCell<Box<dyn Actor>>>,
     ) -> Option<Rc<RefCell<Box<dyn Actor>>>> {
-        let _ignored = actor.borrow_mut().receive(Msg::Blank);
+        let _ignored = actor.borrow_mut().receive(Mail::Blank);
         Some(actor)
     }
 }
@@ -163,11 +167,11 @@ impl Arrow {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Actor, Msg};
+    use crate::{Actor, Mail, Msg};
     pub struct NewActor;
     impl Actor for NewActor {
-        fn receive(&mut self, _incoming: Msg) -> std::option::Option<Msg> {
-            Some(Msg::new_with_text("Reply from new actor", "from", "to"))
+        fn receive(&mut self, _incoming: Mail) -> std::option::Option<Mail> {
+            Some(Msg::new_with_text("Reply from new actor", "from", "to").into())
         }
     }
     /***

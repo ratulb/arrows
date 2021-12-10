@@ -1,37 +1,35 @@
-use crate::{Msg, Result};
+use crate::common::mail::Msg;
+use crate::Mail;
 use serde::{Deserialize, Serialize};
 use std::any::{self, Any};
 use std::fmt::{self, Debug, Formatter};
-use std::fs::{File, OpenOptions};
-use std::io::{BufReader, BufWriter, Read, Write};
-use std::path::PathBuf;
 
 pub trait Actor: Any + Send + Sync {
-    //The method by which actors receive their messages(_msg - being ignored here). Messages are
-    //durable - An actor may fail - but when it comes back - it will start receiving message -along
-    //with any piled up message that it may have missed
-    fn receive(&mut self, _msg: Msg) -> Option<Msg> {
-        Some(Msg::Blank)
+    fn receive(&mut self, _mail: Mail) -> Option<Mail> {
+        Some(Mail::Blank)
     }
-    //The type implenmenting the this trait
     fn type_name(&self) -> &'static str {
         any::type_name::<Self>()
     }
-    //The very first message(_msg) sent to the actor instance prior to its normal msg processing
-    fn post_start(&mut self, _msg: Msg) -> Option<Msg> {
-        Some(Msg::new(
-            Some("Actor loading".as_bytes().to_vec()),
-            self.type_name(),
-            "system",
-        ))
+    fn post_start(&mut self, _mail: Mail) -> Option<Mail> {
+        Some(
+            Msg::new(
+                Some("Actor loading".as_bytes().to_vec()),
+                self.type_name(),
+                "system",
+            )
+            .into(),
+        )
     }
-    //Message(_msg - being ingnored)  sent to the actor instance prior to shutdown
-    fn pre_shutdown(&mut self, _msg: Msg) -> Option<Msg> {
-        Some(Msg::new(
-            Some("Actor unloading".as_bytes().to_vec()),
-            self.type_name(),
-            "system",
-        ))
+    fn pre_shutdown(&mut self, _mail: Mail) -> Option<Mail> {
+        Some(
+            Msg::new(
+                Some("Actor unloading".as_bytes().to_vec()),
+                self.type_name(),
+                "system",
+            )
+            .into(),
+        )
     }
 }
 
@@ -51,15 +49,15 @@ pub trait ActorBuilder {
     //collide in a running system. In reality - they are peristed to sqlite db.
     fn build(&mut self) -> Box<dyn Actor>;
 }
-//BuilderResurrector is used to rebuild actor builders from their serialized state.
+//BuilderDeserializer is used to rebuild actor builders from their serialized state.
 
 #[derive(Debug, Serialize, Deserialize, Default)]
-pub struct BuilderResurrector;
+pub struct BuilderDeserializer;
 
 #[typetag::serde(name = "builder_resurrector")]
-impl ActorBuilder for BuilderResurrector {
+impl ActorBuilder for BuilderDeserializer {
     fn build(&mut self) -> Box<dyn Actor> {
-        panic!("Should not be called on BuilderResurrector");
+        panic!("Should not be called on BuilderDeserializer");
     }
 }
 
@@ -84,12 +82,12 @@ mod tests {
         //A demo actor implementation which responds by blank replies. Its ignoring the incoming
         //message(_msg)
         impl Actor for MyActor {
-            fn receive(&mut self, _msg: Msg) -> Option<Msg> {
-                Some(Msg::Blank)
+            fn receive(&mut self, _msg: Mail) -> Option<Mail> {
+                Some(Mail::Blank)
             }
         }
         let mut my_actor = MyActor::new();
-        assert!(my_actor.receive(Msg::Blank).is_some());
+        assert!(my_actor.receive(Mail::Blank).is_some());
     }
 
     #[test]
@@ -113,7 +111,7 @@ mod tests {
         let mut builder = MyActorBuilder1::default();
         let mut built_actor = builder.build();
         //Send a blank message and get a response back
-        let actor_response = built_actor.receive(Msg::Blank);
+        let actor_response = built_actor.receive(Mail::Blank);
         assert!(actor_response.is_some());
     }
 }

@@ -6,16 +6,8 @@ use std::time::SystemTime;
 use uuid::Uuid;
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum Msg {
-    Trade {
-        id: u64,
-        from: Option<Addr>,
-        to: Option<Addr>,
-        content: Option<Vec<u8>>,
-        recipients: Option<AdditionalRecipients>,
-        dispatched: Option<SystemTime>,
-    },
-
+pub enum Mail {
+    Trade(Msg),
     Blank,
 }
 
@@ -25,9 +17,19 @@ pub enum AdditionalRecipients {
     OnlySome(Vec<Addr>),
 }
 
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Default)]
+pub struct Msg {
+    id: u64,
+    from: Option<Addr>,
+    to: Option<Addr>,
+    content: Option<Vec<u8>>,
+    recipients: Option<AdditionalRecipients>,
+    dispatched: Option<SystemTime>,
+}
+
 impl Msg {
     pub fn new(content: Option<Vec<u8>>, from: &str, to: &str) -> Self {
-        Self::Trade {
+        Self {
             id: compute_hash(&Uuid::new_v4()),
             from: Some(Addr::new(from)),
             to: Some(Addr::new(to)),
@@ -37,7 +39,7 @@ impl Msg {
         }
     }
     pub fn new_with_text(content: &str, from: &str, to: &str) -> Self {
-        Self::Trade {
+        Self {
             id: compute_hash(&Uuid::new_v4()),
             from: Some(Addr::new(from)),
             to: Some(Addr::new(to)),
@@ -48,177 +50,80 @@ impl Msg {
     }
 
     pub fn content_as_text(&self) -> Option<&str> {
-        match self {
-            Msg::Trade { ref content, .. } => match content {
-                Some(ref value) => {
-                    let text: crate::Result<&str> = from_bytes(value);
-                    text.ok()
-                }
-                None => None,
-            },
-
-            Msg::Blank => None,
+        match self.content {
+            Some(ref value) => {
+                let text: crate::Result<&str> = from_bytes(value);
+                text.ok()
+            }
+            None => None,
         }
     }
     pub fn get_bytes(&self) -> Vec<u8> {
-        option_of_bytes(self).unwrap_or(vec![])
+        option_of_bytes(self).unwrap_or_default()
     }
 
     pub fn uturn_with_text(&mut self, reply: &str) {
-        match self {
-            Msg::Trade {
-                ref mut from,
-                ref mut to,
-                ref mut content,
-                ..
-            } => {
-                swap(from, to);
-                let _ignore = replace(content, option_of_bytes(&String::from(reply)));
-            }
-
-            Msg::Blank => (),
-        }
+        swap(&mut self.from, &mut self.to);
+        let _ignore = replace(&mut self.content, option_of_bytes(&String::from(reply)));
     }
 
     pub fn update_text_content(&mut self, reply: &str) {
-        match self {
-            Msg::Trade {
-                ref mut content, ..
-            } => {
-                let _ignore = replace(content, option_of_bytes(&String::from(reply)));
-            }
-
-            Msg::Blank => (),
-        }
+        let _ignore = replace(&mut self.content, option_of_bytes(&String::from(reply)));
     }
 
     pub fn with_content_and_to(&mut self, new_content: Vec<u8>, new_to: &str) {
-        match self {
-            Msg::Trade {
-                ref mut content,
-                ref mut to,
-                ..
-            } => {
-                *content = Some(new_content);
-                *to = Some(Addr::new(new_to));
-            }
-
-            Msg::Blank => (),
-        }
+        self.content = Some(new_content);
+        self.to = Some(Addr::new(new_to));
     }
 
     pub fn with_content(&mut self, new_content: Vec<u8>) {
-        match self {
-            Msg::Trade {
-                ref mut content, ..
-            } => {
-                *content = Some(new_content);
-            }
-
-            Msg::Blank => (),
-        }
+        self.content = Some(new_content);
     }
 
     pub fn set_recipient(&mut self, new_to: &str) {
-        match self {
-            Msg::Trade { ref mut to, .. } => {
-                *to = Some(Addr::new(new_to));
-            }
-
-            Msg::Blank => (),
-        }
+        self.to = Some(Addr::new(new_to));
     }
     pub fn set_recipient_ip(&mut self, new_to_ip: &str) {
-        match self {
-            Msg::Trade { to, .. } => match to {
-                Some(ref mut addr) => addr.with_ip(new_to_ip),
-                None => (),
-            },
-
-            Msg::Blank => (),
+        match self.to {
+            Some(ref mut addr) => addr.with_ip(new_to_ip),
+            None => (),
         }
     }
     pub fn set_recipient_port(&mut self, new_port: u16) {
-        match self {
-            Msg::Trade { to, .. } => match to {
-                Some(ref mut addr) => addr.with_port(new_port),
-                None => (),
-            },
-
-            Msg::Blank => (),
+        match self.to {
+            Some(ref mut addr) => addr.with_port(new_port),
+            None => (),
         }
     }
 
     pub fn uturn_with_reply(&mut self, reply: Option<Vec<u8>>) {
-        match self {
-            Msg::Trade {
-                ref mut from,
-                ref mut to,
-                ref mut content,
-                ..
-            } => {
-                swap(from, to);
-                let _ignore = replace(content, reply);
-            }
-
-            Msg::Blank => (),
-        }
+        swap(&mut self.from, &mut self.to);
+        let _ignore = replace(&mut self.content, reply);
     }
 
     pub fn with_recipients(&mut self, new_recipients: Vec<&str>) {
-        match self {
-            Msg::Trade {
-                ref mut recipients, ..
-            } => {
-                *recipients = Some(AdditionalRecipients::OnlySome(
-                    new_recipients.iter().map(|each| Addr::new(each)).collect(),
-                ));
-            }
-
-            Msg::Blank => (),
-        }
+        self.recipients = Some(AdditionalRecipients::OnlySome(
+            new_recipients.iter().map(|each| Addr::new(each)).collect(),
+        ));
     }
 
     pub fn set_recipient_all(&mut self) {
-        match self {
-            Msg::Trade {
-                ref mut recipients, ..
-            } => {
-                *recipients = Some(AdditionalRecipients::All);
-            }
-
-            Msg::Blank => (),
-        }
+        self.recipients = Some(AdditionalRecipients::All);
     }
 
     pub fn get_content(&self) -> &Option<Vec<u8>> {
-        match self {
-            Msg::Trade { content, .. } => content,
-            Msg::Blank => &None,
-        }
+        &self.content
     }
     //Would take content out - leaving message content to a None
     pub fn get_content_out(&mut self) -> Option<Vec<u8>> {
-        match self {
-            Msg::Trade {
-                ref mut content, ..
-            } => content.take(),
-
-            Msg::Blank => None,
-        }
+        self.content.take()
     }
 
     pub fn get_to(&self) -> &Option<Addr> {
-        match self {
-            Msg::Trade { to, .. } => to,
-            Msg::Blank => &None,
-        }
+        &self.to
     }
     pub fn get_id(&self) -> &u64 {
-        match self {
-            Msg::Trade { id, .. } => id,
-            Msg::Blank => &0,
-        }
+        &self.id
     }
 
     pub fn id_as_string(&self) -> String {
@@ -227,54 +132,40 @@ impl Msg {
 
     //Callers would be better served by cloning the returned &u64
     pub fn get_to_id(&self) -> u64 {
-        match self {
-            Msg::Trade { to, .. } => match to {
-                Some(ref addr) => addr.get_id(),
-                None => 0,
-            },
-
-            Msg::Blank => 0,
+        match self.to {
+            Some(ref addr) => addr.get_id(),
+            None => 0,
         }
     }
 
     pub fn get_from(&self) -> &Option<Addr> {
-        match self {
-            Msg::Trade { from, .. } => from,
-            Msg::Blank => &None,
-        }
+        &self.from
     }
     pub fn is_outbound(&self) -> bool {
-        match self {
-            Msg::Trade { to, .. } => match to {
-                Some(ref addr) => !addr.is_local(),
-                None => false,
-            },
-
-            Msg::Blank => false,
+        match self.to {
+            Some(ref addr) => !addr.is_local(),
+            None => false,
         }
     }
 
     pub fn get_recipients(&self) -> &Option<AdditionalRecipients> {
-        match self {
-            Msg::Trade { recipients, .. } => recipients,
-            Msg::Blank => &None,
-        }
+        &self.recipients
     }
 
     pub fn is_recipient_all(&self) -> bool {
-        match self {
-            Msg::Trade { ref recipients, .. } => {
-                matches!(*recipients, Some(AdditionalRecipients::All))
-            }
-
-            Msg::Blank => false,
-        }
+        matches!(self.recipients, Some(AdditionalRecipients::All))
     }
 }
 
-impl Default for Msg {
+impl Default for Mail {
     fn default() -> Self {
-        Msg::Blank
+        Mail::Blank
+    }
+}
+
+impl From<Msg> for Mail {
+    fn from(msg: Msg) -> Self {
+        Mail::Trade(msg)
     }
 }
 
@@ -371,16 +262,10 @@ mod tests {
     }
     #[test]
     fn outbound_mgs_test_1() {
-        let trade_msg = Msg::new(option_of_bytes(&"Content"), "addr_from", "addr_to");
-        assert!(!trade_msg.is_outbound());
-        let blank = Msg::Blank;
-        assert!(!blank.is_outbound());
-
         let mut trade_msg = Msg::new(option_of_bytes(&"Content"), "addr_from", "addr_to");
+        assert!(!trade_msg.is_outbound());
 
         trade_msg.set_recipient_ip("89.89.89.89");
         assert!(trade_msg.is_outbound());
-        let blank = Msg::Blank;
-        assert!(!blank.is_outbound());
     }
 }
