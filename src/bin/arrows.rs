@@ -1,3 +1,7 @@
+use arrows::from_bytes;
+use arrows::type_of;
+use arrows::Mail;
+use byte_marks::Marks;
 use byte_marks::Unmarkable;
 use std::fs;
 use std::io::prelude::*;
@@ -45,44 +49,37 @@ impl ArrowServer {
                     eprintln!("Error handling connection {:?}", e);
                 }
             }
+            println!("Server served stream!");
         }
         Ok(())
     }
 
     fn serve(&mut self, tcp: TcpStream) -> Result<()> {
         let peer_addr = tcp.peer_addr()?;
-        let mut reader = BufReader::new(&tcp);
-        let mut writer = BufWriter::new(&tcp);
-        let message_bytes = Unmarkable::new(&mut reader);
+        let mut reader = BufReader::new(tcp.try_clone()?);
+        let mut writer = BufWriter::new(tcp);
+        let mut message_bytes = Unmarkable::new(&mut reader);
+        println!("Connection from = {:?}", peer_addr);
 
-        /***macro_rules! do_reply {
-            ($reply:expr) => {{
-                let reply = $reply;
-                serde_json::to_writer(&mut writer, &reply)?;
-                writer.flush()?;
-                println!("Reply sent to {:?} -> {:?}", peer_addr, reply);
-            }};
+        /***let buf = reader.fill_buf()?;
+        println!("Buf len = {:?}", buf.len());
+
+        let unmarked = Marks::unmark(buf);
+
+        if let Some(unmarked) = unmarked {
+            println!("Len is = {:?}", unmarked.0.len());
+            let mail: Mail = from_bytes(unmarked.0[0]).unwrap();
+            println!("Msg is = {:?}", mail);
         }***/
 
-        for bytes in message_bytes {
-            /***let request = request?;
-            println!("Request received from {:?} -> {:?}", peer_addr, request);
+        while let Some(inner) = message_bytes.next() {
+            type_of(&inner);
 
-            match request {
-                Request::Get { key } => do_reply!(match self.engine.get(key) {
-                    Ok(value) => GetResponse::Ok(value),
-                    Err(e) => GetResponse::Err(e.to_string()),
-                }),
-                Request::Remove { key } => do_reply!(match self.engine.remove(key) {
-                    Ok(_) => RemoveResponse::Ok(()),
-                    Err(e) => RemoveResponse::Err(e.to_string()),
-                }),
-                Request::Set { key, value } => do_reply!(match self.engine.set(key, value) {
-                    Ok(_) => SetResponse::Ok(()),
-                    Err(e) => SetResponse::Err(e.to_string()),
-                }),
-            };***/
+            println!("Mgs len here");
         }
+        writer.write_all("Server received request".as_bytes())?;
+        writer.flush()?;
+        println!("Server reached then here!");
         Ok(())
     }
 }

@@ -91,6 +91,7 @@ impl Client {
                 self.writer.flush()?;
                 let mut buf = vec![0; 1024];
                 let len = self.reader.read(&mut buf)?;
+                println!("Past this point");
                 println!(
                     "Server response = {:?}",
                     String::from_utf8_lossy(&buf[..len])
