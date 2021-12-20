@@ -10,6 +10,7 @@ use uuid::Uuid;
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Mail {
     Trade(Box<Msg>),
+    Bulk(Vec<(Addr, Vec<Msg>)>),
     Blank,
 }
 

@@ -5,6 +5,7 @@ pub use common::addr::Addr;
 pub use common::errs::{Error, Result};
 pub use common::mail::Mail;
 pub use common::mail::Msg;
+pub use common::utils::*;
 
 pub mod common;
 pub mod macros;
