@@ -1,5 +1,5 @@
 use arrows::{option_of_bytes, Addr, Mail, Msg};
-use byte_marks::Marks;
+use byte_marks::ByteMarker;
 use clap::AppSettings;
 use std::io::{BufReader, BufWriter, Error, ErrorKind, Read, Result, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
@@ -61,18 +61,20 @@ fn run(opt: Opt) -> Result<()> {
     Ok(())
 }
 
-pub struct Client {
+pub struct Client<'a> {
     reader: BufReader<TcpStream>,
     writer: BufWriter<TcpStream>,
+    marker: ByteMarker<'a>,
 }
 
-impl Client {
+impl Client<'_> {
     pub fn connect<A: ToSocketAddrs>(addr: A) -> Result<Self> {
         let stream = TcpStream::connect(addr)?;
         let write_half = stream.try_clone()?;
         Ok(Client {
             reader: BufReader::new(stream),
             writer: BufWriter::new(write_half),
+            marker: ByteMarker::with_defaults(),
         })
     }
 
@@ -86,12 +88,12 @@ impl Client {
         let bulk = Mail::Bulk(vec![(addr, msgs)]);
         match option_of_bytes(&bulk) {
             Some(ref mut bytes) => {
-                Marks::mark_bytes(bytes);
+                self.marker.mark_tail(bytes);
                 self.writer.write_all(bytes)?;
+                println!("Total bytes len = {:?}", bytes.len());
                 self.writer.flush()?;
                 let mut buf = vec![0; 1024];
                 let len = self.reader.read(&mut buf)?;
-                println!("Past this point");
                 println!(
                     "Server response = {:?}",
                     String::from_utf8_lossy(&buf[..len])

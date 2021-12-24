@@ -19,6 +19,6 @@ rand = "^0.8.4"
 async-std = {version="^1.10.0"}
 futures = "^0.3.17"
 mktemp = "0.4.1"
-byte_marks = {path ="../byte_marks"}
+byte_marks = { git = "https://github.com/ratulb/byte_marks" }
 clap = "2.34.0"
 structopt = "0.3.25"
