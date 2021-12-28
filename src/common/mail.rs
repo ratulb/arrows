@@ -8,16 +8,18 @@ use std::time::SystemTime;
 use uuid::Uuid;
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum Mail {
-    Trade(Box<Msg>),
-    Bulk(Vec<(Addr, Vec<Msg>)>),
-    Blank,
+pub enum Content {
+    Text(String),
+    Binary(Vec<u8>),
 }
 
+use Content::*;
+
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum AdditionalRecipients {
-    All,
-    OnlySome(Vec<Addr>),
+pub enum Mail {
+    Trade(Msg),
+    Bulk(Vec<Msg>),
+    Blank,
 }
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Default)]
@@ -25,8 +27,7 @@ pub struct Msg {
     id: u64,
     from: Option<Addr>,
     to: Option<Addr>,
-    content: Option<Vec<u8>>,
-    recipients: Option<AdditionalRecipients>,
+    content: Option<Content>,
     dispatched: Option<SystemTime>,
 }
 
@@ -36,8 +37,7 @@ impl Msg {
             id: compute_hash(&Uuid::new_v4()),
             from: Some(Addr::new(from)),
             to: Some(Addr::new(to)),
-            content,
-            recipients: None,
+            content: content.map(|data| Binary(data)),
             dispatched: None,
         }
     }
@@ -46,18 +46,18 @@ impl Msg {
             id: compute_hash(&Uuid::new_v4()),
             from: Some(Addr::new(from)),
             to: Some(Addr::new(to)),
-            content: option_of_bytes(&String::from(content)),
-            recipients: None,
+            content: Some(Text(content.to_string())),
             dispatched: None,
         }
     }
 
     pub fn content_as_text(&self) -> Option<&str> {
         match self.content {
-            Some(ref value) => {
-                let text: crate::Result<&str> = from_bytes(value);
+            Some(Binary(ref bytes)) => {
+                let text: crate::Result<&str> = from_bytes(bytes);
                 text.ok()
             }
+            Some(Text(ref s)) => Some(s),
             None => None,
         }
     }
@@ -67,20 +67,20 @@ impl Msg {
 
     pub fn uturn_with_text(&mut self, reply: &str) {
         swap(&mut self.from, &mut self.to);
-        let _ignore = replace(&mut self.content, option_of_bytes(&String::from(reply)));
+        let _ignore = replace(&mut self.content, Some(Text(reply.to_string())));
     }
 
     pub fn update_text_content(&mut self, reply: &str) {
-        let _ignore = replace(&mut self.content, option_of_bytes(&String::from(reply)));
+        let _ignore = replace(&mut self.content, Some(Text(reply.to_string())));
     }
 
     pub fn with_content_and_to(&mut self, new_content: Vec<u8>, new_to: &str) {
-        self.content = Some(new_content);
+        self.content = Some(Binary(new_content));
         self.to = Some(Addr::new(new_to));
     }
 
     pub fn with_content(&mut self, new_content: Vec<u8>) {
-        self.content = Some(new_content);
+        self.content = Some(Binary(new_content));
     }
 
     pub fn set_recipient(&mut self, new_to: &str) {
@@ -99,25 +99,25 @@ impl Msg {
 
     pub fn uturn_with_reply(&mut self, reply: Option<Vec<u8>>) {
         swap(&mut self.from, &mut self.to);
-        let _ignore = replace(&mut self.content, reply);
+        let _ignore = replace(&mut self.content, reply.map(|data| Binary(data)));
     }
 
-    pub fn with_recipients(&mut self, new_recipients: Vec<&str>) {
-        self.recipients = Some(AdditionalRecipients::OnlySome(
-            new_recipients.iter().map(|each| Addr::new(each)).collect(),
-        ));
+    pub fn get_content(&self) -> Option<Vec<u8>> {
+        match &self.content {
+            Some(Binary(data)) => Some(data.to_vec()),
+            _ => None,
+        }
     }
-
-    pub fn set_recipient_all(&mut self) {
-        self.recipients = Some(AdditionalRecipients::All);
-    }
-
-    pub fn get_content(&self) -> &Option<Vec<u8>> {
-        &self.content
-    }
-    //Would take content out - leaving message content to a None
+    //Would take content out (if binary)- leaving message content to a None
     pub fn get_content_out(&mut self) -> Option<Vec<u8>> {
-        self.content.take()
+        match self.content.take() {
+            Some(Binary(data)) => Some(data),
+            content @ Some(_) => {
+                self.content = content;
+                None
+            }
+            _ => None,
+        }
     }
 
     pub fn get_to(&self) -> &Option<Addr> {
@@ -148,14 +148,6 @@ impl Msg {
             None => false,
         }
     }
-
-    pub fn get_recipients(&self) -> &Option<AdditionalRecipients> {
-        &self.recipients
-    }
-
-    pub fn is_recipient_all(&self) -> bool {
-        matches!(self.recipients, Some(AdditionalRecipients::All))
-    }
 }
 
 impl Default for Mail {
@@ -166,7 +158,7 @@ impl Default for Mail {
 
 impl From<Msg> for Mail {
     fn from(msg: Msg) -> Self {
-        Mail::Trade(Box::new(msg))
+        Mail::Trade(msg)
     }
 }
 
@@ -194,36 +186,11 @@ mod tests {
     #[test]
     fn create_trade_msg_test_alter_content_and_to() {
         let mut msg = Msg::new(option_of_bytes(&"Content"), "addr_from", "addr_to");
-        assert_eq!(msg.get_content(), &option_of_bytes(&"Content"));
+        assert_eq!(msg.get_content(), option_of_bytes(&"Content"));
         assert_eq!(msg.get_to(), &Some(Addr::new("addr_to")));
         msg.with_content_and_to(option_of_bytes(&"New content").unwrap(), "New_to");
-        assert_eq!(msg.get_content(), &option_of_bytes(&"New content"));
+        assert_eq!(msg.get_content(), option_of_bytes(&"New content"));
         assert_eq!(msg.get_to(), &Some(Addr::new("New_to")));
-    }
-
-    #[test]
-    fn alter_additional_recipients_test_1() {
-        let mut msg = Msg::new(option_of_bytes(&"Content"), "addr_from", "addr_to");
-        let additional_recipients = vec!["Recipient1", "Recipient2", "Recipient3"];
-        msg.with_recipients(additional_recipients);
-        let additional_recipients_returned = vec!["Recipient1", "Recipient2", "Recipient3"];
-        if let Some(AdditionalRecipients::OnlySome(recipients)) = msg.get_recipients() {
-            let mut index = 0;
-            recipients.iter().for_each(|addr| {
-                assert_eq!(addr.get_name(), additional_recipients_returned[index]);
-                index += 1;
-            });
-        } else {
-            panic!("Failed for message test - additional recipients");
-        }
-    }
-
-    #[test]
-    fn set_recipients_all_test_1() {
-        let mut msg = Msg::new(option_of_bytes(&"Content"), "addr_from", "addr_to");
-        assert_eq!(msg.get_recipients(), &None);
-        msg.set_recipient_all();
-        assert_eq!(msg.get_recipients(), &Some(AdditionalRecipients::All));
     }
 
     #[test]
@@ -240,25 +207,25 @@ mod tests {
         msg.uturn_with_reply(option_of_bytes(&"Reply"));
         assert_eq!(msg.get_to(), &Some(Addr::new("addr_from")));
         assert_eq!(msg.get_from(), &Some(Addr::new("addr_to")));
-        assert_eq!(msg.get_content(), &option_of_bytes(&"Reply"));
+        assert_eq!(msg.get_content(), option_of_bytes(&"Reply"));
     }
     #[test]
     fn uturn_with_text_reply_test_1() {
         let mut msg = Msg::new(option_of_bytes(&"Content"), "addr_from", "addr_to");
-        assert_eq!(msg.get_content(), &option_of_bytes(&"Content"));
+        assert_eq!(msg.get_content(), option_of_bytes(&"Content"));
         msg.uturn_with_text("Reply");
         assert_eq!(msg.get_to(), &Some(Addr::new("addr_from")));
         assert_eq!(msg.get_from(), &Some(Addr::new("addr_to")));
-        assert_eq!(msg.get_content(), &option_of_bytes(&"Reply"));
+        assert_eq!(msg.get_content(), option_of_bytes(&"Reply"));
     }
     #[test]
     fn content_as_text_test_1() {
         let mut msg = Msg::new(option_of_bytes(&"Content"), "addr_from", "addr_to");
-        assert_eq!(msg.get_content(), &option_of_bytes(&"Content"));
+        assert_eq!(msg.get_content(), option_of_bytes(&"Content"));
         assert_eq!(msg.content_as_text(), Some("Content"));
 
         msg.update_text_content("Updated content");
-        assert_eq!(msg.get_content(), &option_of_bytes(&"Updated content"));
+        assert_eq!(msg.get_content(), option_of_bytes(&"Updated content"));
         assert_eq!(msg.content_as_text(), Some("Updated content"));
     }
     #[test]

@@ -85,7 +85,7 @@ impl Client<'_> {
             .collect();
         let addr = Addr::new(actor);
 
-        let bulk = Mail::Bulk(vec![(addr, msgs)]);
+        let bulk = Mail::Bulk(msgs);
         match option_of_bytes(&bulk) {
             Some(ref mut bytes) => {
                 self.marker.mark_tail(bytes);
