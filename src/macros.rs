@@ -3,7 +3,6 @@ macro_rules! builder_of {
     ($actor_name:literal, $actor_builder:path) => {{
         let identity = $crate::Addr::new($actor_name).get_id();
         let res = $crate::registry::register_builder(identity, $actor_builder);
-        //println!("Res result is = {:?}", res);
         res
     }};
     ($actor_addr:expr, $actor_builder:path) => {{
@@ -28,24 +27,6 @@ macro_rules! send_to {
         $crate::registry::send(identity, msg);
     };
 }
-
-/***
-1) Fix location of arrows.db
-2) Event loop
-3) Send macro - done
-4) cfg to check selected scheme
-5) Message routing to inbox/outbox
-6) Binaries for server/Client
-7) Message exchange format for client and server
-8) Make everything async
-8) Multithreading
-9) Json message out from stream
-10) db trimming
-11) Documentation
-12) Error handling
-13) Macro output
-14) Logging
-***/
 
 #[cfg(test)]
 mod tests {

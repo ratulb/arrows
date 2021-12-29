@@ -64,12 +64,6 @@ pub fn register_builder(
     addr: u64,
     mut builder: impl ActorBuilder,
 ) -> Result<Rc<RefCell<Box<dyn Actor>>>, Error> {
-    //Will replace existing
-    //Will store name on db
-    //Will create inbox and outbox
-    //Will fire pre shutdown on existing -
-    //Will schedule it
-    //Will send post_start message - configure post start message
 
     let identity = addr.to_string();
     remove_actor(addr).and_then(pre_shutdown);
