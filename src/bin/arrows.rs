@@ -72,7 +72,7 @@ impl Server {
             Mail::Trade(msg) => println!("Trade = {:?}", msg),
             Mail::Bulk(msgs) => {
                 for msg in msgs {
-                    println!("Msg text = {:?}\n", msg.content_as_text());
+                    println!("Msg text = {:?}", msg.content_as_text());
                 }
             }
             Mail::Blank => eprintln!("Blank"),

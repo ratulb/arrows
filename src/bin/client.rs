@@ -1,4 +1,4 @@
-use arrows::{option_of_bytes, Addr, Mail, Msg};
+use arrows::{option_of_bytes, Mail, Msg};
 use byte_marks::ByteMarker;
 use clap::AppSettings;
 use std::io::{BufReader, BufWriter, Error, ErrorKind, Read, Result, Write};
@@ -81,16 +81,14 @@ impl Client<'_> {
     pub fn send(&mut self, actor: &str, msgs: &str) -> Result<()> {
         let msgs: Vec<_> = msgs
             .split(',')
-            .map(|msg| Msg::new_with_text(msg, "cli", "actor"))
+            .map(|msg| Msg::new_with_text(msg, "cli", actor))
             .collect();
-        let addr = Addr::new(actor);
 
         let bulk = Mail::Bulk(msgs);
         match option_of_bytes(&bulk) {
             Some(ref mut bytes) => {
                 self.marker.mark_tail(bytes);
                 self.writer.write_all(bytes)?;
-                println!("Total bytes len = {:?}", bytes.len());
                 self.writer.flush()?;
                 let mut buf = vec![0; 1024];
                 let len = self.reader.read(&mut buf)?;

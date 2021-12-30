@@ -64,7 +64,6 @@ pub fn register_builder(
     addr: u64,
     mut builder: impl ActorBuilder,
 ) -> Result<Rc<RefCell<Box<dyn Actor>>>, Error> {
-
     let identity = addr.to_string();
     remove_actor(addr).and_then(pre_shutdown);
     remove_actor_permanent(&identity);
