@@ -1,3 +1,4 @@
+use arrows::persist_mail;
 use arrows::{from_bytes, Mail};
 use byte_marks::Marked;
 use std::io::{BufReader, BufWriter, Result, Write};
@@ -55,25 +56,22 @@ impl Server {
         let mut reader = BufReader::new(cloned);
         let mut writer = BufWriter::new(tcp);
         let marked = Marked::with_defaults(&mut reader);
-        println!("Connection from = {:?}", peer_addr);
 
         for mail in marked {
             println!("Received mail length = {}", mail.len());
-            self.client_mail(mail);
+            self.route_mail(mail);
         }
         writer.write_all("Server received request".as_bytes())?;
         writer.flush()?;
         Ok(())
     }
 
-    fn client_mail(&self, mail: Vec<u8>) -> Result<()> {
+    fn route_mail(&self, mail: Vec<u8>) -> Result<()> {
         let mail = from_bytes::<'_, Mail>(&mail)?;
         match mail {
-            Mail::Trade(msg) => println!("Trade = {:?}", msg),
-            Mail::Bulk(msgs) => {
-                for msg in msgs {
-                    println!("Msg text = {:?}", msg.content_as_text());
-                }
+            trade @ Mail::Trade(_) => persist_mail(trade),
+            bulk @ Mail::Bulk(_) => {
+                persist_mail(bulk);
             }
             Mail::Blank => eprintln!("Blank"),
         }

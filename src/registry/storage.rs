@@ -1,5 +1,5 @@
-use crate::common::mail::Msg;
 use crate::common::utils::{from_byte_array, option_of_bytes};
+use crate::{Mail, Mail::*, Msg};
 use constants::*;
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use rusqlite::{
@@ -17,11 +17,11 @@ use std::sync::mpsc::*;
 use std::thread;
 use std::thread::JoinHandle;
 
-unsafe impl Send for DBEventRecorder {}
+/***unsafe impl Send for DBEventRecorder {}
 unsafe impl Sync for DBEventRecorder {}
 
 pub(crate) struct DBEventRecorder {
-    conn: Connection,
+      conn: Connection,
     events: VecDeque<DBEvent>,
     sender: Sender<DBEvent>,
 }
@@ -44,16 +44,16 @@ impl DBEventRecorder {
     }
 
     pub(crate) fn record_event(&mut self, event: DBEvent) -> Result<()> {
-        /***if self.events.len() < 1000 {
+        if self.events.len() < 1000 {
             self.events.push_back(event);
             return Ok(());
-        }***/
+        }
         //self.events.push_back(event);
         //let events = std::mem::replace(&mut self.events, VecDeque::with_capacity(1000));
         //let tx = self.conn.transaction()?;
         //for event in events {
         self.sender.send(event);
-        /***  let DBEvent(tbl, row_id) = event;
+        let DBEvent(tbl, row_id) = event;
             let actor_id = match tbl.find('_') {
                 None => continue,
                 Some(idx) => &tbl[idx + 1..],
@@ -64,11 +64,11 @@ impl DBEventRecorder {
                 &[&row_id as &dyn ToSql, &actor_id as &dyn ToSql],
             );
         }
-        tx.commit();***/
+        tx.commit();
         Ok(())
     }
 }
-/***impl Drop for DBEventRecorder {
+impl Drop for DBEventRecorder {
     fn drop(&mut self) {
         if self.events.len() > 0 {
             let tx = self.conn.transaction().unwrap();
@@ -90,7 +90,7 @@ impl DBEventRecorder {
     }
 }***/
 pub(crate) struct DBConnection {
-    primary: Connection,
+    inner: Connection,
 }
 
 impl DBConnection {
@@ -101,12 +101,36 @@ impl DBConnection {
         path.push(DATABASE);
         let result = Connection::open(path);
 
-        if let Ok(primary) = result {
-            primary.set_prepared_statement_cache_capacity(100);
-            Self { primary }
+        if let Ok(inner) = result {
+            inner.set_prepared_statement_cache_capacity(100); //TODO make it configurable
+            Self { inner }
         } else {
-            panic!("Failed to obtain primary db connection");
+            panic!("Failed to obtain db connection");
         }
+    }
+
+    /***    pub(crate) fn setup_publisher(&mut self, mut recorder: DBEventRecorder) {
+        self.inner.update_hook(None::<fn(Action, &str, &str, i64)>);
+        self.inner
+            .update_hook(Some(move |action: Action, _db: &str, tbl: &str, row_id| {
+                let tbl_of_interest = tbl.starts_with(INBOX) || tbl.starts_with(OUTBOX);
+                if action == Action::SQLITE_INSERT && tbl_of_interest {
+                    let event = DBEvent(String::from(tbl), row_id);
+                    recorder.record_event(event);
+                }
+            }));
+    }***/
+
+    pub(crate) fn setup_publisher(&mut self, publisher: Sender<DBEvent>) {
+        self.inner.update_hook(None::<fn(Action, &str, &str, i64)>);
+        self.inner
+            .update_hook(Some(move |action: Action, _db: &str, tbl: &str, row_id| {
+                let tbl_of_interest = tbl.starts_with(INBOX) || tbl.starts_with(OUTBOX);
+                if action == Action::SQLITE_INSERT && tbl_of_interest {
+                    let event = DBEvent(String::from(tbl), row_id);
+                    publisher.send(event).expect("Event published");
+                }
+            }));
     }
 }
 
@@ -123,13 +147,52 @@ impl DBEvent {
         )
     }
 }
+
 unsafe impl Send for DBConnection {}
 unsafe impl Sync for DBConnection {}
 
 unsafe impl Send for Storage {}
 unsafe impl Sync for Storage {}
-#[derive(Clone)]
+
 pub(crate) struct DBEvent(String, i64);
+
+pub(crate) struct UpdateHook {
+    sender: Sender<DBEvent>,
+    receiver: Option<Receiver<DBEvent>>,
+    join_handle: Option<JoinHandle<()>>,
+}
+
+impl UpdateHook {
+    pub fn new() -> Self {
+        let (sender, receiver) = channel();
+        Self {
+            sender,
+            receiver: Some(receiver),
+            join_handle: None,
+        }
+    }
+    pub fn attach(&mut self, conn: &mut DBConnection) -> Option<JoinHandle<()>> {
+        conn.inner.update_hook(None::<fn(Action, &str, &str, i64)>);
+        let sender = self.sender.clone();
+        conn.inner
+            .update_hook(Some(move |action: Action, _db: &str, tbl: &str, row_id| {
+                let tbl_of_interest = tbl.starts_with(INBOX) || tbl.starts_with(OUTBOX);
+                if action == Action::SQLITE_INSERT && tbl_of_interest {
+                    let event = DBEvent(String::from(tbl), row_id);
+                    sender.send(event).expect("Event published");
+                }
+            }));
+        let receiver = self.receiver.take();
+        let join_handle = std::thread::spawn(move || {
+            let receiver = receiver.as_ref().expect("Inner receiver");
+            loop {
+                let event = receiver.recv().expect("Expected event");
+                println!("Received event = {:?}", event);
+            }
+        });
+        Some(join_handle)
+    }
+}
 
 impl std::fmt::Debug for DBEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -172,20 +235,21 @@ impl From<Action> for DBAction {
 
 impl Drop for Storage {
     fn drop(&mut self) {
-        self.recorder.take();
-        self.update_receiver.take().map(JoinHandle::join);
+        //self.recorder.take();
+        //self.update_receiver.take().map(JoinHandle::join);
     }
 }
 
 pub(crate) struct Storage {
+    buffer: Vec<Msg>,
     conn: DBConnection,
-    recorder: Option<DBEventRecorder>,
     inbox_insert_stmts: HashMap<String, String>,
     inbox_select_stmts: HashMap<String, String>,
     outbox_insert_stmts: HashMap<String, String>,
     outbox_select_stmts: HashMap<String, String>,
     actor_create_stmts: HashMap<String, String>,
-    update_receiver: Option<JoinHandle<()>>,
+    update_hook: UpdateHook,
+    join_handle: Option<JoinHandle<()>>,
 }
 impl std::fmt::Debug for Storage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -199,38 +263,88 @@ impl std::fmt::Debug for Storage {
 }
 impl Storage {
     pub(crate) fn new() -> Self {
-        let (sender, receiver) = channel();
-        let update_receiver = thread::spawn(move || {
-            let count = 0;
-            while let Ok(_event) = receiver.recv() {
-                // println!("Receiving event = {:?}", event);
-                if count >= 1000000 {
-                    println!("Received events = {:?}", count);
-                }
-            }
-        });
         Self {
+            buffer: Vec::new(),
             conn: DBConnection::new(),
-            recorder: Some(DBEventRecorder::new(sender)),
             inbox_insert_stmts: HashMap::new(),
             outbox_insert_stmts: HashMap::new(),
             inbox_select_stmts: HashMap::new(),
             outbox_select_stmts: HashMap::new(),
             actor_create_stmts: HashMap::new(),
-            update_receiver: Some(update_receiver),
+            update_hook: UpdateHook::new(),
+            join_handle: None,
+        }
+    }
+    fn flush_buffer(&mut self) -> Result<()> {
+        if self.buffer.len() >= BUFFER_MAX_SIZE {
+            //TODO make it configurable
+            return self.persist(Blank);
+        } else {
+            return Ok(());
         }
     }
 
-    pub(crate) fn crate_actors_table(&mut self) -> Result<()> {
-        self.conn.primary.execute(ACTORS, [])?;
+    pub(crate) fn persist(&mut self, mail: Mail) -> Result<()> {
+        match mail {
+            Blank if self.buffer.len() == 0 => Ok(()),
+            Blank => self.persist_buffer(),
+            Trade(msg) => {
+                self.buffer.push(msg);
+                return self.flush_buffer();
+            }
+            Bulk(msgs) => {
+                self.buffer.extend(msgs);
+                return self.flush_buffer();
+            }
+            _ => Ok(()),
+        }
+    }
+
+    fn persist_buffer(&mut self) -> Result<()> {
+        self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
+        for msg in self.buffer.drain(..) {
+            let stmt = self
+                .inbox_insert_stmts
+                .entry(
+                    msg.get_to()
+                        .as_ref()
+                        .expect("actor address")
+                        .get_id()
+                        .to_string(),
+                )
+                .or_insert_with(|| {
+                    format!(
+                        "INSERT INTO inbox_{} (msg_id, msg) VALUES (:msg_id, :msg)",
+                        &msg.get_to()
+                            .as_ref()
+                            .expect("actor address")
+                            .get_id()
+                            .to_string()
+                    )
+                });
+            let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
+            match stmt {
+                Some(ref mut s) => {
+                    let bytes = msg.as_bytes();
+                    let _status = s.execute(named_params! { ":msg_id": &msg.id_as_string() as &dyn ToSql, ":msg": &bytes as &dyn ToSql })?;
+                }
+                None => panic!(),
+            }
+        }
+        self.conn.inner.execute_batch(COMMIT_TRANSACTION)?;
         Ok(())
     }
 
+    pub(crate) fn crate_actors_table(&mut self) -> Result<()> {
+        self.conn.inner.execute(ACTORS, [])?;
+        Ok(())
+    }
+    //TODO - the commented out portion is for inbounds in the 2nd conn if used
     pub(crate) fn crate_inbounds_table(&mut self) -> Result<()> {
-        self.conn.primary.execute(INBOUNDS, [])?;
-        if let Some(ref mut evt_recorder) = self.recorder {
+        self.conn.inner.execute(INBOUNDS, [])?;
+        /***if let Some(ref mut evt_recorder) = self.recorder {
             evt_recorder.conn.execute(INBOUNDS, [])?;
-        }
+        }***/
         Ok(())
     }
 
@@ -240,29 +354,15 @@ impl Storage {
         let existing_actors = self.select_existing_actors()?;
         self.setup_inboxes(&existing_actors)?;
         self.setup_outboxes(&existing_actors)?;
-        println!(
-            "Setting up actors - existing count {}",
-            existing_actors.len()
-        );
-
-        /***self.conn
-        .primary
-        .update_hook(Some(|action: Action, _db: &str, tbl: &str, row_id| {
-            let tbl_of_interest = tbl.starts_with(INBOX) || tbl.starts_with(OUTBOX);
-            if action == Action::SQLITE_INSERT && tbl_of_interest {
-                let event = DBEvent(String::from(tbl), row_id);
-                if let Some(ref mut recorder) = self.recorder {
-                    recorder.record_event(event);
-                }
-            }
-        }));***/
+        self.join_handle = self.update_hook.attach(&mut self.conn);
+        println!("Set up actors - existing count {}", existing_actors.len());
         Ok(())
     }
 
     pub(crate) fn select_existing_actors(&mut self) -> Result<Vec<String>> {
         let mut stmt = self
             .conn
-            .primary
+            .inner
             .prepare_cached("SELECT actor_id FROM actors")
             .ok();
         //TODO check capacity
@@ -280,20 +380,20 @@ impl Storage {
         Ok(actors)
     }
     pub(crate) fn setup_inboxes(&mut self, actor_ids: &[String]) -> Result<()> {
-        self.conn.primary.execute_batch(BEGIN_TRANSACTION)?;
+        self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
         for actor_id in actor_ids {
             self.inbox_of(actor_id)?;
         }
-        self.conn.primary.execute_batch(COMMIT_TRANSACTION)?;
+        self.conn.inner.execute_batch(COMMIT_TRANSACTION)?;
         Ok(())
     }
 
     pub(crate) fn setup_outboxes(&mut self, actor_ids: &[String]) -> Result<()> {
-        self.conn.primary.execute_batch(BEGIN_TRANSACTION)?;
+        self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
         for actor_id in actor_ids {
             self.outbox_of(actor_id)?;
         }
-        self.conn.primary.execute_batch(COMMIT_TRANSACTION)?;
+        self.conn.inner.execute_batch(COMMIT_TRANSACTION)?;
         Ok(())
     }
 
@@ -302,7 +402,7 @@ impl Storage {
             "CREATE TABLE IF NOT EXISTS inbox_{} (msg_id TEXT PRIMARY KEY, msg BLOB)",
             actor_id
         );
-        self.conn.primary.execute(&stmt, [])?;
+        self.conn.inner.execute(&stmt, [])?;
         Ok(())
     }
     pub(crate) fn outbox_of(&mut self, actor_id: &String) -> Result<()> {
@@ -310,7 +410,7 @@ impl Storage {
             "CREATE TABLE IF NOT EXISTS outbox_{} (msg_id TEXT PRIMARY KEY, msg BLOB)",
             actor_id
         );
-        self.conn.primary.execute(&stmt, [])?;
+        self.conn.inner.execute(&stmt, [])?;
         Ok(())
     }
 
@@ -319,13 +419,13 @@ impl Storage {
             "SELECT count(1) FROM sqlite_master WHERE type='table' AND name='inbox_{}'",
             actor_id
         );
-        let mut stmt = self.conn.primary.prepare(&stmt)?;
+        let mut stmt = self.conn.inner.prepare(&stmt)?;
         let mut rows = stmt.query([])?;
         if let Some(row) = rows.next()? {
             let value: usize = row.get(0)?;
             if value == 1 {
                 let stmt = format!("DELETE FROM inbox_{}", actor_id);
-                match self.conn.primary.execute(&stmt, []) {
+                match self.conn.inner.execute(&stmt, []) {
                     Ok(deleted) => println!("Rows deleted: {:?}", deleted),
                     Err(err) => println!("Error occured: {:?}", err),
                 }
@@ -343,15 +443,15 @@ impl Storage {
     ) -> std::io::Result<()> {
         let stmt = format!("DELETE FROM inbox_{} WHERE msg_id = ?", actor_id);
         self.conn
-            .primary
+            .inner
             .execute_batch(BEGIN_TRANSACTION)
             .map_err(sql_to_io);
-        let mut stmt = self.conn.primary.prepare_cached(&stmt).map_err(sql_to_io)?;
+        let mut stmt = self.conn.inner.prepare_cached(&stmt).map_err(sql_to_io)?;
         for msg_id in msg_ids {
             stmt.execute(params![msg_id]).map_err(sql_to_io);
         }
         self.conn
-            .primary
+            .inner
             .execute_batch(COMMIT_TRANSACTION)
             .map_err(sql_to_io);
         Ok(())
@@ -380,7 +480,7 @@ impl Storage {
             "SELECT msg FROM inbox_{} WHERE msg_id in ({})",
             actor_id, msg_ids_in
         );
-        let mut stmt = self.conn.primary.prepare(&stmt)?;
+        let mut stmt = self.conn.inner.prepare(&stmt)?;
         let mut rows = stmt.query([])?;
         let mut messages = VecDeque::new();
         while let Some(row) = rows.next()? {
@@ -400,7 +500,7 @@ impl Storage {
                     actor_id
                 )
             });
-        let mut stmt = self.conn.primary.prepare_cached(stmt).ok();
+        let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
         let msg_id = msg.id_as_string();
         let bytes = option_of_bytes(&msg);
         match stmt {
@@ -413,7 +513,7 @@ impl Storage {
     }
 
     pub(crate) fn persist_builder(&mut self, identity: &String, build_def: &String) -> Result<()> {
-        let mut stmt = self.conn.primary.prepare_cached(BUILD_DEF_INSERT).ok();
+        let mut stmt = self.conn.inner.prepare_cached(BUILD_DEF_INSERT).ok();
         match stmt {
             Some(ref mut s) => s.execute(
                 named_params! { ":actor_id": identity as &dyn ToSql, ":build_def": build_def as &dyn ToSql },
@@ -423,7 +523,7 @@ impl Storage {
         Ok(())
     }
     pub(crate) fn remove_actor_permanent(&mut self, identity: &String) -> Result<()> {
-        let mut stmt = self.conn.primary.prepare_cached(DELETE_ACTOR)?;
+        let mut stmt = self.conn.inner.prepare_cached(DELETE_ACTOR)?;
         stmt.execute(params![identity]).and_then(
             |c| {
                 if c == 1 {
@@ -435,7 +535,7 @@ impl Storage {
         )
     }
     pub(crate) fn actor_is_present(&mut self, actor_id: &String) -> Result<()> {
-        let mut stmt = self.conn.primary.prepare_cached(ACTOR_ROWID)?;
+        let mut stmt = self.conn.inner.prepare_cached(ACTOR_ROWID)?;
         let status = stmt
             .query(rusqlite::params![actor_id])?
             .count()
@@ -443,7 +543,7 @@ impl Storage {
         status
     }
     pub(crate) fn retrieve_build_def(&mut self, actor_id: &String) -> Result<Option<String>> {
-        let mut stmt = self.conn.primary.prepare_cached(BUILD_DEF)?;
+        let mut stmt = self.conn.inner.prepare_cached(BUILD_DEF)?;
         let mut rows = stmt.query(rusqlite::params![actor_id])?;
         if let Some(row) = rows.next()? {
             return Ok(Some(row.get(0)?));
@@ -461,7 +561,7 @@ impl Storage {
                     actor_id
                 )
             });
-        let mut stmt = self.conn.primary.prepare_cached(stmt).ok();
+        let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
         let msg_id = msg.id_as_string();
         let bytes = option_of_bytes(&msg);
         match stmt {
@@ -483,7 +583,7 @@ impl Storage {
                 )
             });
 
-        let mut stmt = self.conn.primary.prepare_cached(stmt).ok();
+        let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
         let mut messages = VecDeque::with_capacity(usize::from_str(FETCH_LIMIT).unwrap());
         match stmt {
             Some(ref mut s) => {
@@ -506,7 +606,7 @@ impl Storage {
             .inbox_select_stmts
             .entry(actor_id.to_string())
             .or_insert_with(|| format!("SELECT msg FROM inbox_{} ORDER BY rowid ASC", actor_id));
-        let mut stmt = self.conn.primary.prepare_cached(stmt).ok();
+        let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
         let mut messages = VecDeque::with_capacity(usize::from_str(FETCH_LIMIT).unwrap());
         match stmt {
             Some(ref mut s) => {
@@ -526,7 +626,7 @@ impl Storage {
         actor_id: &String,
         msg_itr: impl Iterator<Item = Msg>,
     ) -> Result<()> {
-        self.conn.primary.execute_batch(BEGIN_TRANSACTION)?;
+        self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
         let stmt = self
             .inbox_insert_stmts
             .entry(actor_id.to_string())
@@ -536,17 +636,17 @@ impl Storage {
                     actor_id
                 )
             });
-        let mut stmt = self.conn.primary.prepare_cached(stmt).ok();
+        let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
         match stmt {
             Some(ref mut s) => {
                 for msg in msg_itr {
-                    let bytes = option_of_bytes(&msg);
+                    let bytes = msg.as_bytes();
                     let _status = s.execute(named_params! { ":msg_id": &msg.id_as_string() as &dyn ToSql, ":msg": &bytes as &dyn ToSql })?;
                 }
             }
             None => panic!(),
         };
-        self.conn.primary.execute_batch(COMMIT_TRANSACTION)?;
+        self.conn.inner.execute_batch(COMMIT_TRANSACTION)?;
         Ok(())
     }
 }
@@ -795,6 +895,7 @@ pub(crate) mod constants {
     pub(crate) const DATABASE_EVENTS: &str = "arrows_events.db";
     pub(crate) const ARROWS_DB_PATH: &str = "ARROWS_DB_PATH";
     pub(super) const FETCH_LIMIT: &str = "1000";
+    pub(super) const BUFFER_MAX_SIZE: usize = 1;
     pub(super) const INBOX: &str = "inbox";
     pub(super) const OUTBOX: &str = "outbox";
     pub(super) const BEGIN_TRANSACTION: &str = "BEGIN TRANSACTION;";

@@ -61,7 +61,7 @@ impl Msg {
             None => None,
         }
     }
-    pub fn get_bytes(&self) -> Vec<u8> {
+    pub fn as_bytes(&self) -> Vec<u8> {
         option_of_bytes(self).unwrap_or_default()
     }
 

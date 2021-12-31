@@ -76,6 +76,10 @@ pub fn register_builder(
         .ok_or(Error::RegistrationError)
 }
 
+pub fn persist_mail(mail: Mail) {
+    persist(mail);
+}
+
 pub fn send(identity: u64, msg: Msg) {
     send_msg(identity, msg);
 }
@@ -96,6 +100,11 @@ pub fn reload_actor(addr: u64) -> Result<Rc<RefCell<Box<dyn Actor>>>, Error> {
 
 pub(in crate::registry) mod ctxops {
     use super::*;
+
+    pub(super) fn persist(mail: Mail) {
+        CTX.write().unwrap().storage.persist(mail);
+    }
+
     pub(super) fn send_msg(identity: u64, msg: Msg) {
         let ctx = CTX.write().unwrap();
         let actor = ctx.actors.get_actor(identity);

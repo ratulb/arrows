@@ -6,6 +6,7 @@ pub use common::errs::{Error, Result};
 pub use common::mail::Mail;
 pub use common::mail::Msg;
 pub use common::utils::*;
+pub use registry::persist_mail;
 
 pub mod common;
 pub mod macros;
