@@ -51,7 +51,7 @@ impl Server {
     }
 
     fn serve(&mut self, tcp: TcpStream) -> Result<()> {
-        let peer_addr = tcp.peer_addr()?;
+        let _peer_addr = tcp.peer_addr()?;
         let cloned = tcp.try_clone()?;
         let mut reader = BufReader::new(cloned);
         let mut writer = BufWriter::new(tcp);

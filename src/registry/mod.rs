@@ -1,11 +1,10 @@
-pub(crate) mod storage;
 use crate::common::{
     actor::Actor,
     actor::ActorBuilder,
     mail::{Mail, Msg},
 };
 use crate::registry::ctxops::*;
-use crate::registry::storage::Storage;
+use crate::apis::Storage;
 use crate::BuilderDeserializer;
 use crate::Error;
 use lazy_static::lazy_static;

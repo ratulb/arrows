@@ -37,7 +37,7 @@ impl Msg {
             id: compute_hash(&Uuid::new_v4()),
             from: Some(Addr::new(from)),
             to: Some(Addr::new(to)),
-            content: content.map(|data| Binary(data)),
+            content: content.map(Binary),
             dispatched: None,
         }
     }
@@ -99,7 +99,7 @@ impl Msg {
 
     pub fn uturn_with_reply(&mut self, reply: Option<Vec<u8>>) {
         swap(&mut self.from, &mut self.to);
-        let _ignore = replace(&mut self.content, reply.map(|data| Binary(data)));
+        let _ignore = replace(&mut self.content, reply.map(Binary));
     }
 
     pub fn get_content(&self) -> Option<Vec<u8>> {

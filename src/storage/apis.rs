@@ -1,237 +1,19 @@
 use crate::common::utils::{from_byte_array, option_of_bytes};
+use crate::constants::*;
+use crate::dbconnection::DBConnection;
 use crate::{Mail, Mail::*, Msg};
-use constants::*;
+
 use fallible_streaming_iterator::FallibleStreamingIterator;
-use rusqlite::{
-    hooks::Action, named_params, params, types::Value, Connection, Error::InvalidQuery, Result,
-    ToSql, Transaction,
-};
-use serde::{Deserialize, Serialize, Serializer};
+use rusqlite::{named_params, params, types::Value, Error::InvalidQuery, Result, ToSql};
+
+use crate::updatehook::UpdateHook;
 use std::collections::{HashMap, VecDeque};
-
 use std::io::{Error, ErrorKind};
-
-use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::mpsc::*;
-use std::thread;
 use std::thread::JoinHandle;
-
-/***unsafe impl Send for DBEventRecorder {}
-unsafe impl Sync for DBEventRecorder {}
-
-pub(crate) struct DBEventRecorder {
-      conn: Connection,
-    events: VecDeque<DBEvent>,
-    sender: Sender<DBEvent>,
-}
-
-impl DBEventRecorder {
-    pub(crate) fn new(sender: Sender<DBEvent>) -> Self {
-        let path = std::env::var(ARROWS_DB_PATH)
-            .expect("Please set ARROWS_DB_PATH pointing to an existing directory!");
-        let mut path = PathBuf::from(path);
-        path.push(DATABASE_EVENTS);
-        let conn = match Connection::open(path) {
-            Ok(conn) => conn,
-            Err(err) => panic!("{}", err),
-        };
-        Self {
-            conn,
-            events: VecDeque::with_capacity(1000),
-            sender,
-        }
-    }
-
-    pub(crate) fn record_event(&mut self, event: DBEvent) -> Result<()> {
-        if self.events.len() < 1000 {
-            self.events.push_back(event);
-            return Ok(());
-        }
-        //self.events.push_back(event);
-        //let events = std::mem::replace(&mut self.events, VecDeque::with_capacity(1000));
-        //let tx = self.conn.transaction()?;
-        //for event in events {
-        self.sender.send(event);
-        let DBEvent(tbl, row_id) = event;
-            let actor_id = match tbl.find('_') {
-                None => continue,
-                Some(idx) => &tbl[idx + 1..],
-            };
-
-            tx.execute(
-                INBOUND_INSERT,
-                &[&row_id as &dyn ToSql, &actor_id as &dyn ToSql],
-            );
-        }
-        tx.commit();
-        Ok(())
-    }
-}
-impl Drop for DBEventRecorder {
-    fn drop(&mut self) {
-        if self.events.len() > 0 {
-            let tx = self.conn.transaction().unwrap();
-            for event in &self.events {
-                self.sender.send(event.clone());
-                let DBEvent(tbl, row_id) = event;
-                let actor_id = match tbl.find('_') {
-                    None => continue,
-                    Some(idx) => &tbl[idx + 1..],
-                };
-
-                tx.execute(
-                    INBOUND_INSERT,
-                    &[&row_id as &dyn ToSql, &actor_id as &dyn ToSql],
-                );
-            }
-            tx.commit();
-        }
-    }
-}***/
-pub(crate) struct DBConnection {
-    inner: Connection,
-}
-
-impl DBConnection {
-    pub(crate) fn new() -> Self {
-        let path = std::env::var(ARROWS_DB_PATH)
-            .expect("Please set ARROWS_DB_PATH pointing to an existing directory!");
-        let mut path = PathBuf::from(path);
-        path.push(DATABASE);
-        let result = Connection::open(path);
-
-        if let Ok(inner) = result {
-            inner.set_prepared_statement_cache_capacity(100); //TODO make it configurable
-            Self { inner }
-        } else {
-            panic!("Failed to obtain db connection");
-        }
-    }
-
-    /***    pub(crate) fn setup_publisher(&mut self, mut recorder: DBEventRecorder) {
-        self.inner.update_hook(None::<fn(Action, &str, &str, i64)>);
-        self.inner
-            .update_hook(Some(move |action: Action, _db: &str, tbl: &str, row_id| {
-                let tbl_of_interest = tbl.starts_with(INBOX) || tbl.starts_with(OUTBOX);
-                if action == Action::SQLITE_INSERT && tbl_of_interest {
-                    let event = DBEvent(String::from(tbl), row_id);
-                    recorder.record_event(event);
-                }
-            }));
-    }***/
-
-    pub(crate) fn setup_publisher(&mut self, publisher: Sender<DBEvent>) {
-        self.inner.update_hook(None::<fn(Action, &str, &str, i64)>);
-        self.inner
-            .update_hook(Some(move |action: Action, _db: &str, tbl: &str, row_id| {
-                let tbl_of_interest = tbl.starts_with(INBOX) || tbl.starts_with(OUTBOX);
-                if action == Action::SQLITE_INSERT && tbl_of_interest {
-                    let event = DBEvent(String::from(tbl), row_id);
-                    publisher.send(event).expect("Event published");
-                }
-            }));
-    }
-}
-
-impl DBEvent {
-    pub(crate) fn persist(&self, tx: &Transaction<'_>) -> Result<usize> {
-        let DBEvent(tbl, row_id) = self;
-        let actor_id = match tbl.find('_') {
-            None => return Ok(0),
-            Some(idx) => &tbl[(idx + 1)..],
-        };
-        tx.execute(
-            INBOUND_INSERT,
-            &[&row_id as &dyn ToSql, &actor_id as &dyn ToSql],
-        )
-    }
-}
-
-unsafe impl Send for DBConnection {}
-unsafe impl Sync for DBConnection {}
 
 unsafe impl Send for Storage {}
 unsafe impl Sync for Storage {}
-
-pub(crate) struct DBEvent(String, i64);
-
-pub(crate) struct UpdateHook {
-    sender: Sender<DBEvent>,
-    receiver: Option<Receiver<DBEvent>>,
-    join_handle: Option<JoinHandle<()>>,
-}
-
-impl UpdateHook {
-    pub fn new() -> Self {
-        let (sender, receiver) = channel();
-        Self {
-            sender,
-            receiver: Some(receiver),
-            join_handle: None,
-        }
-    }
-    pub fn attach(&mut self, conn: &mut DBConnection) -> Option<JoinHandle<()>> {
-        conn.inner.update_hook(None::<fn(Action, &str, &str, i64)>);
-        let sender = self.sender.clone();
-        conn.inner
-            .update_hook(Some(move |action: Action, _db: &str, tbl: &str, row_id| {
-                let tbl_of_interest = tbl.starts_with(INBOX) || tbl.starts_with(OUTBOX);
-                if action == Action::SQLITE_INSERT && tbl_of_interest {
-                    let event = DBEvent(String::from(tbl), row_id);
-                    sender.send(event).expect("Event published");
-                }
-            }));
-        let receiver = self.receiver.take();
-        let join_handle = std::thread::spawn(move || {
-            let receiver = receiver.as_ref().expect("Inner receiver");
-            loop {
-                let event = receiver.recv().expect("Expected event");
-                println!("Received event = {:?}", event);
-            }
-        });
-        Some(join_handle)
-    }
-}
-
-impl std::fmt::Debug for DBEvent {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DBEvent")
-            .field("table", &self.0)
-            .field("row_id", &self.1)
-            .finish()
-    }
-}
-use serde::ser::SerializeTupleStruct;
-impl Serialize for DBEvent {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut event = serializer.serialize_tuple_struct("DBEvent", 2)?;
-        event.serialize_field(&self.0)?;
-        event.serialize_field(&self.1)?;
-        event.end()
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub(crate) enum DBAction {
-    Insert,
-    Delete,
-    Update,
-    Unknown,
-}
-impl From<Action> for DBAction {
-    fn from(action: Action) -> Self {
-        match action {
-            Action::SQLITE_DELETE => DBAction::Delete,
-            Action::SQLITE_INSERT => DBAction::Insert,
-            Action::SQLITE_UPDATE => DBAction::Update,
-            _ => DBAction::Unknown,
-        }
-    }
-}
 
 impl Drop for Storage {
     fn drop(&mut self) {
@@ -278,23 +60,23 @@ impl Storage {
     fn flush_buffer(&mut self) -> Result<()> {
         if self.buffer.len() >= BUFFER_MAX_SIZE {
             //TODO make it configurable
-            return self.persist(Blank);
+            self.persist(Blank)
         } else {
-            return Ok(());
+            Ok(())
         }
     }
 
     pub(crate) fn persist(&mut self, mail: Mail) -> Result<()> {
         match mail {
-            Blank if self.buffer.len() == 0 => Ok(()),
+            Blank if self.buffer.is_empty() => Ok(()),
             Blank => self.persist_buffer(),
             Trade(msg) => {
                 self.buffer.push(msg);
-                return self.flush_buffer();
+                self.flush_buffer()
             }
             Bulk(msgs) => {
                 self.buffer.extend(msgs);
-                return self.flush_buffer();
+                self.flush_buffer()
             }
             _ => Ok(()),
         }
@@ -328,7 +110,7 @@ impl Storage {
                     let bytes = msg.as_bytes();
                     let _status = s.execute(named_params! { ":msg_id": &msg.id_as_string() as &dyn ToSql, ":msg": &bytes as &dyn ToSql })?;
                 }
-                None => panic!(),
+                None => panic!(), //TODO create inbox table on actor add
             }
         }
         self.conn.inner.execute_batch(COMMIT_TRANSACTION)?;
@@ -693,6 +475,7 @@ pub(crate) fn into_outbox(actor_id: &String, msg: Msg) -> Result<()> {
 mod tests {
     use super::*;
     use crate::common::mail::Msg;
+    use crate::signals::DBEvent;
     use rand::{thread_rng, Rng};
 
     #[test]
@@ -888,37 +671,4 @@ mod tests {
         let json = serde_json::to_string(&db_event).unwrap();
         println!("The serialized db event = {:?}", json);
     }
-}
-
-pub(crate) mod constants {
-    pub(crate) const DATABASE: &str = "arrows.db";
-    pub(crate) const DATABASE_EVENTS: &str = "arrows_events.db";
-    pub(crate) const ARROWS_DB_PATH: &str = "ARROWS_DB_PATH";
-    pub(super) const FETCH_LIMIT: &str = "1000";
-    pub(super) const BUFFER_MAX_SIZE: usize = 1;
-    pub(super) const INBOX: &str = "inbox";
-    pub(super) const OUTBOX: &str = "outbox";
-    pub(super) const BEGIN_TRANSACTION: &str = "BEGIN TRANSACTION;";
-    pub(super) const COMMIT_TRANSACTION: &str = "COMMIT TRANSACTION;";
-    pub(super) const SELECT_ACTORS: &str = "SELECT actor_id FROM actors";
-    //TODO check where its being used?
-    pub(self) const DOES_TABLE_EXIST: &str =
-        "SELECT count(1) FROM sqlite_master WHERE type='table' AND name=?";
-    pub(super) const ACTORS: &str =
-        "CREATE TABLE IF NOT EXISTS actors (actor_id TEXT PRIMARY KEY, build_def TEXT)";
-    pub(super) const INBOUNDS: &str =
-        "CREATE TABLE IF NOT EXISTS inbounds (row_id INTEGER, actor_id TEXT)";
-
-    pub(super) const OUTBOUNDS: &str =
-        "CREATE TABLE IF NOT EXISTS outbounds (row_id INTEGER, actor_id TEXT)";
-
-    pub(super) const BUILD_DEF_INSERT: &str =
-        "INSERT INTO actors (actor_id, build_def) VALUES (:actor_id, :build_def)";
-
-    pub(super) const INBOUND_INSERT: &str =
-        "INSERT INTO inbounds (row_id, actor_id) VALUES (:row_id, :actor_id)";
-
-    pub(super) const DELETE_ACTOR: &str = "DELETE FROM actors WHERE actor_id = ?";
-    pub(super) const ACTOR_ROWID: &str = "SELECT rowid FROM actors WHERE actor_id = ?";
-    pub(super) const BUILD_DEF: &str = "SELECT build_def FROM actors WHERE actor_id = ?";
 }
