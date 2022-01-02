@@ -1,10 +1,12 @@
-use crate::constants::INBOUND_INSERT;
+use crate::constants::{BUCKET_MAX_SIZE, EVENT_MAX_AGE, INBOUND_INSERT};
 use rusqlite::{hooks::Action, Result, ToSql, Transaction};
 use serde::{ser::SerializeTupleStruct, Deserialize, Serialize, Serializer};
+use std::mem;
+use std::time::{Duration, Instant};
 
 #[derive(Debug)]
 pub(crate) enum Signal {
-    Break,
+    Stop,
     DbUpdate(DBEvent),
 }
 
@@ -61,4 +63,45 @@ impl From<Action> for DBAction {
             _ => DBAction::Unknown,
         }
     }
+}
+
+pub(crate) struct EventBucket {
+    events: Vec<DBEvent>,
+    oldest_receipt_instant: Option<Instant>,
+}
+
+impl EventBucket {
+    pub fn new() -> Self {
+        Self {
+            events: Vec::new(),
+            oldest_receipt_instant: None,
+        }
+    }
+
+    pub fn overflown(&self) -> bool {
+        self.events.len() >= BUCKET_MAX_SIZE
+    }
+
+    pub fn oldest_matured(&self) -> bool {
+        match self.oldest_receipt_instant {
+            None => false,
+            Some(instant) => instant.elapsed() >= Duration::new(EVENT_MAX_AGE, 0),
+        }
+    }
+
+    pub fn should_invoke_actors(&self) -> bool {
+        self.overflown() || self.oldest_matured()
+    }
+    pub fn add_event(&mut self, event: DBEvent) {
+        if self.should_invoke_actors() {
+            let events = mem::replace(&mut self.events, Vec::new());
+            Self::deliver_actor_messages(events);
+        }
+        self.events.push(event);
+        if self.events.len() == 1 {
+            self.oldest_receipt_instant = Some(Instant::now());
+        }
+    }
+
+    pub fn deliver_actor_messages(events: Vec<DBEvent>) {}
 }

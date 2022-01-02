@@ -39,10 +39,10 @@ impl Publisher {
     }
 
     pub fn loopbreak(&self) {
-        self.publisher.send(Signal::Break).expect("Sent");
+        self.publisher.send(Signal::Stop).expect("Sent");
     }
 }
-use crate::{Mail};
+use crate::Mail;
 
 pub fn transpose(rows: &mut Vec<Vec<Mail>>) -> Vec<Vec<Mail>> {
     assert!(!rows.is_empty());
@@ -83,7 +83,7 @@ impl Subscriber {
             loop {
                 let event = receiver.recv().expect("Expected event");
                 match event {
-                    Signal::Break => break,
+                    Signal::Stop => break,
                     Signal::DbUpdate(evt) => println!("Received event = {:?}", evt),
                 }
             }
