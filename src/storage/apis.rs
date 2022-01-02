@@ -6,7 +6,7 @@ use crate::{Mail, Mail::*, Msg};
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use rusqlite::{named_params, params, types::Value, Error::InvalidQuery, Result, ToSql};
 
-use crate::updatehook::UpdateHook;
+use crate::pubsub::Publisher;
 use std::collections::{HashMap, VecDeque};
 use std::io::{Error, ErrorKind};
 use std::str::FromStr;
@@ -17,8 +17,8 @@ unsafe impl Sync for Storage {}
 
 impl Drop for Storage {
     fn drop(&mut self) {
-        //self.recorder.take();
-        //self.update_receiver.take().map(JoinHandle::join);
+        self.publisher.loopbreak();
+        self.subscriber_handle.take().map(JoinHandle::join);
     }
 }
 
@@ -30,8 +30,8 @@ pub(crate) struct Storage {
     outbox_insert_stmts: HashMap<String, String>,
     outbox_select_stmts: HashMap<String, String>,
     actor_create_stmts: HashMap<String, String>,
-    update_hook: UpdateHook,
-    join_handle: Option<JoinHandle<()>>,
+    publisher: Publisher,
+    subscriber_handle: Option<JoinHandle<()>>,
 }
 impl std::fmt::Debug for Storage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -53,8 +53,8 @@ impl Storage {
             inbox_select_stmts: HashMap::new(),
             outbox_select_stmts: HashMap::new(),
             actor_create_stmts: HashMap::new(),
-            update_hook: UpdateHook::new(),
-            join_handle: None,
+            publisher: Publisher::new(),
+            subscriber_handle: None,
         }
     }
     fn flush_buffer(&mut self) -> Result<()> {
@@ -136,7 +136,7 @@ impl Storage {
         let existing_actors = self.select_existing_actors()?;
         self.setup_inboxes(&existing_actors)?;
         self.setup_outboxes(&existing_actors)?;
-        self.join_handle = self.update_hook.attach(&mut self.conn);
+        self.publisher.start(&mut self.conn);
         println!("Set up actors - existing count {}", existing_actors.len());
         Ok(())
     }

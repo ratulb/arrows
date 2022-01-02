@@ -2,9 +2,10 @@ use crate::constants::INBOUND_INSERT;
 use rusqlite::{hooks::Action, Result, ToSql, Transaction};
 use serde::{ser::SerializeTupleStruct, Deserialize, Serialize, Serializer};
 
-pub(crate) enum Singal {
+#[derive(Debug)]
+pub(crate) enum Signal {
     Break,
-    DbUpdate,
+    DbUpdate(DBEvent),
 }
 
 pub(crate) struct DBEvent(pub String, pub i64);
