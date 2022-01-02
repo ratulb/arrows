@@ -8,7 +8,7 @@ use std::thread::JoinHandle;
 pub(crate) struct Publisher {
     publisher: Sender<Signal>,
     receiver: Option<Receiver<Signal>>,
-    subscriber: Option<Subscriber>,
+    pub subscriber: Option<Subscriber>,
 }
 impl Publisher {
     pub fn new() -> Self {
@@ -42,7 +42,7 @@ impl Publisher {
         self.publisher.send(Signal::Break).expect("Sent");
     }
 }
-use crate::{Mail, Mail::*, Msg};
+use crate::{Mail};
 
 pub fn transpose(rows: &mut Vec<Vec<Mail>>) -> Vec<Vec<Mail>> {
     assert!(!rows.is_empty());
@@ -66,13 +66,13 @@ pub fn transpose(rows: &mut Vec<Vec<Mail>>) -> Vec<Vec<Mail>> {
 
 pub(crate) struct Subscriber {
     receiver: Option<Receiver<Signal>>,
-    join_handle: Option<JoinHandle<()>>,
+    pub join_handle: Option<JoinHandle<()>>,
 }
 
 impl Subscriber {
     pub fn new(receiver: Option<Receiver<Signal>>) -> Self {
         Self {
-            receiver: receiver,
+            receiver,
             join_handle: None,
         }
     }

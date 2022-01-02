@@ -18,7 +18,10 @@ unsafe impl Sync for Storage {}
 impl Drop for Storage {
     fn drop(&mut self) {
         self.publisher.loopbreak();
-        self.subscriber_handle.take().map(JoinHandle::join);
+        self.publisher
+            .subscriber
+            .take()
+            .map(|mut subscriber| subscriber.join_handle.take().map(JoinHandle::join));
     }
 }
 

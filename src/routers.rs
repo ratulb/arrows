@@ -1,4 +1,4 @@
-use crate::signals::{DBEvent, Signal};
+use crate::signals::{Signal};
 use std::sync::mpsc::Receiver;
 
 pub(crate) struct InboxRouter;
