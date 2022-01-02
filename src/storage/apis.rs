@@ -28,7 +28,6 @@ impl Drop for Storage {
 pub(crate) struct Storage {
     buffer: Vec<Msg>,
     conn: DBConnection,
-    //inbox_insert_stmts: HashMap<String, String>,
     inbox_insert_stmt: Option<String>,
     inbox_select_stmts: HashMap<String, String>,
     outbox_insert_stmts: HashMap<String, String>,
@@ -99,8 +98,9 @@ impl Storage {
             let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
             match stmt {
                 Some(ref mut s) => {
+                    let actor_id = msg.get_to_id().to_string();
                     let bytes = msg.as_bytes();
-                    let _status = s.execute(named_params! { ":msg_id": &msg.id_as_string() as &dyn ToSql, ":msg": &bytes as &dyn ToSql })?;
+                    let _status = s.execute(named_params! {":actor_id": &actor_id as &dyn ToSql, ":msg_id": &msg.id_as_string() as &dyn ToSql, ":msg": &bytes as &dyn ToSql })?;
                 }
                 None => panic!(),
             }
@@ -143,23 +143,6 @@ impl Storage {
             None => panic!("Error draining inbox - CachedStatement not found"),
         }
         Ok(actors)
-    }
-    pub(crate) fn setup_inboxes(&mut self, actor_ids: &[String]) -> Result<()> {
-        self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
-        for _actor_id in actor_ids {
-            //self.inbox_of(actor_id)?;
-        }
-        self.conn.inner.execute_batch(COMMIT_TRANSACTION)?;
-        Ok(())
-    }
-
-    pub(crate) fn setup_outboxes(&mut self, actor_ids: &[String]) -> Result<()> {
-        self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
-        for _actor_id in actor_ids {
-            //self.outbox_of(actor_id)?;
-        }
-        self.conn.inner.execute_batch(COMMIT_TRANSACTION)?;
-        Ok(())
     }
 
     pub(crate) fn purge_inbox_of(&mut self, actor_id: &String) -> Result<()> {
@@ -299,7 +282,7 @@ impl Storage {
         Ok(None)
     }
 
-    pub(crate) fn into_inbox(&mut self, actor_id: &String, msg: Msg) -> Result<()> {
+    pub(crate) fn into_inbox(&mut self, msg: Msg) -> Result<()> {
         let stmt = match self.inbox_insert_stmt.as_ref() {
             Some(s) => s,
             None => {
@@ -309,10 +292,11 @@ impl Storage {
         };
         let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
         let msg_id = msg.id_as_string();
+        let actor_id = msg.get_to_id().to_string();
         let bytes = option_of_bytes(&msg);
         match stmt {
             Some(ref mut s) => s.execute(
-                named_params! {":actor_id": actor_id as &dyn ToSql, ":msg_id": &msg_id as &dyn ToSql, ":msg": &bytes as &dyn ToSql },
+                named_params! {":actor_id": &actor_id as &dyn ToSql, ":msg_id": &msg_id as &dyn ToSql, ":msg": &bytes as &dyn ToSql },
             )?,
             None => panic!(),
         };
@@ -367,11 +351,7 @@ impl Storage {
         Ok(messages)
     }
 
-    pub(crate) fn into_inbox_batch(
-        &mut self,
-        actor_id: &String,
-        msg_itr: impl Iterator<Item = Msg>,
-    ) -> Result<()> {
+    pub(crate) fn into_inbox_batch(&mut self, msg_itr: impl Iterator<Item = Msg>) -> Result<()> {
         self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
         let stmt = match self.inbox_insert_stmt.as_ref() {
             Some(s) => s,
@@ -385,7 +365,8 @@ impl Storage {
             Some(ref mut s) => {
                 for msg in msg_itr {
                     let bytes = msg.as_bytes();
-                    let _status = s.execute(named_params! { ":actor_id": actor_id as &dyn ToSql, ":msg_id": &msg.id_as_string() as &dyn ToSql, ":msg": &bytes as &dyn ToSql })?;
+                    let actor_id = msg.get_to_id().to_string();
+                    let _status = s.execute(named_params! { ":actor_id": &actor_id as &dyn ToSql, ":msg_id": &msg.id_as_string() as &dyn ToSql, ":msg": &bytes as &dyn ToSql })?;
                 }
             }
             None => panic!(),
@@ -412,7 +393,7 @@ pub(crate) fn value_to_msg(v: Value) -> Msg {
 pub(crate) fn into_inbox(actor_id: &String, msg: Msg) -> Result<()> {
     let mut ctx = Storage::new();
     let _res = ctx.setup();
-    ctx.into_inbox(actor_id, msg)
+    ctx.into_inbox(msg)
 }
 
 pub(crate) fn into_outbox(actor_id: &String, msg: Msg) -> Result<()> {
