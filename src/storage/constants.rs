@@ -13,17 +13,23 @@ pub(crate) const SELECT_ACTORS: &str = "SELECT actor_id FROM actors";
 //TODO check where its being used?
 //pub(self) const DOES_TABLE_EXIST: &str =
 //  "SELECT count(1) FROM sqlite_master WHERE type='table' AND name=?";
+pub(crate) const INBOX_TABLE: &str =
+    "CREATE TABLE IF NOT EXISTS inbox(actor_id TEXT, msg_id TEXT, msg BLOB, PRIMARY KEY(actor_id, msg_id))";
+pub(crate) const OUTBOX_TABLE: &str =
+    "CREATE TABLE IF NOT EXISTS outbox(actor_id TEXT, msg_id TEXT, msg BLOB, PRIMARY KEY(actor_id, msg_id))";
+
 pub(crate) const ACTORS: &str =
     "CREATE TABLE IF NOT EXISTS actors (actor_id TEXT PRIMARY KEY, build_def TEXT)";
-pub(crate) const INBOUNDS: &str =
-    "CREATE TABLE IF NOT EXISTS inbounds (row_id INTEGER, actor_id TEXT)";
+pub(crate) const INBOUNDS: &str = "CREATE TABLE IF NOT EXISTS inbounds (row_id INTEGER)";
 
-pub(crate) const OUTBOUNDS: &str =
-    "CREATE TABLE IF NOT EXISTS outbounds (row_id INTEGER, actor_id TEXT)";
+pub(crate) const OUTBOUNDS: &str = "CREATE TABLE IF NOT EXISTS outbounds (row_id INTEGER)";
 pub(crate) const BUILD_DEF_INSERT: &str =
     "INSERT INTO actors (actor_id, build_def) VALUES (:actor_id, :build_def)";
-pub(crate) const INBOUND_INSERT: &str =
-    "INSERT INTO inbounds (row_id, actor_id) VALUES (:row_id, :actor_id)";
+pub(crate) const INBOX_INSERT: &str =
+    "INSERT INTO inbox(actor_id, msg_id, msg) VALUES(:actor_id, :msg_id, :msg)";
+
+pub(crate) const INBOUND_INSERT: &str = "INSERT INTO inbounds (row_id) VALUES (:row_id)";
+pub(crate) const OUTBOUND_INSERT: &str = "INSERT INTO outbounds (row_id) VALUES (:row_id)";
 pub(crate) const DELETE_ACTOR: &str = "DELETE FROM actors WHERE actor_id = ?";
 pub(crate) const ACTOR_ROWID: &str = "SELECT rowid FROM actors WHERE actor_id = ?";
 pub(crate) const BUILD_DEF: &str = "SELECT build_def FROM actors WHERE actor_id = ?";

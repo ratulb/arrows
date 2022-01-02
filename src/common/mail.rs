@@ -47,7 +47,7 @@ impl Msg {
             from: Some(Addr::new(from)),
             to: Some(Addr::new(to)),
             content: Some(Text(content.to_string())),
-            dispatched: None,
+            dispatched: Some(SystemTime::now()),
         }
     }
 

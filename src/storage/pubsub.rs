@@ -26,7 +26,7 @@ impl Publisher {
             .update_hook(Some(move |action: Action, _db: &str, tbl: &str, row_id| {
                 let tbl_of_interest = tbl.starts_with(INBOX) || tbl.starts_with(OUTBOX);
                 if action == Action::SQLITE_INSERT && tbl_of_interest {
-                    let event = DBEvent(String::from(tbl), row_id);
+                    let event = DBEvent(String::from(tbl), row_id, String::new());
                     publisher
                         .send(Signal::DbUpdate(event))
                         .expect("Event published");

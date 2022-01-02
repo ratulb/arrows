@@ -28,7 +28,8 @@ impl Drop for Storage {
 pub(crate) struct Storage {
     buffer: Vec<Msg>,
     conn: DBConnection,
-    inbox_insert_stmts: HashMap<String, String>,
+    //inbox_insert_stmts: HashMap<String, String>,
+    inbox_insert_stmt: Option<String>,
     inbox_select_stmts: HashMap<String, String>,
     outbox_insert_stmts: HashMap<String, String>,
     outbox_select_stmts: HashMap<String, String>,
@@ -39,7 +40,7 @@ pub(crate) struct Storage {
 impl std::fmt::Debug for Storage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Storageint")
-            .field("inbox_insert_stmts", &self.inbox_insert_stmts)
+            .field("inbox_insert_stmt", &self.inbox_insert_stmt)
             .field("inbox_select_stmts", &self.inbox_select_stmts)
             .field("outbox_insert_stmts", &self.outbox_insert_stmts)
             .field("actor_create_stmts", &self.actor_create_stmts)
@@ -51,7 +52,7 @@ impl Storage {
         Self {
             buffer: Vec::new(),
             conn: DBConnection::new(),
-            inbox_insert_stmts: HashMap::new(),
+            inbox_insert_stmt: None,
             outbox_insert_stmts: HashMap::new(),
             inbox_select_stmts: HashMap::new(),
             outbox_select_stmts: HashMap::new(),
@@ -87,60 +88,39 @@ impl Storage {
 
     fn persist_buffer(&mut self) -> Result<()> {
         self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
+        let stmt = match self.inbox_insert_stmt.as_ref() {
+            Some(s) => s,
+            None => {
+                self.inbox_insert_stmt = Some(INBOX_INSERT.to_string());
+                INBOX_INSERT
+            }
+        };
         for msg in self.buffer.drain(..) {
-            let stmt = self
-                .inbox_insert_stmts
-                .entry(
-                    msg.get_to()
-                        .as_ref()
-                        .expect("actor address")
-                        .get_id()
-                        .to_string(),
-                )
-                .or_insert_with(|| {
-                    format!(
-                        "INSERT INTO inbox_{} (msg_id, msg) VALUES (:msg_id, :msg)",
-                        &msg.get_to()
-                            .as_ref()
-                            .expect("actor address")
-                            .get_id()
-                            .to_string()
-                    )
-                });
             let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
             match stmt {
                 Some(ref mut s) => {
                     let bytes = msg.as_bytes();
                     let _status = s.execute(named_params! { ":msg_id": &msg.id_as_string() as &dyn ToSql, ":msg": &bytes as &dyn ToSql })?;
                 }
-                None => panic!(), //TODO create inbox table on actor add
+                None => panic!(),
             }
         }
         self.conn.inner.execute_batch(COMMIT_TRANSACTION)?;
         Ok(())
     }
 
-    pub(crate) fn crate_actors_table(&mut self) -> Result<()> {
-        self.conn.inner.execute(ACTORS, [])?;
-        Ok(())
-    }
-    //TODO - the commented out portion is for inbounds in the 2nd conn if used
-    pub(crate) fn crate_inbounds_table(&mut self) -> Result<()> {
-        self.conn.inner.execute(INBOUNDS, [])?;
-        /***if let Some(ref mut evt_recorder) = self.recorder {
-            evt_recorder.conn.execute(INBOUNDS, [])?;
-        }***/
-        Ok(())
-    }
-
     pub(crate) fn setup(&mut self) -> Result<()> {
-        self.crate_actors_table()?;
-        self.crate_inbounds_table()?;
-        let existing_actors = self.select_existing_actors()?;
-        self.setup_inboxes(&existing_actors)?;
-        self.setup_outboxes(&existing_actors)?;
+        self.conn.inner.execute(INBOX_TABLE, [])?;
+        self.conn.inner.execute(OUTBOX_TABLE, [])?;
+
+        self.conn.inner.execute(ACTORS, [])?;
+
+        self.conn.inner.execute(INBOUNDS, [])?;
+        self.conn.inner.execute(OUTBOUNDS, [])?;
+
         self.publisher.start(&mut self.conn);
-        println!("Set up actors - existing count {}", existing_actors.len());
+
+        println!("Set up arrows schema");
         Ok(())
     }
 
@@ -166,8 +146,8 @@ impl Storage {
     }
     pub(crate) fn setup_inboxes(&mut self, actor_ids: &[String]) -> Result<()> {
         self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
-        for actor_id in actor_ids {
-            self.inbox_of(actor_id)?;
+        for _actor_id in actor_ids {
+            //self.inbox_of(actor_id)?;
         }
         self.conn.inner.execute_batch(COMMIT_TRANSACTION)?;
         Ok(())
@@ -175,27 +155,10 @@ impl Storage {
 
     pub(crate) fn setup_outboxes(&mut self, actor_ids: &[String]) -> Result<()> {
         self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
-        for actor_id in actor_ids {
-            self.outbox_of(actor_id)?;
+        for _actor_id in actor_ids {
+            //self.outbox_of(actor_id)?;
         }
         self.conn.inner.execute_batch(COMMIT_TRANSACTION)?;
-        Ok(())
-    }
-
-    pub(crate) fn inbox_of(&mut self, actor_id: &String) -> Result<()> {
-        let stmt = format!(
-            "CREATE TABLE IF NOT EXISTS inbox_{} (msg_id TEXT PRIMARY KEY, msg BLOB)",
-            actor_id
-        );
-        self.conn.inner.execute(&stmt, [])?;
-        Ok(())
-    }
-    pub(crate) fn outbox_of(&mut self, actor_id: &String) -> Result<()> {
-        let stmt = format!(
-            "CREATE TABLE IF NOT EXISTS outbox_{} (msg_id TEXT PRIMARY KEY, msg BLOB)",
-            actor_id
-        );
-        self.conn.inner.execute(&stmt, [])?;
         Ok(())
     }
 
@@ -337,21 +300,19 @@ impl Storage {
     }
 
     pub(crate) fn into_inbox(&mut self, actor_id: &String, msg: Msg) -> Result<()> {
-        let stmt = self
-            .inbox_insert_stmts
-            .entry(actor_id.to_string())
-            .or_insert_with(|| {
-                format!(
-                    "INSERT INTO inbox_{} (msg_id, msg) VALUES (:msg_id, :msg)",
-                    actor_id
-                )
-            });
+        let stmt = match self.inbox_insert_stmt.as_ref() {
+            Some(s) => s,
+            None => {
+                self.inbox_insert_stmt = Some(INBOX_INSERT.to_string());
+                INBOX_INSERT
+            }
+        };
         let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
         let msg_id = msg.id_as_string();
         let bytes = option_of_bytes(&msg);
         match stmt {
             Some(ref mut s) => s.execute(
-                named_params! { ":msg_id": &msg_id as &dyn ToSql, ":msg": &bytes as &dyn ToSql },
+                named_params! {":actor_id": actor_id as &dyn ToSql, ":msg_id": &msg_id as &dyn ToSql, ":msg": &bytes as &dyn ToSql },
             )?,
             None => panic!(),
         };
@@ -412,21 +373,19 @@ impl Storage {
         msg_itr: impl Iterator<Item = Msg>,
     ) -> Result<()> {
         self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
-        let stmt = self
-            .inbox_insert_stmts
-            .entry(actor_id.to_string())
-            .or_insert_with(|| {
-                format!(
-                    "INSERT INTO inbox_{} (msg_id, msg) VALUES (:msg_id, :msg)",
-                    actor_id
-                )
-            });
+        let stmt = match self.inbox_insert_stmt.as_ref() {
+            Some(s) => s,
+            None => {
+                self.inbox_insert_stmt = Some(INBOX_INSERT.to_string());
+                INBOX_INSERT
+            }
+        };
         let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
         match stmt {
             Some(ref mut s) => {
                 for msg in msg_itr {
                     let bytes = msg.as_bytes();
-                    let _status = s.execute(named_params! { ":msg_id": &msg.id_as_string() as &dyn ToSql, ":msg": &bytes as &dyn ToSql })?;
+                    let _status = s.execute(named_params! { ":actor_id": actor_id as &dyn ToSql, ":msg_id": &msg.id_as_string() as &dyn ToSql, ":msg": &bytes as &dyn ToSql })?;
                 }
             }
             None => panic!(),
@@ -450,18 +409,6 @@ pub(crate) fn value_to_msg(v: Value) -> Msg {
     Msg::default()
 }
 
-pub(crate) fn create_actor_inbox(actor_id: &String) -> Result<()> {
-    let mut ctx = Storage::new();
-    ctx.setup();
-    ctx.inbox_of(actor_id)
-}
-
-pub(crate) fn create_actor_outbox(actor_id: &String) -> Result<()> {
-    let mut ctx = Storage::new();
-
-    ctx.setup();
-    ctx.outbox_of(actor_id)
-}
 pub(crate) fn into_inbox(actor_id: &String, msg: Msg) -> Result<()> {
     let mut ctx = Storage::new();
     let _res = ctx.setup();
@@ -560,21 +507,9 @@ mod tests {
         println!("The msg read count: {:?}", read_count);
     }
 
-    #[test]
-    fn create_actor_inbox_test1() {
-        let inbox_create_result = create_actor_inbox(&"1000".to_string());
-        assert_eq!(inbox_create_result, Ok(()));
-    }
-    #[test]
-    fn create_actor_outbox_test1() {
-        let outbox_create_result = create_actor_outbox(&"1000".to_string());
-        assert_eq!(outbox_create_result, Ok(()));
-    }
-
     fn into_inbox_batch_func(num: u32, actor_id: &String) -> Result<()> {
         let mut ctx = Storage::new();
         let _ = ctx.setup();
-        ctx.inbox_of(actor_id);
         let mut messages = Vec::<Msg>::with_capacity(num.try_into().unwrap());
         let mut rng = thread_rng();
         for _ in 0..num {
@@ -591,7 +526,6 @@ mod tests {
     fn into_inbox_no_batch_func(num: u32, actor_id: &String) -> Result<()> {
         let mut ctx = Storage::new();
         let _ = ctx.setup();
-        ctx.inbox_of(actor_id);
 
         let mut rng = thread_rng();
         for _ in 0..num {
@@ -670,8 +604,17 @@ mod tests {
 
     #[test]
     fn serialize_db_event_test1() {
-        let db_event = DBEvent("event".to_string(), 100);
+        let db_event = DBEvent("event".to_string(), 100, String::new());
         let json = serde_json::to_string(&db_event).unwrap();
         println!("The serialized db event = {:?}", json);
+    }
+    //Received event = DBEvent { table: "inbox_8116041356566675367", row_id: 9 }
+    #[test]
+    fn create_db_event_select_test1() {
+        let mut db_event = DBEvent("inbox_8116041356566675367".to_string(), 9, String::new());
+        assert_eq!(
+            "SELECT msg FROM inbox_8116041356566675367 WHERE row_id ='9'".to_string(),
+            db_event.as_select_text()
+        );
     }
 }

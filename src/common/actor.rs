@@ -99,6 +99,7 @@ mod tests {
 
         let mut builder = MyActorBuilder::default();
         let mut built_actor = builder.build();
+        println!("The type name is = {:?}", built_actor.type_name());
         //Send a blank message and get a response back
         let actor_response = built_actor.receive(Mail::Blank);
         assert!(actor_response.is_some());

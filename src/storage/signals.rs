@@ -1,7 +1,7 @@
-use crate::constants::{BUCKET_MAX_SIZE, EVENT_MAX_AGE, INBOUND_INSERT};
-use rusqlite::{hooks::Action, Result, ToSql, Transaction};
+use crate::constants::{BUCKET_MAX_SIZE, EVENT_MAX_AGE};
+use rusqlite::{hooks::Action, Result};
 use serde::{ser::SerializeTupleStruct, Deserialize, Serialize, Serializer};
-use std::mem;
+
 use std::time::{Duration, Instant};
 
 #[derive(Debug)]
@@ -10,10 +10,10 @@ pub(crate) enum Signal {
     DbUpdate(DBEvent),
 }
 
-pub(crate) struct DBEvent(pub String, pub i64);
+pub(crate) struct DBEvent(pub String, pub i64, pub String);
 
 impl DBEvent {
-    pub(crate) fn persist(&self, tx: &Transaction<'_>) -> Result<usize> {
+    /***pub(crate) fn persist(&self, tx: &Transaction<'_>) -> Result<usize> {
         let DBEvent(tbl, row_id) = self;
         let actor_id = match tbl.find('_') {
             None => return Ok(0),
@@ -23,6 +23,18 @@ impl DBEvent {
             INBOUND_INSERT,
             &[&row_id as &dyn ToSql, &actor_id as &dyn ToSql],
         )
+    }***/
+    //CREATE TABLE inbox_8116041356566675367 (msg_id TEXT PRIMARY KEY, msg BLOB);
+    pub(crate) fn as_select_text(&mut self) -> &str {
+        if self.2 == String::new() {
+            let mut select = String::from("SELECT msg FROM ");
+            select += &self.0;
+            select += " WHERE row_id ='";
+            select += &self.1.to_string();
+            select += "'";
+            self.2 = select;
+        }
+        &self.2
     }
 }
 
@@ -71,14 +83,14 @@ pub(crate) struct EventBucket {
 }
 
 impl EventBucket {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             events: Vec::new(),
             oldest_receipt_instant: None,
         }
     }
 
-    pub fn overflown(&self) -> bool {
+    pub(crate) fn overflown(&self) -> bool {
         self.events.len() >= BUCKET_MAX_SIZE
     }
 
@@ -89,12 +101,12 @@ impl EventBucket {
         }
     }
 
-    pub fn should_invoke_actors(&self) -> bool {
+    pub(crate) fn should_invoke_actors(&self) -> bool {
         self.overflown() || self.oldest_matured()
     }
-    pub fn add_event(&mut self, event: DBEvent) {
+    pub(crate) fn add_event(&mut self, event: DBEvent) {
         if self.should_invoke_actors() {
-            let events = mem::replace(&mut self.events, Vec::new());
+            let events = std::mem::take(&mut self.events);
             Self::deliver_actor_messages(events);
         }
         self.events.push(event);
@@ -103,5 +115,5 @@ impl EventBucket {
         }
     }
 
-    pub fn deliver_actor_messages(events: Vec<DBEvent>) {}
+    pub(crate) fn deliver_actor_messages(_events: Vec<DBEvent>) {}
 }
