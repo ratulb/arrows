@@ -345,7 +345,22 @@ impl Store {
         Ok(messages)
     }
 
-    pub(crate) fn persist_dbevents(
+    pub(crate) fn read_past_events(&mut self, inbound: bool) -> Result<Vec<i64>> {
+        let stmt = if inbound {
+            INBOUND_SELECT
+        } else {
+            OUTBOUND_SELECT
+        };
+        let mut stmt = self.conn.inner.prepare_cached(stmt)?;
+        let mut rows = stmt.query([])?;
+        let mut events = Vec::new();
+        while let Some(row) = rows.next()? {
+            events.push(row.get(0)?);
+        }
+        Ok(events)
+    }
+
+    pub(crate) fn persist_events(
         &mut self,
         events: impl Iterator<Item = DBEvent>,
     ) -> Result<(Vec<i64>, Vec<i64>)> {
@@ -397,7 +412,7 @@ pub(crate) fn value_to_msg(v: Value) -> Msg {
     Msg::default()
 }
 
-pub(crate) fn into_inbox(_actor_id: &String, msg: Msg) -> Result<()> {
+/***pub(crate) fn into_inbox(_actor_id: &String, msg: Msg) -> Result<()> {
     let mut ctx = Store::new();
     let _res = ctx.setup();
     ctx.into_inbox(msg)
@@ -407,7 +422,7 @@ pub(crate) fn into_outbox(actor_id: &String, msg: Msg) -> Result<()> {
     let mut ctx = Store::new();
     ctx.setup();
     ctx.into_outbox(actor_id, msg)
-}
+}***/
 
 #[cfg(test)]
 mod tests {
@@ -595,13 +610,4 @@ mod tests {
         let expected = "[\"event\",100]";
         assert_eq!(json, expected);
     }
-    //Received event = DBEvent { table: "inbox_8116041356566675367", row_id: 9 }
-    /*** #[test]
-    fn create_db_event_select_test1() {
-        let mut db_event = DBEvent("inbox_8116041356566675367".to_string(), 9, String::new());
-        assert_eq!(
-            "SELECT msg FROM inbox_8116041356566675367 WHERE row_id ='9'".to_string(),
-            db_event.as_select_text()
-        );
-    }***/
 }

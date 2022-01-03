@@ -1,8 +1,8 @@
 pub(crate) const DATABASE: &str = "arrows.db";
-pub(crate) const DATABASE_EVENTS: &str = "arrows_events.db";
+//pub(crate) const DATABASE_EVENTS: &str = "arrows_events.db";
 pub(crate) const ARROWS_DB_PATH: &str = "ARROWS_DB_PATH";
 pub(crate) const FETCH_LIMIT: &str = "1000";
-pub(crate) const BUFFER_MAX_SIZE: usize = 1;
+pub(crate) const BUFFER_MAX_SIZE: usize = 5;
 pub(crate) const EVENT_MAX_AGE: u64 = 1;
 pub(crate) const INBOX: &str = "inbox";
 pub(crate) const OUTBOX: &str = "outbox";
@@ -34,3 +34,6 @@ pub(crate) const OUTBOUND_INSERT: &str = "INSERT INTO outbounds (row_id) VALUES 
 pub(crate) const DELETE_ACTOR: &str = "DELETE FROM actors WHERE actor_id = ?";
 pub(crate) const ACTOR_ROWID: &str = "SELECT rowid FROM actors WHERE actor_id = ?";
 pub(crate) const BUILD_DEF: &str = "SELECT build_def FROM actors WHERE actor_id = ?";
+
+pub(crate) const INBOUND_SELECT: &str = "SELECT row_id FROM inbounds WHERE status ='N'";
+pub(crate) const OUTBOUND_SELECT: &str = "SELECT row_id FROM outbounds WHERE status ='N'";

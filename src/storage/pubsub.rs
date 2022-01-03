@@ -1,7 +1,7 @@
 use crate::constants::{INBOX, OUTBOX};
 use crate::dbconnection::DBConnection;
 use crate::events::{DBEvent, Events};
-use crate::routers::EventBuffer;
+use crate::routers::Router;
 use rusqlite::hooks::Action;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread::JoinHandle;
@@ -81,14 +81,13 @@ impl Subscriber {
         let receiver = self.receiver.take();
         let join_handle = std::thread::spawn(move || {
             let receiver = receiver.as_ref().expect("Inner receiver");
-            let mut buffer = EventBuffer::new();
+            let mut router = Router::new();
             loop {
                 let event = receiver.recv().expect("Expected event");
                 match event {
                     Events::Stop => break,
                     Events::DbUpdate(evt) => {
-                        println!("Received event = {:?}", evt);
-                        buffer.add_event(evt);
+                        router.route(evt);
                     }
                 }
             }
