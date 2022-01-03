@@ -1,4 +1,4 @@
-use crate::apis::Storage;
+use crate::apis::Store;
 use crate::common::{
     actor::Actor,
     actor::ActorBuilder,
@@ -12,6 +12,7 @@ use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::RwLock;
+use std::sync::RwLockWriteGuard;
 
 lazy_static! {
     pub(crate) static ref CTX: RwLock<Context> = RwLock::new(Context::init());
@@ -20,15 +21,19 @@ lazy_static! {
 #[derive(Debug)]
 pub(crate) struct Context {
     pub(crate) actors: Actors,
-    pub(crate) storage: Storage,
+    pub(crate) store: Store,
 }
 
 impl Context {
-    pub fn init() -> Context {
+    pub fn init() -> Self {
         let actors = Actors::new();
-        let mut storage = Storage::new();
-        storage.setup();
-        Self { actors, storage }
+        let mut store = Store::new();
+        store.setup();
+        Self { actors, store }
+    }
+
+    pub fn instance() -> RwLockWriteGuard<'static, Self> {
+        CTX.write().unwrap()
     }
 }
 
@@ -101,11 +106,11 @@ pub(in crate::registry) mod ctxops {
     use super::*;
 
     pub(super) fn persist(mail: Mail) {
-        CTX.write().unwrap().storage.persist(mail);
+        Context::instance().store.persist(mail);
     }
 
     pub(super) fn send_msg(identity: u64, msg: Msg) {
-        let ctx = CTX.write().unwrap();
+        let ctx = Context::instance();
         let actor = ctx.actors.get_actor(identity);
         if let Some(mut actor) = actor {
             actor.receive(msg.into());
@@ -116,7 +121,7 @@ pub(in crate::registry) mod ctxops {
     }
 
     pub(super) fn remove_actor(identity: u64) -> Option<Rc<RefCell<Box<dyn Actor>>>> {
-        CTX.write().unwrap().actors.remove_actor(identity)
+        Context::instance().actors.remove_actor(identity)
     }
 
     //Send a shutdown msg to the actor that is being removed
@@ -126,9 +131,8 @@ pub(in crate::registry) mod ctxops {
     }
 
     pub(super) fn remove_actor_permanent(identity: &String) -> Result<(), Error> {
-        CTX.write()
-            .unwrap()
-            .storage
+        Context::instance()
+            .store
             .remove_actor_permanent(identity)
             .map_err(|err| Error::Other(Box::new(err)))
     }
@@ -138,14 +142,13 @@ pub(in crate::registry) mod ctxops {
         builder: &impl ActorBuilder,
     ) -> Result<(), Error> {
         let builder_def = serde_json::to_string(builder as &dyn ActorBuilder)?;
-        CTX.write()
-            .unwrap()
-            .storage
+        Context::instance()
+            .store
             .persist_builder(identity, &builder_def)
             .map_err(|err| Error::Other(Box::new(err)))
     }
     pub(super) fn retrieve_build_def(identity: &String) -> Option<String> {
-        let rs = CTX.write().unwrap().storage.retrieve_build_def(identity);
+        let rs = Context::instance().store.retrieve_build_def(identity);
         match rs {
             Ok(build_def) => build_def,
             Err(err) => {
@@ -160,7 +163,7 @@ pub(in crate::registry) mod ctxops {
         actor: Box<dyn Actor>,
     ) -> Option<Rc<RefCell<Box<dyn Actor>>>> {
         let actor = Rc::new(RefCell::new(actor));
-        CTX.write().unwrap().actors.add_actor(addr, actor.clone());
+        Context::instance().actors.add_actor(addr, actor.clone());
         Some(actor)
     }
 

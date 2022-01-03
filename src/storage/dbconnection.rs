@@ -12,11 +12,14 @@ impl DBConnection {
         let mut path = PathBuf::from(path);
         path.push(DATABASE);
         let result = Connection::open(path);
-        if let Ok(inner) = result {
-            inner.set_prepared_statement_cache_capacity(100); //TODO make it configurable
-            Self { inner }
-        } else {
-            panic!("Failed to obtain db connection");
+        match result {
+            Ok(inner) => {
+                inner.set_prepared_statement_cache_capacity(100); //TODO make it configurable
+                Self { inner }
+            }
+            Err(err) => {
+                panic!("Failed to obtain db connection: {:?}", err);
+            }
         }
     }
 }

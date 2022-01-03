@@ -4,7 +4,6 @@ pub(crate) const ARROWS_DB_PATH: &str = "ARROWS_DB_PATH";
 pub(crate) const FETCH_LIMIT: &str = "1000";
 pub(crate) const BUFFER_MAX_SIZE: usize = 1;
 pub(crate) const EVENT_MAX_AGE: u64 = 1;
-pub(crate) const BUCKET_MAX_SIZE: usize = 1;
 pub(crate) const INBOX: &str = "inbox";
 pub(crate) const OUTBOX: &str = "outbox";
 pub(crate) const BEGIN_TRANSACTION: &str = "BEGIN TRANSACTION;";

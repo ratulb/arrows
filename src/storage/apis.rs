@@ -1,8 +1,8 @@
 use crate::common::utils::{from_byte_array, option_of_bytes};
 use crate::constants::*;
 use crate::dbconnection::DBConnection;
+use crate::events::DBEvent;
 use crate::pubsub::Publisher;
-use crate::signals::DBEvent;
 use crate::{Mail, Mail::*, Msg};
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use rusqlite::{named_params, params, types::Value, Error::InvalidQuery, Result, ToSql};
@@ -11,10 +11,10 @@ use std::io::{Error, ErrorKind};
 use std::str::FromStr;
 use std::thread::JoinHandle;
 
-unsafe impl Send for Storage {}
-unsafe impl Sync for Storage {}
+unsafe impl Send for Store {}
+unsafe impl Sync for Store {}
 
-impl Drop for Storage {
+impl Drop for Store {
     fn drop(&mut self) {
         self.publisher.loopbreak();
         self.publisher
@@ -24,7 +24,7 @@ impl Drop for Storage {
     }
 }
 
-pub(crate) struct Storage {
+pub(crate) struct Store {
     buffer: Vec<Msg>,
     conn: DBConnection,
     inbox_insert_stmt: Option<String>,
@@ -35,9 +35,9 @@ pub(crate) struct Storage {
     publisher: Publisher,
     subscriber_handle: Option<JoinHandle<()>>,
 }
-impl std::fmt::Debug for Storage {
+impl std::fmt::Debug for Store {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Storageint")
+        f.debug_struct("Storeint")
             .field("inbox_insert_stmt", &self.inbox_insert_stmt)
             .field("inbox_select_stmts", &self.inbox_select_stmts)
             .field("outbox_insert_stmts", &self.outbox_insert_stmts)
@@ -45,7 +45,7 @@ impl std::fmt::Debug for Storage {
             .finish()
     }
 }
-impl Storage {
+impl Store {
     pub(crate) fn new() -> Self {
         Self {
             buffer: Vec::new(),
@@ -398,13 +398,13 @@ pub(crate) fn value_to_msg(v: Value) -> Msg {
 }
 
 pub(crate) fn into_inbox(_actor_id: &String, msg: Msg) -> Result<()> {
-    let mut ctx = Storage::new();
+    let mut ctx = Store::new();
     let _res = ctx.setup();
     ctx.into_inbox(msg)
 }
 
 pub(crate) fn into_outbox(actor_id: &String, msg: Msg) -> Result<()> {
-    let mut ctx = Storage::new();
+    let mut ctx = Store::new();
     ctx.setup();
     ctx.into_outbox(actor_id, msg)
 }
@@ -413,7 +413,7 @@ pub(crate) fn into_outbox(actor_id: &String, msg: Msg) -> Result<()> {
 mod tests {
     use super::*;
     use crate::common::mail::Msg;
-    use crate::signals::DBEvent;
+    use crate::events::DBEvent;
     use rand::{thread_rng, Rng};
 
     #[test]
@@ -425,7 +425,7 @@ mod tests {
             "4058720503399076582",
             "3311787687830812909",
         ];
-        let mut ctx = Storage::new();
+        let mut ctx = Store::new();
         let _ = ctx.setup();
         let messages = ctx.select_from_inbox(&actor_id, msg_ids)?;
         let messages: Vec<_> = messages.iter().map(|msg| msg.id_as_string()).collect();
@@ -436,7 +436,7 @@ mod tests {
     fn delete_from_inbox_test1() {
         let actor_id = "1000".to_string();
         let msg_ids = vec!["16563997168647304630", "18086766434657795389"];
-        let mut ctx = Storage::new();
+        let mut ctx = Store::new();
         let _ = ctx.setup();
         assert_eq!(ctx.delete_from_inbox(&actor_id, msg_ids).ok(), Some(()));
     }
@@ -444,7 +444,7 @@ mod tests {
     #[test]
     fn purge_inbox_of_test_1() {
         let actor_id = "1000".to_string();
-        let mut ctx = Storage::new();
+        let mut ctx = Store::new();
         let _ = ctx.setup();
         assert_eq!(ctx.purge_inbox_of(&actor_id), Ok(()));
     }
@@ -452,7 +452,7 @@ mod tests {
     fn read_inbox_write_out_msg_test_1() {
         let actor_id = "1000".to_string();
         let mut read_count = 0;
-        let mut ctx = Storage::new();
+        let mut ctx = Store::new();
         let _ = ctx.setup();
         let messages = ctx.read_inbox_full(&actor_id).unwrap();
 
@@ -466,7 +466,7 @@ mod tests {
     fn read_inbox_test1() {
         let actor_id = "1000".to_string();
         let mut read_count = 0;
-        let mut ctx = Storage::new();
+        let mut ctx = Store::new();
         let _ = ctx.setup();
         let messages = ctx.read_inbox(&actor_id).unwrap();
         for msg in messages {
@@ -482,7 +482,7 @@ mod tests {
     fn read_inbox_full_test1() {
         let actor_id = "1000".to_string();
         let mut read_count = 0;
-        let mut ctx = Storage::new();
+        let mut ctx = Store::new();
         let _ = ctx.setup();
         let messages = ctx.read_inbox_full(&actor_id).unwrap();
         for msg in messages {
@@ -496,7 +496,7 @@ mod tests {
     }
 
     fn into_inbox_batch_func(num: u32) -> Result<()> {
-        let mut ctx = Storage::new();
+        let mut ctx = Store::new();
         let _ = ctx.setup();
         let mut messages = Vec::<Msg>::with_capacity(num.try_into().unwrap());
         let mut rng = thread_rng();
@@ -512,7 +512,7 @@ mod tests {
     }
 
     fn into_inbox_no_batch_func(num: u32) -> Result<()> {
-        let mut ctx = Storage::new();
+        let mut ctx = Store::new();
         let _ = ctx.setup();
 
         let mut rng = thread_rng();
@@ -547,7 +547,7 @@ mod tests {
 
     #[test]
     fn persist_builder_1001_test_1() -> Result<()> {
-        let mut ctx = Storage::new();
+        let mut ctx = Store::new();
         let _ = ctx.setup();
         let identity = "1001".to_string();
         let insert = ctx.persist_builder(&identity, &r#"{"new_actor_builder":null}"#.to_string());
@@ -557,7 +557,7 @@ mod tests {
     }
     #[test]
     fn remove_actor_permanent_1001_test_1() -> Result<()> {
-        let mut ctx = Storage::new();
+        let mut ctx = Store::new();
         let _ = ctx.setup();
         let actor_id = "1001".to_string();
         let remove = ctx.remove_actor_permanent(&actor_id);
@@ -568,7 +568,7 @@ mod tests {
 
     #[test]
     fn actor_is_present_1001_test_1() -> Result<()> {
-        let mut ctx = Storage::new();
+        let mut ctx = Store::new();
         let _ = ctx.setup();
         let actor_id = "1001".to_string();
         let present = ctx.actor_is_present(&actor_id);
@@ -579,7 +579,7 @@ mod tests {
 
     #[test]
     fn retrieve_build_def_1001_test_1() -> Result<()> {
-        let mut ctx = Storage::new();
+        let mut ctx = Store::new();
         let _ = ctx.setup();
         let actor_id = "1001".to_string();
         let build_def = ctx.retrieve_build_def(&actor_id);

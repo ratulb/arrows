@@ -1,13 +1,14 @@
 use crate::constants::{INBOX, OUTBOX};
 use crate::dbconnection::DBConnection;
-use crate::signals::{DBEvent, EventBucket, Signal};
+use crate::events::{DBEvent, Events};
+use crate::routers::EventBuffer;
 use rusqlite::hooks::Action;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread::JoinHandle;
 
 pub(crate) struct Publisher {
-    publisher: Sender<Signal>,
-    receiver: Option<Receiver<Signal>>,
+    publisher: Sender<Events>,
+    receiver: Option<Receiver<Events>>,
     pub subscriber: Option<Subscriber>,
 }
 impl Publisher {
@@ -28,7 +29,7 @@ impl Publisher {
                 if action == Action::SQLITE_INSERT && tbl_of_interest {
                     let event = DBEvent(String::from(tbl), row_id);
                     publisher
-                        .send(Signal::DbUpdate(event))
+                        .send(Events::DbUpdate(event))
                         .expect("Event published");
                 }
             }));
@@ -39,7 +40,7 @@ impl Publisher {
     }
 
     pub fn loopbreak(&self) {
-        self.publisher.send(Signal::Stop).expect("Sent");
+        self.publisher.send(Events::Stop).expect("Sent");
     }
 }
 use crate::Mail;
@@ -65,12 +66,12 @@ pub fn transpose(rows: &mut Vec<Vec<Mail>>) -> Vec<Vec<Mail>> {
 }
 
 pub(crate) struct Subscriber {
-    receiver: Option<Receiver<Signal>>,
+    receiver: Option<Receiver<Events>>,
     pub join_handle: Option<JoinHandle<()>>,
 }
 
 impl Subscriber {
-    pub fn new(receiver: Option<Receiver<Signal>>) -> Self {
+    pub fn new(receiver: Option<Receiver<Events>>) -> Self {
         Self {
             receiver,
             join_handle: None,
@@ -80,14 +81,14 @@ impl Subscriber {
         let receiver = self.receiver.take();
         let join_handle = std::thread::spawn(move || {
             let receiver = receiver.as_ref().expect("Inner receiver");
-            let mut bucket = EventBucket::new();
+            let mut buffer = EventBuffer::new();
             loop {
                 let event = receiver.recv().expect("Expected event");
                 match event {
-                    Signal::Stop => break,
-                    Signal::DbUpdate(evt) => {
+                    Events::Stop => break,
+                    Events::DbUpdate(evt) => {
                         println!("Received event = {:?}", evt);
-                        bucket.add_event(evt);
+                        buffer.add_event(evt);
                     }
                 }
             }
