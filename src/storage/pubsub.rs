@@ -1,6 +1,6 @@
 use crate::constants::{INBOX, OUTBOX};
 use crate::dbconnection::DBConnection;
-use crate::signals::{DBEvent, Signal};
+use crate::signals::{DBEvent, EventBucket, Signal};
 use rusqlite::hooks::Action;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread::JoinHandle;
@@ -26,7 +26,7 @@ impl Publisher {
             .update_hook(Some(move |action: Action, _db: &str, tbl: &str, row_id| {
                 let tbl_of_interest = tbl.starts_with(INBOX) || tbl.starts_with(OUTBOX);
                 if action == Action::SQLITE_INSERT && tbl_of_interest {
-                    let event = DBEvent(String::from(tbl), row_id, String::new());
+                    let event = DBEvent(String::from(tbl), row_id);
                     publisher
                         .send(Signal::DbUpdate(event))
                         .expect("Event published");
@@ -80,11 +80,15 @@ impl Subscriber {
         let receiver = self.receiver.take();
         let join_handle = std::thread::spawn(move || {
             let receiver = receiver.as_ref().expect("Inner receiver");
+            let mut bucket = EventBucket::new();
             loop {
                 let event = receiver.recv().expect("Expected event");
                 match event {
                     Signal::Stop => break,
-                    Signal::DbUpdate(evt) => println!("Received event = {:?}", evt),
+                    Signal::DbUpdate(evt) => {
+                        println!("Received event = {:?}", evt);
+                        bucket.add_event(evt);
+                    }
                 }
             }
         });

@@ -1,7 +1,7 @@
-use crate::constants::{BUCKET_MAX_SIZE, EVENT_MAX_AGE};
-use rusqlite::{hooks::Action, Result};
+use crate::apis::Storage;
+use crate::constants::{BUCKET_MAX_SIZE, EVENT_MAX_AGE, INBOUND_INSERT, INBOX, OUTBOUND_INSERT};
+use rusqlite::{hooks::Action, Result, ToSql, Transaction};
 use serde::{ser::SerializeTupleStruct, Deserialize, Serialize, Serializer};
-
 use std::time::{Duration, Instant};
 
 #[derive(Debug)]
@@ -10,22 +10,20 @@ pub(crate) enum Signal {
     DbUpdate(DBEvent),
 }
 
-pub(crate) struct DBEvent(pub String, pub i64, pub String);
+pub(crate) struct DBEvent(pub String, pub i64);
 
 impl DBEvent {
-    /***pub(crate) fn persist(&self, tx: &Transaction<'_>) -> Result<usize> {
-        let DBEvent(tbl, row_id) = self;
-        let actor_id = match tbl.find('_') {
-            None => return Ok(0),
-            Some(idx) => &tbl[(idx + 1)..],
+    pub(crate) fn persist(&self, tx: &Transaction<'_>) -> Result<usize> {
+        let insert_cmd = if self.is_inbound() {
+            INBOUND_INSERT
+        } else {
+            OUTBOUND_INSERT
         };
-        tx.execute(
-            INBOUND_INSERT,
-            &[&row_id as &dyn ToSql, &actor_id as &dyn ToSql],
-        )
-    }***/
+        let DBEvent(_, row_id) = self;
+        tx.execute(insert_cmd, &[&row_id as &dyn ToSql])
+    }
     //CREATE TABLE inbox_8116041356566675367 (msg_id TEXT PRIMARY KEY, msg BLOB);
-    pub(crate) fn as_select_text(&mut self) -> &str {
+    /***pub(crate) fn as_select_text(&mut self) -> &str {
         if self.2 == String::new() {
             let mut select = String::from("SELECT msg FROM ");
             select += &self.0;
@@ -35,6 +33,9 @@ impl DBEvent {
             self.2 = select;
         }
         &self.2
+    }***/
+    pub(crate) fn is_inbound(&self) -> bool {
+        &self.0 == INBOX
     }
 }
 
@@ -101,19 +102,34 @@ impl EventBucket {
         }
     }
 
-    pub(crate) fn should_invoke_actors(&self) -> bool {
+    pub(crate) fn should_persist_events(&self) -> bool {
         self.overflown() || self.oldest_matured()
     }
     pub(crate) fn add_event(&mut self, event: DBEvent) {
-        if self.should_invoke_actors() {
-            let events = std::mem::take(&mut self.events);
-            Self::deliver_actor_messages(events);
-        }
         self.events.push(event);
         if self.events.len() == 1 {
             self.oldest_receipt_instant = Some(Instant::now());
         }
+        if self.should_persist_events() {
+            let events = std::mem::take(&mut self.events);
+            Self::deliver_messages(events);
+        }
     }
 
-    pub(crate) fn deliver_actor_messages(_events: Vec<DBEvent>) {}
+    pub(crate) fn deliver_messages(events: Vec<DBEvent>) {
+        let mut storage = Storage::new();
+        storage.setup();
+        let (ins, outs) = storage
+            .persist_dbevents(events.into_iter())
+            .expect("Events persisted");
+        println!("Ins = {:?} and outs = {:?}", ins, outs);
+    }
+}
+
+impl Drop for EventBucket {
+    fn drop(&mut self) {
+        if self.events.len() > 0 {
+            Self::deliver_messages(std::mem::take(&mut self.events));
+        }
+    }
 }

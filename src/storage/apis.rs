@@ -1,12 +1,11 @@
 use crate::common::utils::{from_byte_array, option_of_bytes};
 use crate::constants::*;
 use crate::dbconnection::DBConnection;
+use crate::pubsub::Publisher;
+use crate::signals::DBEvent;
 use crate::{Mail, Mail::*, Msg};
-
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use rusqlite::{named_params, params, types::Value, Error::InvalidQuery, Result, ToSql};
-
-use crate::pubsub::Publisher;
 use std::collections::{HashMap, VecDeque};
 use std::io::{Error, ErrorKind};
 use std::str::FromStr;
@@ -87,15 +86,9 @@ impl Storage {
 
     fn persist_buffer(&mut self) -> Result<()> {
         self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
-        let stmt = match self.inbox_insert_stmt.as_ref() {
-            Some(s) => s,
-            None => {
-                self.inbox_insert_stmt = Some(INBOX_INSERT.to_string());
-                INBOX_INSERT
-            }
-        };
+        let stmt = Self::inbox_insert_stmt(&mut self.inbox_insert_stmt);
+        let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
         for msg in self.buffer.drain(..) {
-            let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
             match stmt {
                 Some(ref mut s) => {
                     let actor_id = msg.get_to_id().to_string();
@@ -112,19 +105,15 @@ impl Storage {
     pub(crate) fn setup(&mut self) -> Result<()> {
         self.conn.inner.execute(INBOX_TABLE, [])?;
         self.conn.inner.execute(OUTBOX_TABLE, [])?;
-
         self.conn.inner.execute(ACTORS, [])?;
-
         self.conn.inner.execute(INBOUNDS, [])?;
         self.conn.inner.execute(OUTBOUNDS, [])?;
-
         self.publisher.start(&mut self.conn);
-
         println!("Set up arrows schema");
         Ok(())
     }
 
-    pub(crate) fn select_existing_actors(&mut self) -> Result<Vec<String>> {
+    pub(crate) fn all_actors(&mut self) -> Result<Vec<String>> {
         let mut stmt = self
             .conn
             .inner
@@ -282,14 +271,19 @@ impl Storage {
         Ok(None)
     }
 
-    pub(crate) fn into_inbox(&mut self, msg: Msg) -> Result<()> {
-        let stmt = match self.inbox_insert_stmt.as_ref() {
-            Some(s) => s,
+    #[inline(always)]
+    fn inbox_insert_stmt<'a>(stmt: &'a mut Option<String>) -> &'a str {
+        match stmt {
+            Some(ref s) => s,
             None => {
-                self.inbox_insert_stmt = Some(INBOX_INSERT.to_string());
-                INBOX_INSERT
+                *stmt = Some(INSERT_INTO_INBOX.to_string());
+                INSERT_INTO_INBOX
             }
-        };
+        }
+    }
+
+    pub(crate) fn into_inbox(&mut self, msg: Msg) -> Result<()> {
+        let stmt = Self::inbox_insert_stmt(&mut self.inbox_insert_stmt);
         let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
         let msg_id = msg.id_as_string();
         let actor_id = msg.get_to_id().to_string();
@@ -351,19 +345,32 @@ impl Storage {
         Ok(messages)
     }
 
-    pub(crate) fn into_inbox_batch(&mut self, msg_itr: impl Iterator<Item = Msg>) -> Result<()> {
-        self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
-        let stmt = match self.inbox_insert_stmt.as_ref() {
-            Some(s) => s,
-            None => {
-                self.inbox_insert_stmt = Some(INBOX_INSERT.to_string());
-                INBOX_INSERT
+    pub(crate) fn persist_dbevents(
+        &mut self,
+        events: impl Iterator<Item = DBEvent>,
+    ) -> Result<(Vec<i64>, Vec<i64>)> {
+        let tx = self.conn.inner.transaction()?;
+        let mut inbounds = Vec::new();
+        let mut outbounds = Vec::new();
+        for event in events {
+            event.persist(&tx)?;
+            if event.is_inbound() {
+                inbounds.push(event.1);
+            } else {
+                outbounds.push(event.1);
             }
-        };
+        }
+        tx.commit()?;
+        Ok((inbounds, outbounds))
+    }
+
+    pub(crate) fn into_inbox_batch(&mut self, msgs: impl Iterator<Item = Msg>) -> Result<()> {
+        self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
+        let stmt = Self::inbox_insert_stmt(&mut self.inbox_insert_stmt);
         let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
         match stmt {
             Some(ref mut s) => {
-                for msg in msg_itr {
+                for msg in msgs {
                     let bytes = msg.as_bytes();
                     let actor_id = msg.get_to_id().to_string();
                     let _status = s.execute(named_params! { ":actor_id": &actor_id as &dyn ToSql, ":msg_id": &msg.id_as_string() as &dyn ToSql, ":msg": &bytes as &dyn ToSql })?;
@@ -390,7 +397,7 @@ pub(crate) fn value_to_msg(v: Value) -> Msg {
     Msg::default()
 }
 
-pub(crate) fn into_inbox(actor_id: &String, msg: Msg) -> Result<()> {
+pub(crate) fn into_inbox(_actor_id: &String, msg: Msg) -> Result<()> {
     let mut ctx = Storage::new();
     let _res = ctx.setup();
     ctx.into_inbox(msg)
@@ -488,7 +495,7 @@ mod tests {
         println!("The msg read count: {:?}", read_count);
     }
 
-    fn into_inbox_batch_func(num: u32, actor_id: &String) -> Result<()> {
+    fn into_inbox_batch_func(num: u32) -> Result<()> {
         let mut ctx = Storage::new();
         let _ = ctx.setup();
         let mut messages = Vec::<Msg>::with_capacity(num.try_into().unwrap());
@@ -499,12 +506,12 @@ mod tests {
             let msg = Msg::new_with_text(&msg_content, "from", "to");
             messages.push(msg);
         }
-        let status = ctx.into_inbox_batch(actor_id, messages.into_iter());
+        let status = ctx.into_inbox_batch(messages.into_iter());
         assert!(status.is_ok());
         Ok(())
     }
 
-    fn into_inbox_no_batch_func(num: u32, actor_id: &String) -> Result<()> {
+    fn into_inbox_no_batch_func(num: u32) -> Result<()> {
         let mut ctx = Storage::new();
         let _ = ctx.setup();
 
@@ -513,7 +520,7 @@ mod tests {
             let random_num: u64 = rng.gen();
             let msg_content = format!("The test msg-{}", random_num);
             let msg = Msg::new_with_text(&msg_content, "from", "to");
-            let _status = ctx.into_inbox(actor_id, msg);
+            let _status = ctx.into_inbox(msg);
         }
         Ok(())
     }
@@ -521,7 +528,6 @@ mod tests {
     #[test]
     fn into_inbox_no_batch_test_1() {
         let num = 100;
-        let actor_id = "1000".to_string();
         //InvalidParameterCount
         //Err(SqliteFailure(
         //Err(ToSqlConversionFailure(TryFromIntError
@@ -529,14 +535,13 @@ mod tests {
         //Err(SqliteFailure(Error { code: TypeMismatch
         //Err(SqliteFailure(Error { code: ConstraintViolation, extended_code: 1555 },
         // Some("UNIQUE constraint failed: actors.actor_id")
-        let _status = into_inbox_no_batch_func(num, &actor_id);
+        let _status = into_inbox_no_batch_func(num);
     }
 
     #[test]
     fn into_inbox_batch_test_1() {
         let num = 100;
-        let actor_id = "1000".to_string();
-        let status = into_inbox_batch_func(num, &actor_id);
+        let status = into_inbox_batch_func(num);
         assert!(status.is_ok());
     }
 
@@ -585,17 +590,18 @@ mod tests {
 
     #[test]
     fn serialize_db_event_test1() {
-        let db_event = DBEvent("event".to_string(), 100, String::new());
+        let db_event = DBEvent("event".to_string(), 100);
         let json = serde_json::to_string(&db_event).unwrap();
-        println!("The serialized db event = {:?}", json);
+        let expected = "[\"event\",100]";
+        assert_eq!(json, expected);
     }
     //Received event = DBEvent { table: "inbox_8116041356566675367", row_id: 9 }
-    #[test]
+    /*** #[test]
     fn create_db_event_select_test1() {
         let mut db_event = DBEvent("inbox_8116041356566675367".to_string(), 9, String::new());
         assert_eq!(
             "SELECT msg FROM inbox_8116041356566675367 WHERE row_id ='9'".to_string(),
             db_event.as_select_text()
         );
-    }
+    }***/
 }
