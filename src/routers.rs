@@ -1,5 +1,5 @@
 use crate::constants::{BUFFER_MAX_SIZE, EVENT_MAX_AGE};
-use crate::events::{DBEvent, Events};
+use crate::events::DBEvent;
 use crate::registry::Context;
 use std::{
     mem,
@@ -40,7 +40,16 @@ impl Router {
             .store
             .read_past_events(false)
             .expect("Past outbounds");
-        println!("Routing past events. Ins = {:?} and outs = {:?}", ins, outs);
+        let ins = Context::instance().store.from_inbox(ins).expect("Incoming");
+        let outs = Context::instance()
+            .store
+            .from_inbox(outs)
+            .expect("Outgoing");
+        println!(
+            "Routing past events. Ins = {:?} and outs = {:?}",
+            ins.len(),
+            outs.len()
+        );
     }
 }
 
