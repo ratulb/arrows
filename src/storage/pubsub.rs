@@ -1,4 +1,4 @@
-use crate::constants::{INBOX, OUTBOX};
+use crate::constants::TABLE_MESSAGES;
 use crate::dbconnection::DBConnection;
 use crate::events::{DBEvent, Events};
 use crate::routers::Router;
@@ -25,9 +25,9 @@ impl Publisher {
         let publisher = self.publisher.clone();
         conn.inner
             .update_hook(Some(move |action: Action, _db: &str, tbl: &str, row_id| {
-                let tbl_of_interest = tbl.starts_with(INBOX) || tbl.starts_with(OUTBOX);
+                let tbl_of_interest = tbl.starts_with(TABLE_MESSAGES);
                 if action == Action::SQLITE_INSERT && tbl_of_interest {
-                    let event = DBEvent(String::from(tbl), row_id);
+                    let event = DBEvent(row_id);
                     publisher
                         .send(Events::DbUpdate(event))
                         .expect("Event published");

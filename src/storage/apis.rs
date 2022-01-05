@@ -29,8 +29,6 @@ pub(crate) struct Store {
     conn: DBConnection,
     inbox_insert_stmt: Option<String>,
     inbox_select_stmts: HashMap<String, String>,
-    outbox_insert_stmts: HashMap<String, String>,
-    outbox_select_stmts: HashMap<String, String>,
     actor_create_stmts: HashMap<String, String>,
     publisher: Publisher,
     subscriber_handle: Option<JoinHandle<()>>,
@@ -40,7 +38,6 @@ impl std::fmt::Debug for Store {
         f.debug_struct("Storeint")
             .field("inbox_insert_stmt", &self.inbox_insert_stmt)
             .field("inbox_select_stmts", &self.inbox_select_stmts)
-            .field("outbox_insert_stmts", &self.outbox_insert_stmts)
             .field("actor_create_stmts", &self.actor_create_stmts)
             .finish()
     }
@@ -51,9 +48,9 @@ impl Store {
             buffer: Vec::new(),
             conn: DBConnection::new(),
             inbox_insert_stmt: None,
-            outbox_insert_stmts: HashMap::new(),
+            //outbox_insert_stmts: HashMap::new(),
             inbox_select_stmts: HashMap::new(),
-            outbox_select_stmts: HashMap::new(),
+            //outbox_select_stmts: HashMap::new(),
             actor_create_stmts: HashMap::new(),
             publisher: Publisher::new(),
             subscriber_handle: None,
@@ -103,11 +100,9 @@ impl Store {
     }
 
     pub(crate) fn setup(&mut self) -> Result<()> {
-        self.conn.inner.execute(INBOX_TABLE, [])?;
-        self.conn.inner.execute(OUTBOX_TABLE, [])?;
+        self.conn.inner.execute(MESSAGES, [])?;
         self.conn.inner.execute(ACTORS, [])?;
-        self.conn.inner.execute(INBOUNDS, [])?;
-        self.conn.inner.execute(OUTBOUNDS, [])?;
+        self.conn.inner.execute(EVENTS, [])?;
         self.publisher.start(&mut self.conn);
         println!("Set up arrows schema");
         Ok(())
@@ -177,28 +172,6 @@ impl Store {
         Ok(())
     }
 
-    pub(crate) fn into_outbox(&mut self, actor_id: &String, msg: Msg) -> Result<()> {
-        let stmt = self
-            .outbox_insert_stmts
-            .entry(actor_id.to_string())
-            .or_insert_with(|| {
-                format!(
-                    "INSERT INTO outbox_{} (msg_id, msg) VALUES (:msg_id, :msg)",
-                    actor_id
-                )
-            });
-        let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
-        let msg_id = msg.id_as_string();
-        let bytes = option_of_bytes(&msg);
-        match stmt {
-            Some(ref mut s) => s.execute(
-                named_params! { ":msg_id": &msg_id as &dyn ToSql, ":msg": &bytes as &dyn ToSql },
-            )?,
-            None => panic!(),
-        };
-        Ok(())
-    }
-
     pub(crate) fn persist_builder(&mut self, identity: &String, build_def: &String) -> Result<()> {
         let mut stmt = self.conn.inner.prepare_cached(BUILD_DEF_INSERT).ok();
         match stmt {
@@ -243,21 +216,20 @@ impl Store {
         match stmt {
             Some(ref s) => s,
             None => {
-                *stmt = Some(INSERT_INTO_INBOX.to_string());
-                INSERT_INTO_INBOX
+                *stmt = Some(INSERT_INTO_MESSAGES.to_string());
+                INSERT_INTO_MESSAGES
             }
         }
     }
 
-    pub(crate) fn from_box(&mut self, rowids: Vec<i64>, inbox: bool) -> Result<Vec<Msg>> {
+    pub(crate) fn from_messages(&mut self, rowids: Vec<i64>) -> Result<Vec<(Msg, i64)>> {
         let rowids = rowids
             .iter()
             .map(|id| id.to_string())
             .collect::<Vec<_>>()
             .join(",");
         let stmt = format!(
-            "SELECT msg FROM {} WHERE rowid IN ({})",
-            if inbox { INBOX } else { OUTBOX },
+            "SELECT msg, msg_seq FROM messages WHERE rowid IN ({})",
             rowids
         );
         let mut stmt = self.conn.inner.prepare(&stmt)?;
@@ -265,7 +237,8 @@ impl Store {
         let mut msgs = Vec::new();
         while let Some(row) = rows.next()? {
             let value: Value = row.get(0)?;
-            msgs.push(value_to_msg(value));
+            let msg_seq: i64 = row.get(1)?;
+            msgs.push((value_to_msg(value), msg_seq));
         }
         Ok(msgs)
     }
@@ -313,11 +286,10 @@ impl Store {
         Ok(messages)
     }
 
-    pub(crate) fn rowids_of(&mut self, actor_id: &str, inbox: bool) -> Result<Vec<i64>> {
-        let from_box = if inbox { INBOX } else { OUTBOX };
+    pub(crate) fn rowids_of(&mut self, actor_id: &str) -> Result<Vec<i64>> {
         let stmt = format!(
-            "SELECT rowid FROM {} WHERE actor_id = '{}' ORDER BY rowid ASC",
-            from_box, actor_id
+            "SELECT rowid FROM messages WHERE actor_id = '{}' ORDER BY rowid ASC",
+            actor_id
         );
         let mut stmt = self.conn.inner.prepare_cached(&stmt)?;
         let mut rows = stmt.query([])?;
@@ -344,13 +316,8 @@ impl Store {
         Ok(messages)
     }
 
-    pub(crate) fn read_past_events(&mut self, inbound: bool) -> Result<Vec<i64>> {
-        let stmt = if inbound {
-            INBOUND_SELECT
-        } else {
-            OUTBOUND_SELECT
-        };
-        let mut stmt = self.conn.inner.prepare_cached(stmt)?;
+    pub(crate) fn read_past_events(&mut self) -> Result<Vec<i64>> {
+        let mut stmt = self.conn.inner.prepare_cached(EVENTS_SELECT)?;
         let mut rows = stmt.query([])?;
         let mut events = Vec::new();
         while let Some(row) = rows.next()? {
@@ -362,19 +329,15 @@ impl Store {
     pub(crate) fn persist_events(
         &mut self,
         events: impl Iterator<Item = DBEvent>,
-    ) -> Result<Vec<(i64, bool)>> {
+    ) -> Result<Vec<i64>> {
         let tx = self.conn.inner.transaction()?;
-        let mut directed_events = Vec::new();
+        let mut persisted_events = Vec::new();
         for event in events {
             event.persist(&tx)?;
-            if event.is_inbound() {
-                directed_events.push((event.1, true));
-            } else {
-                directed_events.push((event.1, false));
-            }
+            persisted_events.push(event.0);
         }
         tx.commit()?;
-        Ok(directed_events)
+        Ok(persisted_events)
     }
 
     pub(crate) fn into_inbox_batch(&mut self, msgs: impl Iterator<Item = Msg>) -> Result<()> {
@@ -447,11 +410,11 @@ mod tests {
         let mut store = Store::new();
         let _ = store.setup();
 
-        let rowids = store.rowids_of(&actor_id, true).unwrap();
-        let msgs = store.from_inbox(rowids).unwrap();
+        let rowids = store.rowids_of(&actor_id).unwrap();
+        let msgs = store.from_messages(rowids).unwrap();
         let count = msgs
             .iter()
-            .filter(|msg| msg.content_as_text() == Some(&message))
+            .filter(|msg| msg.0.content_as_text() == Some(&message))
             .count();
         assert!(count == BUFFER_MAX_SIZE);
         Ok(())
@@ -462,7 +425,7 @@ mod tests {
         let (message, actor_id) = store_messages("actor");
         let mut store = Store::new();
         let _ = store.setup();
-        let mut rowids = store.rowids_of(&actor_id, true).unwrap();
+        let mut rowids = store.rowids_of(&actor_id).unwrap();
         let last = rowids.pop().unwrap();
         let msgs = store.read_inbox_from(&actor_id, last).unwrap();
 
@@ -618,9 +581,9 @@ mod tests {
 
     #[test]
     fn serialize_db_event_test1() {
-        let db_event = DBEvent("event".to_string(), 100);
+        let db_event = DBEvent(100);
         let json = serde_json::to_string(&db_event).unwrap();
-        let expected = "[\"event\",100]";
+        let expected = "[100]";
         assert_eq!(json, expected);
     }
 }

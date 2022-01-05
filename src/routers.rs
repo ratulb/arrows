@@ -16,7 +16,7 @@ pub(crate) struct Router {
 
 impl Router {
     pub(crate) fn new() -> Self {
-        let (sender, receiver) = channel();
+        let (sender, _receiver) = channel();
         let mut this = Self {
             buffer: EventBuffer::new(),
             sender,
@@ -27,49 +27,36 @@ impl Router {
     pub(crate) fn route(&mut self, event: DBEvent) {
         self.buffer.add(event);
         if self.buffer.should_flush() {
-            let directed_events = Self::perist_buffered(self.buffer.flush());
-            let (inbox, outbox): (Vec<(i64, _)>, Vec<(i64, _)>) =
-                directed_events.iter().partition(|e| e.1 == true);
-            let inbox = inbox.iter().map(|e| e.0);
-            let outbox = outbox.iter().map(|e| e.0);
+            let _persisted_events = Self::perist_buffered(self.buffer.flush());
             /***for event in directed_events {
               self.sender.send(event).expect("Send directed event");
             }***/
         }
     }
     //Persists the events to db
-    pub(crate) fn perist_buffered(events: Vec<DBEvent>) -> Vec<(i64, bool)> {
-        let directed_events = Context::instance()
+    pub(crate) fn perist_buffered(events: Vec<DBEvent>) -> Vec<i64> {
+        let persisted_events = Context::instance()
             .store
             .persist_events(events.into_iter())
             .expect("Events persisted");
-        println!("Clearing buffer. Directed events = {:?}", directed_events);
-        directed_events
+        println!("Clearing buffer. Persisted events = {:?}", persisted_events);
+        persisted_events
     }
 
-    pub(crate) fn load_messages(rowids: Vec<i64>) -> Vec<Msg> {
+    pub(crate) fn load_messages(rowids: Vec<i64>) -> Vec<(Msg, i64)> {
         Context::instance()
             .store
-            .from_box(rowids, true)
+            .from_messages(rowids)
             .expect("Messages")
     }
 
     pub(crate) fn route_past_events(&mut self) {
-        let ins = Context::instance()
+        let events = Context::instance()
             .store
-            .read_past_events(true)
-            .expect("Past inbounds");
-        let outs = Context::instance()
-            .store
-            .read_past_events(false)
-            .expect("Past outbounds");
-        let ins = Self::load_messages(ins);
-        let outs = Self::load_messages(outs);
-        println!(
-            "Routing past events. Ins = {:?} and outs = {:?}",
-            ins.len(),
-            outs.len()
-        );
+            .read_past_events()
+            .expect("Past events");
+        let events = Self::load_messages(events);
+        println!("Routing past events. Events = {:?}", events.len());
     }
 }
 /***
