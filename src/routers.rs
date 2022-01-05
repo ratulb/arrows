@@ -1,37 +1,56 @@
 use crate::constants::{BUFFER_MAX_SIZE, EVENT_MAX_AGE};
 use crate::events::DBEvent;
 use crate::registry::Context;
-use std::{
-    mem,
-    time::{Duration, Instant},
-};
+use crate::{Mail, Msg};
+use std::mem;
+use std::sync::mpsc::{channel, Sender};
+use std::time::{Duration, Instant};
 
 pub(crate) struct InboxRouter;
 pub(crate) struct OutboxRouter;
 
 pub(crate) struct Router {
     buffer: EventBuffer,
+    sender: Sender<(Msg, bool)>,
 }
 
 impl Router {
     pub(crate) fn new() -> Self {
-        Self::route_past_events();
-        Self {
+        let (sender, receiver) = channel();
+        let mut this = Self {
             buffer: EventBuffer::new(),
-        }
+            sender,
+        };
+        Self::route_past_events(&mut this);
+        this
     }
     pub(crate) fn route(&mut self, event: DBEvent) {
         self.buffer.add(event);
+        if self.buffer.should_flush() {
+            let directed_events = Self::perist_buffered(self.buffer.flush());
+            for event in directed_events {
+              self.sender.send(event).expect("Send directed event");
+            }
+        }
     }
-    pub(crate) fn route_all(events: Vec<DBEvent>) {
-        let (ins, outs) = Context::instance()
+    //Persists the events to db
+    pub(crate) fn perist_buffered(events: Vec<DBEvent>) -> Vec<(i64, bool)> {
+        let directed_events = Context::instance()
             .store
             .persist_events(events.into_iter())
             .expect("Events persisted");
-        println!("Clearing buffer. Ins = {:?} and outs = {:?}", ins, outs);
+        println!("Clearing buffer. Directed events = {:?}", directed_events);
+        directed_events
     }
 
-    pub(crate) fn route_past_events() {
+    pub(crate) fn load_messages(rowids: Vec<i64>) -> Vec<Msg> {
+        Context::instance()
+            .store
+            .from_inbox(rowids)
+            .expect("Messages")
+    }
+
+    pub(crate) fn route_past_events(&mut self) {
         let ins = Context::instance()
             .store
             .read_past_events(true)
@@ -40,11 +59,8 @@ impl Router {
             .store
             .read_past_events(false)
             .expect("Past outbounds");
-        let ins = Context::instance().store.from_inbox(ins).expect("Incoming");
-        let outs = Context::instance()
-            .store
-            .from_inbox(outs)
-            .expect("Outgoing");
+        let ins = Self::load_messages(ins);
+        let outs = Self::load_messages(outs);
         println!(
             "Routing past events. Ins = {:?} and outs = {:?}",
             ins.len(),
@@ -52,7 +68,35 @@ impl Router {
         );
     }
 }
+/***
+Message1 - Actor1
 
+Message2 - Actor2
+
+Message3 - Actor1
+
+Message4 -> Actor2
+
+Message5 -> Actor3
+
+****************
+
+Message6 -> Actor3
+
+Message7 -> Actor2
+
+Message8 - Actor1
+
+Message9 - Actor2
+
+Message10 - Actor1
+
+*****************
+
+Message11 -> Actor2
+
+Message12 -> Actor3
+***/
 pub(crate) struct EventBuffer {
     events: Vec<DBEvent>,
     first_event_receipt_at: Option<Instant>,
@@ -82,17 +126,16 @@ impl EventBuffer {
         if self.events.len() == 1 {
             self.first_event_receipt_at = Some(Instant::now());
         }
-        if self.should_flush() {
-            let events = mem::take(&mut self.events);
-            Router::route_all(events);
-        }
+    }
+    pub(crate) fn flush(&mut self) -> Vec<DBEvent> {
+        mem::take(&mut self.events)
     }
 }
 impl Drop for EventBuffer {
     fn drop(&mut self) {
-        let events = mem::take(&mut self.events);
+        let events = self.flush();
         if !events.is_empty() {
-            Router::route_all(events);
+            Router::perist_buffered(events);
         }
     }
 }

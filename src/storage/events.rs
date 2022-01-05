@@ -1,4 +1,4 @@
-use crate::constants::{INBOUND_INSERT, INBOX, OUTBOUND_INSERT};
+use crate::constants::{INBOUND_INSERT, INBOX, OUTBOUND_INSERT, OUTBOX};
 use rusqlite::{hooks::Action, Result, ToSql, Transaction};
 use serde::{ser::SerializeTupleStruct, Deserialize, Serialize, Serializer};
 
@@ -23,6 +23,15 @@ impl DBEvent {
 
     pub(crate) fn is_inbound(&self) -> bool {
         self.0 == INBOX
+    }
+}
+
+impl From<(i64, bool)> for DBEvent {
+    fn from(directed_event: (i64, bool)) -> Self {
+        match directed_event {
+            (rowid, true) => DBEvent(INBOX.to_string(), rowid),
+            (rowid, false) => DBEvent(OUTBOX.to_string(), rowid),
+        }
     }
 }
 
@@ -54,6 +63,7 @@ pub(crate) enum DBAction {
     Update,
     Unknown,
 }
+
 impl From<Action> for DBAction {
     fn from(action: Action) -> Self {
         match action {

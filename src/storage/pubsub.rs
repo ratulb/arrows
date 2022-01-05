@@ -43,27 +43,6 @@ impl Publisher {
         self.publisher.send(Events::Stop).expect("Sent");
     }
 }
-use crate::Mail;
-
-pub fn transpose(rows: &mut Vec<Vec<Mail>>) -> Vec<Vec<Mail>> {
-    assert!(!rows.is_empty());
-    let size = rows
-        .iter()
-        .max_by(|row1, row2| row1.len().cmp(&row2.len()))
-        .unwrap()
-        .len();
-    let rows = rows.iter_mut().map(|row| {
-        row.resize_with(size, Mail::default);
-        row
-    });
-    let mut result = vec![vec![Mail::Blank; rows.len()]; size];
-    for (i, row) in rows.enumerate() {
-        for (j, e) in row.drain(..).enumerate() {
-            result[j][i] = e;
-        }
-    }
-    result
-}
 
 pub(crate) struct Subscriber {
     receiver: Option<Receiver<Events>>,

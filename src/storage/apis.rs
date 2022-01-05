@@ -8,7 +8,7 @@ use fallible_streaming_iterator::FallibleStreamingIterator;
 use rusqlite::{named_params, params, types::Value, Error::InvalidQuery, Result, ToSql};
 use std::collections::{HashMap, VecDeque};
 use std::io::{Error, ErrorKind};
-use std::str::FromStr;
+
 use std::thread::JoinHandle;
 
 unsafe impl Send for Store {}
@@ -358,20 +358,19 @@ impl Store {
     pub(crate) fn persist_events(
         &mut self,
         events: impl Iterator<Item = DBEvent>,
-    ) -> Result<(Vec<i64>, Vec<i64>)> {
+    ) -> Result<Vec<(i64, bool)>> {
         let tx = self.conn.inner.transaction()?;
-        let mut inbounds = Vec::new();
-        let mut outbounds = Vec::new();
+        let mut directed_events = Vec::new();
         for event in events {
             event.persist(&tx)?;
             if event.is_inbound() {
-                inbounds.push(event.1);
+                directed_events.push((event.1, true));
             } else {
-                outbounds.push(event.1);
+                directed_events.push((event.1, false));
             }
         }
         tx.commit()?;
-        Ok((inbounds, outbounds))
+        Ok(directed_events)
     }
 
     pub(crate) fn into_inbox_batch(&mut self, msgs: impl Iterator<Item = Msg>) -> Result<()> {
@@ -418,18 +417,23 @@ mod tests {
     use std::iter::repeat;
 
     fn store_messages(actor_name: &str) -> (String, String) {
+        //Add randomness to the message text
         let mut rng = thread_rng();
         let random: u64 = rng.gen();
         let message = format!("Actor message-{}", random);
+        //Generate as many messages as required to flush buffer
         let messages = repeat(&message).take(BUFFER_MAX_SIZE);
         let messages: Vec<_> = messages
             .map(|msg| Msg::new_with_text(msg, "from", actor_name))
             .collect();
+
         let mut store = Store::new();
         let _ = store.setup();
+        //Persist messages
         let rs = store.persist(Mail::Bulk(messages));
         assert!(rs.is_ok());
         let actor_id = Addr::new("actor").get_id().to_string();
+        //Return random generated message and actor_id for actor_name
         (message.to_string(), actor_id)
     }
     #[test]
@@ -464,17 +468,17 @@ mod tests {
     #[test]
     fn purge_inbox_of_test_1() {
         let actor_id = "1000".to_string();
-        let mut ctx = Store::new();
-        let _ = ctx.setup();
-        assert_eq!(ctx.purge_inbox_of(&actor_id), Ok(()));
+        let mut store = Store::new();
+        let _ = store.setup();
+        assert_eq!(store.purge_inbox_of(&actor_id), Ok(()));
     }
     #[test]
     fn read_inbox_write_out_msg_test_1() {
-        let actor_id = "1000".to_string();
-        let mut read_count = 0;
-        let mut ctx = Store::new();
-        let _ = ctx.setup();
-        /***let messages = ctx.read_inbox_full(&actor_id).unwrap();
+        let _actor_id = "1000".to_string();
+        let _read_count = 0;
+        let mut store = Store::new();
+        let _ = store.setup();
+        /***let messages = store.read_inbox_full(&actor_id).unwrap();
 
         for _msg in &messages {
             read_count += 1;
@@ -486,9 +490,9 @@ mod tests {
     fn read_inbox_test1() {
         let actor_id = "1000".to_string();
         let mut read_count = 0;
-        let mut ctx = Store::new();
-        let _ = ctx.setup();
-        let messages = ctx.read_inbox(&actor_id).unwrap();
+        let mut store = Store::new();
+        let _ = store.setup();
+        let messages = store.read_inbox(&actor_id).unwrap();
         for msg in messages {
             println!("The msg: {:?}", msg);
             println!();
@@ -500,11 +504,11 @@ mod tests {
     }
     #[test]
     fn read_inbox_full_test1() {
-        let actor_id = "1000".to_string();
-        let mut read_count = 0;
-        let mut ctx = Store::new();
-        let _ = ctx.setup();
-        /***let messages = ctx.read_inbox_full(&actor_id).unwrap();
+        let _actor_id = "1000".to_string();
+        let _read_count = 0;
+        let mut store = Store::new();
+        let _ = store.setup();
+        /***let messages = store.read_inbox_full(&actor_id).unwrap();
         for msg in messages {
             println!("The msg: {:?}", msg);
             println!();
@@ -516,8 +520,8 @@ mod tests {
     }
 
     fn into_inbox_batch_func(num: u32) -> Result<()> {
-        let mut ctx = Store::new();
-        let _ = ctx.setup();
+        let mut store = Store::new();
+        let _ = store.setup();
         let mut messages = Vec::<Msg>::with_capacity(num.try_into().unwrap());
         let mut rng = thread_rng();
         for _ in 0..num {
@@ -526,21 +530,21 @@ mod tests {
             let msg = Msg::new_with_text(&msg_content, "from", "to");
             messages.push(msg);
         }
-        let status = ctx.into_inbox_batch(messages.into_iter());
+        let status = store.into_inbox_batch(messages.into_iter());
         assert!(status.is_ok());
         Ok(())
     }
 
     fn into_inbox_no_batch_func(num: u32) -> Result<()> {
-        let mut ctx = Store::new();
-        let _ = ctx.setup();
+        let mut store = Store::new();
+        let _ = store.setup();
 
         let mut rng = thread_rng();
         for _ in 0..num {
             let random_num: u64 = rng.gen();
             let msg_content = format!("The test msg-{}", random_num);
             let msg = Msg::new_with_text(&msg_content, "from", "to");
-            let _status = ctx.into_inbox(msg);
+            let _status = store.into_inbox(msg);
         }
         Ok(())
     }
@@ -567,20 +571,20 @@ mod tests {
 
     #[test]
     fn persist_builder_1001_test_1() -> Result<()> {
-        let mut ctx = Store::new();
-        let _ = ctx.setup();
+        let mut store = Store::new();
+        let _ = store.setup();
         let identity = "1001".to_string();
-        let insert = ctx.persist_builder(&identity, &r#"{"new_actor_builder":null}"#.to_string());
+        let insert = store.persist_builder(&identity, &r#"{"new_actor_builder":null}"#.to_string());
         println!("insert = {:?}", insert);
         assert!(insert.is_ok());
         Ok(())
     }
     #[test]
     fn remove_actor_permanent_1001_test_1() -> Result<()> {
-        let mut ctx = Store::new();
-        let _ = ctx.setup();
+        let mut store = Store::new();
+        let _ = store.setup();
         let actor_id = "1001".to_string();
-        let remove = ctx.remove_actor_permanent(&actor_id);
+        let remove = store.remove_actor_permanent(&actor_id);
         println!("remove = {:?}", remove);
         assert!(remove.is_ok());
         Ok(())
@@ -588,10 +592,10 @@ mod tests {
 
     #[test]
     fn actor_is_present_1001_test_1() -> Result<()> {
-        let mut ctx = Store::new();
-        let _ = ctx.setup();
+        let mut store = Store::new();
+        let _ = store.setup();
         let actor_id = "1001".to_string();
-        let present = ctx.actor_is_present(&actor_id);
+        let present = store.actor_is_present(&actor_id);
         println!("present = {:?}", present);
         assert!(present.is_ok());
         Ok(())
@@ -599,10 +603,10 @@ mod tests {
 
     #[test]
     fn retrieve_build_def_1001_test_1() -> Result<()> {
-        let mut ctx = Store::new();
-        let _ = ctx.setup();
+        let mut store = Store::new();
+        let _ = store.setup();
         let actor_id = "1001".to_string();
-        let build_def = ctx.retrieve_build_def(&actor_id);
+        let build_def = store.retrieve_build_def(&actor_id);
         println!("build_def = {:?}", build_def);
         assert!(build_def.is_ok());
         Ok(())
