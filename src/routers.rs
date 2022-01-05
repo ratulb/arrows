@@ -1,7 +1,7 @@
 use crate::constants::{BUFFER_MAX_SIZE, EVENT_MAX_AGE};
 use crate::events::DBEvent;
 use crate::registry::Context;
-use crate::{Mail, Msg};
+use crate::Msg;
 use std::mem;
 use std::sync::mpsc::{channel, Sender};
 use std::time::{Duration, Instant};
@@ -28,9 +28,13 @@ impl Router {
         self.buffer.add(event);
         if self.buffer.should_flush() {
             let directed_events = Self::perist_buffered(self.buffer.flush());
-            for event in directed_events {
+            let (inbox, outbox): (Vec<(i64, _)>, Vec<(i64, _)>) =
+                directed_events.iter().partition(|e| e.1 == true);
+            let inbox = inbox.iter().map(|e| e.0);
+            let outbox = outbox.iter().map(|e| e.0);
+            /***for event in directed_events {
               self.sender.send(event).expect("Send directed event");
-            }
+            }***/
         }
     }
     //Persists the events to db
@@ -46,7 +50,7 @@ impl Router {
     pub(crate) fn load_messages(rowids: Vec<i64>) -> Vec<Msg> {
         Context::instance()
             .store
-            .from_inbox(rowids)
+            .from_box(rowids, true)
             .expect("Messages")
     }
 

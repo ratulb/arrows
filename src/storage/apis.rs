@@ -249,13 +249,17 @@ impl Store {
         }
     }
 
-    pub(crate) fn from_inbox(&mut self, rowids: Vec<i64>) -> Result<Vec<Msg>> {
+    pub(crate) fn from_box(&mut self, rowids: Vec<i64>, inbox: bool) -> Result<Vec<Msg>> {
         let rowids = rowids
             .iter()
             .map(|id| id.to_string())
             .collect::<Vec<_>>()
             .join(",");
-        let stmt = format!("SELECT msg FROM inbox WHERE rowid IN ({})", rowids);
+        let stmt = format!(
+            "SELECT msg FROM {} WHERE rowid IN ({})",
+            if inbox { INBOX } else { OUTBOX },
+            rowids
+        );
         let mut stmt = self.conn.inner.prepare(&stmt)?;
         let mut rows = stmt.query([])?;
         let mut msgs = Vec::new();
