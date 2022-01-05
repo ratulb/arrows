@@ -222,14 +222,14 @@ impl Store {
         }
     }
 
-    pub(crate) fn from_messages(&mut self, rowids: Vec<i64>) -> Result<Vec<(Msg, i64)>> {
+    pub(crate) fn from_messages(&mut self, rowids: Vec<i64>) -> Result<Vec<(Msg, bool, i64)>> {
         let rowids = rowids
             .iter()
             .map(|id| id.to_string())
             .collect::<Vec<_>>()
             .join(",");
         let stmt = format!(
-            "SELECT msg, msg_seq FROM messages WHERE rowid IN ({})",
+            "SELECT msg, inbound, msg_seq FROM messages WHERE rowid IN ({})",
             rowids
         );
         let mut stmt = self.conn.inner.prepare(&stmt)?;
@@ -237,8 +237,9 @@ impl Store {
         let mut msgs = Vec::new();
         while let Some(row) = rows.next()? {
             let value: Value = row.get(0)?;
-            let msg_seq: i64 = row.get(1)?;
-            msgs.push((value_to_msg(value), msg_seq));
+            let inbound: i64 = row.get(1)?;
+            let msg_seq: i64 = row.get(2)?;
+            msgs.push((value_to_msg(value), inbound == 1, msg_seq));
         }
         Ok(msgs)
     }

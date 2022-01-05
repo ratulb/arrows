@@ -43,7 +43,7 @@ impl Router {
         persisted_events
     }
 
-    pub(crate) fn load_messages(rowids: Vec<i64>) -> Vec<(Msg, i64)> {
+    pub(crate) fn load_messages(rowids: Vec<i64>) -> Vec<(Msg, bool, i64)> {
         Context::instance()
             .store
             .from_messages(rowids)
