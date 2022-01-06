@@ -22,7 +22,7 @@ impl Delegate {
                 Err(poisoned) => poisoned.into_inner(),
             };
             match receiver.recv() {
-                Ok(msg) => {
+                Ok(_msg) => {
                     println!("Delegate handling message {:?}", thread::current().id());
                 }
                 Err(err) => {

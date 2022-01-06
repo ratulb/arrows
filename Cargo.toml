@@ -20,3 +20,4 @@ mktemp = "0.4.1"
 byte_marks = { git = "https://github.com/ratulb/byte_marks" }
 clap = "2.34.0"
 structopt = "0.3.25"
+num_cpus = "1.13.1"
