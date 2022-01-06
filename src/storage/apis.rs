@@ -27,7 +27,7 @@ impl Drop for Store {
 pub(crate) struct Store {
     buffer: Vec<Msg>,
     conn: DBConnection,
-    inbox_insert_stmt: Option<String>,
+    message_insert_stmt: Option<String>,
     inbox_select_stmts: HashMap<String, String>,
     actor_create_stmts: HashMap<String, String>,
     publisher: Publisher,
@@ -36,7 +36,7 @@ pub(crate) struct Store {
 impl std::fmt::Debug for Store {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Storeint")
-            .field("inbox_insert_stmt", &self.inbox_insert_stmt)
+            .field("message_insert_stmt", &self.message_insert_stmt)
             .field("inbox_select_stmts", &self.inbox_select_stmts)
             .field("actor_create_stmts", &self.actor_create_stmts)
             .finish()
@@ -47,10 +47,8 @@ impl Store {
         Self {
             buffer: Vec::new(),
             conn: DBConnection::new(),
-            inbox_insert_stmt: None,
-            //outbox_insert_stmts: HashMap::new(),
+            message_insert_stmt: None,
             inbox_select_stmts: HashMap::new(),
-            //outbox_select_stmts: HashMap::new(),
             actor_create_stmts: HashMap::new(),
             publisher: Publisher::new(),
             subscriber_handle: None,
@@ -83,17 +81,17 @@ impl Store {
 
     fn persist_buffer(&mut self) -> Result<()> {
         self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
-        let stmt = Self::inbox_insert_stmt(&mut self.inbox_insert_stmt);
+        let stmt = Self::message_insert_stmt(&mut self.message_insert_stmt);
         let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
-        for msg in self.buffer.drain(..) {
-            match stmt {
-                Some(ref mut s) => {
+        match stmt {
+            Some(ref mut s) => {
+                for msg in self.buffer.drain(..) {
                     let actor_id = msg.get_to_id().to_string();
                     let bytes = msg.as_bytes();
-                    let _status = s.execute(named_params! {":actor_id": &actor_id as &dyn ToSql, ":msg_id": &msg.id_as_string() as &dyn ToSql, ":msg": &bytes as &dyn ToSql })?;
+                    let _status = s.execute(named_params! {":actor_id": &actor_id as &dyn ToSql, ":msg_id": &msg.id_as_string() as &dyn ToSql,":actor_id": &actor_id as &dyn ToSql, ":msg": &bytes as &dyn ToSql })?;
                 }
-                None => panic!(),
             }
+            None => panic!(),
         }
         self.conn.inner.execute_batch(COMMIT_TRANSACTION)?;
         Ok(())
@@ -212,7 +210,7 @@ impl Store {
     }
 
     #[inline(always)]
-    fn inbox_insert_stmt<'a>(stmt: &'a mut Option<String>) -> &'a str {
+    fn message_insert_stmt<'a>(stmt: &'a mut Option<String>) -> &'a str {
         match stmt {
             Some(ref s) => s,
             None => {
@@ -245,14 +243,14 @@ impl Store {
     }
 
     pub(crate) fn into_inbox(&mut self, msg: Msg) -> Result<()> {
-        let stmt = Self::inbox_insert_stmt(&mut self.inbox_insert_stmt);
+        let stmt = Self::message_insert_stmt(&mut self.message_insert_stmt);
         let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
         let msg_id = msg.id_as_string();
         let actor_id = msg.get_to_id().to_string();
         let bytes = option_of_bytes(&msg);
         match stmt {
             Some(ref mut s) => s.execute(
-                named_params! {":actor_id": &actor_id as &dyn ToSql, ":msg_id": &msg_id as &dyn ToSql, ":msg": &bytes as &dyn ToSql },
+                named_params! {":actor_id": &actor_id as &dyn ToSql, ":msg_id": &msg_id as &dyn ToSql, ":actor_id": &actor_id as &dyn ToSql, ":msg": &bytes as &dyn ToSql },
             )?,
             None => panic!(),
         };
@@ -343,14 +341,14 @@ impl Store {
 
     pub(crate) fn into_inbox_batch(&mut self, msgs: impl Iterator<Item = Msg>) -> Result<()> {
         self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
-        let stmt = Self::inbox_insert_stmt(&mut self.inbox_insert_stmt);
+        let stmt = Self::message_insert_stmt(&mut self.message_insert_stmt);
         let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
         match stmt {
             Some(ref mut s) => {
                 for msg in msgs {
                     let bytes = msg.as_bytes();
                     let actor_id = msg.get_to_id().to_string();
-                    let _status = s.execute(named_params! { ":actor_id": &actor_id as &dyn ToSql, ":msg_id": &msg.id_as_string() as &dyn ToSql, ":msg": &bytes as &dyn ToSql })?;
+                    let _status = s.execute(named_params! { ":actor_id": &actor_id as &dyn ToSql, ":msg_id": &msg.id_as_string() as &dyn ToSql, ":actor_id": &actor_id as &dyn ToSql, ":msg": &bytes as &dyn ToSql })?;
                 }
             }
             None => panic!(),
