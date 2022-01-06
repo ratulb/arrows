@@ -5,8 +5,8 @@ pub(crate) const BUFFER_MAX_SIZE: usize = 5;
 pub(crate) const TABLE_MESSAGES: &str = "messages";
 //In seconds
 pub(crate) const EVENT_MAX_AGE: u64 = 1;
-pub(crate) const BEGIN_TRANSACTION: &str = "BEGIN TRANSACTION;";
-pub(crate) const COMMIT_TRANSACTION: &str = "COMMIT TRANSACTION;";
+pub(crate) const TX_BEGIN: &str = "BEGIN TRANSACTION;";
+pub(crate) const TX_COMMIT: &str = "COMMIT TRANSACTION;";
 pub(crate) const SELECT_ACTORS: &str = "SELECT actor_id FROM actors";
 //TODO check where its being used?
 //pub(self) const DOES_TABLE_EXIST: &str =
@@ -22,7 +22,7 @@ pub(crate) const EVENTS: &str =
 pub(crate) const BUILD_DEF_INSERT: &str =
     "INSERT INTO actors (actor_id, build_def) VALUES (:actor_id, :build_def)";
 pub(crate) const INSERT_INTO_MESSAGES: &str =
-"INSERT INTO messages (actor_id, msg_id, msg_seq, msg) VALUES(:actor_id, :msg_id,(SELECT IFNULL(MAX(msg_seq), 0) + 1 FROM messages), :msg)";
+"INSERT INTO messages (actor_id, msg_id, msg_seq, msg) VALUES(:actor_id, :msg_id,(SELECT IFNULL(MAX(msg_seq), 0) + 1 FROM messages where actor_id = :actor_id), :msg)";
 
 pub(crate) const EVENTS_INSERT: &str = "INSERT INTO events (row_id) VALUES (:row_id)";
 pub(crate) const DELETE_ACTOR: &str = "DELETE FROM actors WHERE actor_id = ?";

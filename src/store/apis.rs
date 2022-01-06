@@ -3,10 +3,11 @@ use crate::constants::*;
 use crate::dbconnection::DBConnection;
 use crate::events::DBEvent;
 use crate::pubsub::Publisher;
+use crate::DetailedMsg;
 use crate::{Mail, Mail::*, Msg};
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use rusqlite::{named_params, params, types::Value, Error::InvalidQuery, Result, ToSql};
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::io::{Error, ErrorKind};
 
 use std::thread::JoinHandle;
@@ -75,12 +76,11 @@ impl Store {
                 self.buffer.extend(msgs);
                 self.flush_buffer()
             }
-            _ => Ok(()),
         }
     }
 
     fn persist_buffer(&mut self) -> Result<()> {
-        self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
+        self.conn.inner.execute_batch(TX_BEGIN)?;
         let stmt = Self::message_insert_stmt(&mut self.message_insert_stmt);
         let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
         match stmt {
@@ -93,7 +93,7 @@ impl Store {
             }
             None => panic!(),
         }
-        self.conn.inner.execute_batch(COMMIT_TRANSACTION)?;
+        self.conn.inner.execute_batch(TX_COMMIT)?;
         Ok(())
     }
 
@@ -155,18 +155,12 @@ impl Store {
         msg_ids: Vec<&str>,
     ) -> std::io::Result<()> {
         let stmt = format!("DELETE FROM inbox_{} WHERE msg_id = ?", actor_id);
-        self.conn
-            .inner
-            .execute_batch(BEGIN_TRANSACTION)
-            .map_err(sql_to_io);
+        self.conn.inner.execute_batch(TX_BEGIN).map_err(sql_to_io);
         let mut stmt = self.conn.inner.prepare_cached(&stmt).map_err(sql_to_io)?;
         for msg_id in msg_ids {
             stmt.execute(params![msg_id]).map_err(sql_to_io);
         }
-        self.conn
-            .inner
-            .execute_batch(COMMIT_TRANSACTION)
-            .map_err(sql_to_io);
+        self.conn.inner.execute_batch(TX_COMMIT).map_err(sql_to_io);
         Ok(())
     }
 
@@ -220,7 +214,7 @@ impl Store {
         }
     }
 
-    pub(crate) fn from_messages(&mut self, rowids: Vec<i64>) -> Result<Vec<(Msg, bool, i64)>> {
+    pub(crate) fn from_messages(&mut self, rowids: Vec<i64>) -> Result<Vec<DetailedMsg>> {
         let rowids = rowids
             .iter()
             .map(|id| id.to_string())
@@ -256,33 +250,33 @@ impl Store {
         };
         Ok(())
     }
-    pub(crate) fn read_inbox(&mut self, actor_id: &String) -> Result<VecDeque<Msg>> {
+    pub(crate) fn actor_messages(&mut self, actor_id: &str) -> Result<Vec<Msg>> {
         let stmt = self
             .inbox_select_stmts
             .entry(actor_id.to_string())
             .or_insert_with(|| {
                 format!(
-                    "SELECT msg FROM inbox_{} ORDER BY rowid ASC LIMIT {}",
+                    "SELECT msg FROM messages where actor_id = {} ORDER BY rowid ASC LIMIT {}",
                     actor_id, FETCH_LIMIT
                 )
             });
 
         let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
-        let mut messages = VecDeque::with_capacity(FETCH_LIMIT);
+        let mut msgs = Vec::with_capacity(FETCH_LIMIT);
         match stmt {
             Some(ref mut s) => {
                 //let rows = s.query_and_then([], |row| row.get::<_, Msg>(0))?;
                 let rows = s.query_map([], |row| row.get(0))?;
                 for row in rows {
                     let value: Value = row?;
-                    messages.push_front(value_to_msg(value));
+                    msgs.push(value_to_msg(value));
                 }
             }
             None => {
                 panic!("Error draining inbox - CachedStatement not found")
             }
         }
-        Ok(messages)
+        Ok(msgs)
     }
 
     pub(crate) fn rowids_of(&mut self, actor_id: &str) -> Result<Vec<i64>> {
@@ -298,24 +292,25 @@ impl Store {
         }
         Ok(rowids)
     }
-    pub(crate) fn read_inbox_from(&mut self, actor_id: &str, start_at: i64) -> Result<Vec<Msg>> {
+
+    pub(crate) fn messages_from(&mut self, actor_id: &str, start_at: i64) -> Result<Vec<Msg>> {
         let stmt =format!("SELECT msg FROM inbox WHERE actor_id = '{}' and rowid >= {} ORDER BY rowid ASC LIMIT {}", actor_id, start_at, FETCH_LIMIT);
         let mut stmt = self.conn.inner.prepare_cached(&stmt).ok();
-        let mut messages = Vec::with_capacity(FETCH_LIMIT);
+        let mut msgs = Vec::with_capacity(FETCH_LIMIT);
         match stmt {
             Some(ref mut s) => {
                 let rows = s.query_map([], |row| row.get(0))?;
                 for row in rows {
                     let value: Value = row?;
-                    messages.push(value_to_msg(value));
+                    msgs.push(value_to_msg(value));
                 }
             }
             None => panic!("Error reading inbox!"),
         }
-        Ok(messages)
+        Ok(msgs)
     }
 
-    pub(crate) fn read_past_events(&mut self) -> Result<Vec<i64>> {
+    pub(crate) fn read_events(&mut self) -> Result<Vec<i64>> {
         let mut stmt = self.conn.inner.prepare_cached(EVENTS_SELECT)?;
         let mut rows = stmt.query([])?;
         let mut events = Vec::new();
@@ -340,7 +335,7 @@ impl Store {
     }
 
     pub(crate) fn into_inbox_batch(&mut self, msgs: impl Iterator<Item = Msg>) -> Result<()> {
-        self.conn.inner.execute_batch(BEGIN_TRANSACTION)?;
+        self.conn.inner.execute_batch(TX_BEGIN)?;
         let stmt = Self::message_insert_stmt(&mut self.message_insert_stmt);
         let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
         match stmt {
@@ -353,7 +348,7 @@ impl Store {
             }
             None => panic!(),
         };
-        self.conn.inner.execute_batch(COMMIT_TRANSACTION)?;
+        self.conn.inner.execute_batch(TX_COMMIT)?;
         Ok(())
     }
 }
@@ -420,13 +415,13 @@ mod tests {
     }
 
     #[test]
-    fn read_inbox_from_test() {
+    fn read_message_from_test() {
         let (message, actor_id) = store_messages("actor");
         let mut store = Store::new();
         let _ = store.setup();
         let mut rowids = store.rowids_of(&actor_id).unwrap();
         let last = rowids.pop().unwrap();
-        let msgs = store.read_inbox_from(&actor_id, last).unwrap();
+        let msgs = store.messages_from(&actor_id, last).unwrap();
 
         assert!(msgs[0].content_as_text() == Some(&message));
     }
@@ -454,16 +449,12 @@ mod tests {
 
     #[test]
     fn read_inbox_test1() {
-        let actor_id = "1000".to_string();
+        let actor_id = "1000";
         let mut read_count = 0;
         let mut store = Store::new();
         let _ = store.setup();
-        let messages = store.read_inbox(&actor_id).unwrap();
-        for msg in messages {
-            println!("The msg: {:?}", msg);
-            println!();
-            println!();
-            println!();
+        let msgs = store.actor_messages(actor_id).unwrap();
+        for _msg in msgs {
             read_count += 1;
         }
         println!("The msg read count: {:?}", read_count);
