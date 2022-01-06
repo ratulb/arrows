@@ -1,7 +1,7 @@
 use crate::DetailedMsg;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
-use std::thread::JoinHandle;
+use std::thread::{self, JoinHandle};
 
 pub(crate) struct Delegate {
     receiver: Option<Arc<Mutex<Receiver<DetailedMsg>>>>,
@@ -16,14 +16,14 @@ impl Delegate {
     pub(crate) fn start(&mut self) -> JoinHandle<()> {
         let receiver = self.receiver.take().expect("Receiver");
 
-        std::thread::spawn(move || loop {
+        thread::spawn(move || loop {
             let receiver = match receiver.lock() {
                 Ok(receiver) => receiver,
                 Err(poisoned) => poisoned.into_inner(),
             };
             match receiver.recv() {
                 Ok(msg) => {
-                    println!("Delegate handling message {:?}", msg);
+                    println!("Delegate handling message {:?}", thread::current().id());
                 }
                 Err(err) => {
                     eprintln!("Error receiving msg {:?}", err);
@@ -54,6 +54,13 @@ impl Router {
     pub(crate) fn route(&mut self, msgs: Vec<DetailedMsg>) {
         for msg in msgs {
             self.sender.send(msg).expect("Routing messages");
+        }
+    }
+}
+impl Drop for Router {
+    fn drop(&mut self) {
+        for handle in std::mem::take(&mut self.delegates) {
+            handle.join();
         }
     }
 }

@@ -143,7 +143,8 @@ impl EventTracker {
             .store
             .read_events()
             .expect("Past events");
-        let events = Self::load_messages(events);
-        println!("Routing past events. Events = {:?}", events.len());
+        let msgs = Self::load_messages(events);
+        println!("Handling past mags. Events = {:?}", msgs.len());
+        self.router.route(msgs);
     }
 }
