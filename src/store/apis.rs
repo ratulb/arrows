@@ -199,7 +199,7 @@ impl Store {
             .and_then(|c| if c == 1 { Ok(()) } else { Err(InvalidQuery) });
         status
     }
-    pub(crate) fn retrieve_build_def(&mut self, actor_id: &str) -> Result<Option<(Addr,String)>> {
+    pub(crate) fn retrieve_build_def(&mut self, actor_id: &str) -> Result<Option<(Addr, String)>> {
         let mut stmt = self.conn.inner.prepare_cached(BUILD_DEF)?;
         let mut rows = stmt.query(rusqlite::params![actor_id])?;
         if let Some(row) = rows.next()? {

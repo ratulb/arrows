@@ -1,9 +1,10 @@
-use crate::catalog::Context;
-use crate::DetailedMsg;
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, Mutex};
-use std::thread::{self, JoinHandle};
 
+
+use crate::DetailedMsg;
+use parking_lot::Mutex;
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::Arc;
+use std::thread::{self, JoinHandle};
 pub(crate) struct Delegate {
     receiver: Option<Arc<Mutex<Receiver<DetailedMsg>>>>,
 }
@@ -18,23 +19,26 @@ impl Delegate {
         let receiver = self.receiver.take().expect("Receiver");
 
         thread::spawn(move || loop {
-            let receiver = match receiver.lock() {
-                Ok(receiver) => receiver,
-                Err(poisoned) => poisoned.into_inner(),
-            };
+            let receiver = receiver.lock(); /*** {
+                                                Ok(receiver) => receiver,
+                                                Err(poisoned) => poisoned.into_inner(),
+                                            };***/
             match receiver.recv() {
-                Ok(msg) => {
-                    let ctx = Context::instance();
-                    println!("Here are the actors = {:?}", ctx.actors);
-                    let actor = ctx.actors.get_actor(*msg.0.get_id());
+                Ok(_msg) => {
+                    /***println!("Is it locked here = {:?}", CTX.is_locked());
+                    let mutex = CTX.lock();
+                    println!("Is it locked here ???= {:?}", CTX.is_locked());
+                    println!("Here are the actors = {:?}", mutex.borrow().actors);
+                    let actor: Option<Box<dyn Actor>> = None; //mutex.borrow().actors.get_actor(*msg.0.get_id());
                     match actor {
-                        Some(actor) => println!("Found actor"),
+                        Some(_actor) => println!("Found actor"),
                         None => {
+                            parking_lot::MutexGuard::unlock_fair(mutex);
                             eprintln!("Actor not found - reloading..");
                             crate::catalog::reload_actor(*msg.0.get_id());
                             eprintln!("Done - reloading..");
-                        },
-                    }
+                        }
+                    }***/
                 }
                 Err(err) => {
                     eprintln!("Error receiving msg {:?}", err);
@@ -58,7 +62,8 @@ impl Router {
         let receiver = Arc::new(Mutex::new(receiver));
         for i in 0..count {
             println!("Delegate started = {:?}", i);
-            delegates.push(Delegate::new(Arc::clone(&receiver)).start());
+            //delegates.push(Delegate::new(Arc::clone(&receiver)).start());
+            delegates.push(Delegate::new(receiver.clone()).start());
         }
         Self { sender, delegates }
     }

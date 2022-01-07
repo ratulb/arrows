@@ -1,3 +1,4 @@
+mod actors;
 use crate::apis::Store;
 use crate::catalog::ctxops::*;
 use crate::common::{
@@ -5,26 +6,29 @@ use crate::common::{
     actor::ActorBuilder,
     mail::{Mail, Msg},
 };
-use std::sync::MutexGuard;
-use crate::Addr;
-use crate::BuilderDeserializer;
-use crate::Error;
+
+use crate::{Addr, BuilderDeserializer, Error};
 use lazy_static::lazy_static;
-use std::cell::{RefCell, RefMut};
-use std::collections::HashMap;
+use parking_lot::ReentrantMutex;
+use std::cell::{Ref, RefMut, RefCell};
+
 use std::rc::Rc;
-use std::sync::RwLock;
-use std::sync::RwLockWriteGuard;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+use crate::catalog::actors::Actors;
 
 lazy_static! {
-    //pub(crate) static ref CTX: RwLock<Context> = RwLock::new(Context::init());
-    pub  static ref CTX: Arc<Mutex<Context>> = Arc::new(Mutex::new(Context::init()));
+    pub static ref CTX: Arc<ReentrantMutex<RefCell<Context>>> =
+        Arc::new(ReentrantMutex::new(RefCell::new(Context::init())));
 }
+
+type CachedActor = Rc<RefCell<Box<dyn Actor>>>;
+type ActorRef<'a> = Option<Ref<'a, Box<dyn Actor>>>;
+type ActorRefMut<'a> = Option<RefMut<'a, Box<dyn Actor>>>;
 
 #[derive(Debug)]
 pub struct Context {
-    pub(crate) actors: Actors,
+    actors: Actors,
     pub(crate) store: Store,
 }
 
@@ -36,37 +40,52 @@ impl Context {
         Self { actors, store }
     }
 
-    //pub fn instance() -> RwLockWriteGuard<'static, Self> {
-    pub fn instance() -> MutexGuard<'static, Self> {
-        //CTX.write().unwrap()
-        CTX.lock().unwrap()
+    pub(crate) fn get_actor(&self, addr: &Addr) -> ActorRef<'_> {
+        self.actors.get_actor(addr)
     }
-}
 
-#[derive(Debug)]
-pub(crate) struct Actors {
-    pub(crate) cached_actors: HashMap<u64, Rc<RefCell<Box<dyn Actor>>>>,
-}
-unsafe impl Send for Actors {}
-unsafe impl Sync for Actors {}
+    pub(crate) fn get_actor_mut(&self, addr: &Addr) -> ActorRefMut<'_> {
+        self.actors.get_actor_mut(addr)
+    }
+    pub(crate) fn add_actor(&mut self, addr: Addr, actor: CachedActor) {
+        self.actors.add_actor(addr, actor);
+    }
 
-impl Actors {
-    pub(crate) fn new() -> Self {
-        Self {
-            cached_actors: HashMap::new(),
+    pub(crate) fn remove_actor(&mut self, addr: &Addr) -> Option<CachedActor> {
+        self.actors.remove_actor(addr)
+    }
+
+    pub fn send_mail(&mut self, mail: Mail) {
+        self.store.persist(mail);
+    }
+    //Numeric identity of the actor
+    pub(crate) fn remove_actor_permanent(&mut self, identity: &str) -> Result<(), Error> {
+        self.store
+            .remove_actor_permanent(identity)
+            .map_err(|err| Error::Other(Box::new(err)))
+    }
+
+    pub(crate) fn persist_builder(
+        &mut self,
+        identity: &str,
+        addr: Addr,
+        builder: &impl ActorBuilder,
+    ) -> Result<(), Error> {
+        let builder_def = serde_json::to_string(builder as &dyn ActorBuilder)?;
+        self.store
+            .persist_builder(identity, addr, &builder_def)
+            .map_err(|err| Error::Other(Box::new(err)))
+    }
+
+    pub(crate) fn retrieve_build_def(&mut self, identity: &str) -> Option<(Addr, String)> {
+        let result = self.store.retrieve_build_def(identity);
+        match result {
+            Ok(addr_and_def) => addr_and_def,
+            Err(err) => {
+                eprintln!("Error fetching build def = {:?}", err);
+                None
+            }
         }
-    }
-    pub(crate) fn get_actor(&self, identity: u64) -> Option<RefMut<'_, Box<dyn Actor>>> {
-        self.cached_actors
-            .get(&identity)
-            .as_mut()
-            .map(|entry| entry.borrow_mut())
-    }
-    pub(crate) fn add_actor(&mut self, identity: u64, rc_actor: Rc<RefCell<Box<dyn Actor>>>) {
-        self.cached_actors.insert(identity, rc_actor.clone());
-    }
-    pub(crate) fn remove_actor(&mut self, identity: u64) -> Option<Rc<RefCell<Box<dyn Actor>>>> {
-        self.cached_actors.remove(&identity)
     }
 }
 
@@ -74,7 +93,7 @@ pub fn register_builder(
     identity: u64,
     addr: Addr,
     mut builder: impl ActorBuilder,
-) -> Result<Rc<RefCell<Box<dyn Actor>>>, Error> {
+) -> Result<Box<dyn Actor>, Error> {
     remove_actor(identity).and_then(pre_shutdown);
     remove_actor_permanent(&identity.to_string());
     let addr_id = addr.get_id();
@@ -86,15 +105,20 @@ pub fn register_builder(
         .ok_or(Error::RegistrationError)
 }
 
-pub fn send_mail(mail: Mail) {
-    persist(mail);
+pub fn send_mail(_mail: Mail) {
+    /***  persist(mail);
+     pub(super) fn persist(mail: Mail) {
+        //CTX.lock().borrow_mut().store.persist(mail);
+        CTX.lock().get_mut().store.persist(mail);
+    }
+    ***/
 }
 
 pub fn send(identity: u64, msg: Msg) {
     send_msg(identity, msg);
 }
 
-pub fn reload_actor(addr: u64) -> Result<Rc<RefCell<Box<dyn Actor>>>, Error> {
+pub fn reload_actor(addr: u64) -> Result<Box<dyn Actor>, Error> {
     match retrieve_build_def(&addr.to_string()) {
         Some(s) => {
             println!("check1");
@@ -114,52 +138,67 @@ pub fn reload_actor(addr: u64) -> Result<Rc<RefCell<Box<dyn Actor>>>, Error> {
 pub(in crate::catalog) mod ctxops {
     use super::*;
 
-    pub(super) fn persist(mail: Mail) {
-        Context::instance().store.persist(mail);
-    }
+    /***pub(super) fn persist(mail: Mail) {
+        //CTX.lock().borrow_mut().store.persist(mail);
+        CTX.lock().get_mut().store.persist(mail);
+    }***/
 
-    pub(super) fn send_msg(identity: u64, msg: Msg) {
-        let ctx = Context::instance();
-        let actor = ctx.actors.get_actor(identity);
-        if let Some(mut actor) = actor {
+    pub(super) fn send_msg(_identity: u64, _msg: Msg) {
+        /***let mut mutex = CTX.lock();
+        if let Some(actor) =  mutex.get_mut().actors.get_actor(identity) {
             actor.receive(msg.into());
             println!("Msg delivered");
         } else {
             eprintln!("Actor not found");
-        }
+        }***/
     }
 
-    pub(super) fn remove_actor(identity: u64) -> Option<Rc<RefCell<Box<dyn Actor>>>> {
-        Context::instance().actors.remove_actor(identity)
-    }
-
-    //Send a shutdown msg to the actor that is being removed
-    pub(super) fn pre_shutdown(actor: Rc<RefCell<Box<dyn Actor>>>) -> Option<()> {
-        let _ignored = actor.borrow_mut().receive(Mail::Blank);
+    pub(super) fn remove_actor(_identity: u64) -> Option<Box<dyn Actor>> {
+        //CTX.lock().get_mut().actors.remove_actor(identity)
         None
     }
 
-    pub(super) fn remove_actor_permanent(identity: &String) -> Result<(), Error> {
-        Context::instance()
+    //Send a shutdown msg to the actor that is being removed
+    pub(super) fn pre_shutdown(mut actor: Box<dyn Actor>) -> Option<()> {
+        let _ignored = actor.receive(Mail::Blank);
+        None
+    }
+
+    pub(super) fn remove_actor_permanent(_identity: &String) -> Result<(), Error> {
+        /*** //CTX.lock().get_mut().borrow_mut()
+        CTX.lock()
+            .get_mut()
             .store
             .remove_actor_permanent(identity)
-            .map_err(|err| Error::Other(Box::new(err)))
+            .map_err(|err| Error::Other(Box::new(err)))***/
+        Ok(())
     }
 
     pub(super) fn persist_builder(
-        identity: &String,
-        addr: Addr,
-        builder: &impl ActorBuilder,
+        _identity: &String,
+        _addr: Addr,
+        _builder: &impl ActorBuilder,
     ) -> Result<(), Error> {
-        let builder_def = serde_json::to_string(builder as &dyn ActorBuilder)?;
-        Context::instance()
+        /***let builder_def = serde_json::to_string(builder as &dyn ActorBuilder)?;
+        //CTX.lock().get_mut().borrow_mut()
+        CTX.lock()
+            .get_mut()
             .store
             .persist_builder(identity, addr, &builder_def)
             .map_err(|err| Error::Other(Box::new(err)))
+            ***/
+        Ok(())
     }
-    pub(super) fn retrieve_build_def(identity: &str) -> Option<(Addr,String)> {
-        println!("retrieve_build_def 1");
-        let rs = Context::instance().store.retrieve_build_def(identity);
+
+    pub(super) fn retrieve_build_def(_identity: &str) -> Option<(Addr, String)> {
+        /***     //let rs = CTX.lock().get_mut().borrow_mut().store.retrieve_build_def(identity);
+        let mut locked = CTX.lock();
+        type_of(&locked);
+        let muted = locked.get_mut();
+        type_of(&muted);
+        println!("retrieve 4");
+        //let rs = CTX.clone().lock().get_mut().store.retrieve_build_def(identity);
+        let rs = muted.store.retrieve_build_def(identity);
         println!("retrieve_build_def 2");
         match rs {
             Ok(addr_and_def) => addr_and_def,
@@ -167,22 +206,19 @@ pub(in crate::catalog) mod ctxops {
                 eprintln!("Error fetching build def = {:?}", err);
                 None
             }
-        }
+        }***/
+
+        None
     }
 
-    pub(super) fn add_actor(
-        addr: u64,
-        actor: Box<dyn Actor>,
-    ) -> Option<Rc<RefCell<Box<dyn Actor>>>> {
-        let actor = Rc::new(RefCell::new(actor));
-        Context::instance().actors.add_actor(addr, actor.clone());
+    pub(super) fn add_actor(_addr: u64, actor: Box<dyn Actor>) -> Option<Box<dyn Actor>> {
+        //CTX.lock().get_mut().borrow_mut().actors.add_actor(addr, actor);
+        //CTX.lock().get_mut().actors.add_actor(addr, actor);
         Some(actor)
     }
 
-    pub(super) fn post_start(
-        actor: Rc<RefCell<Box<dyn Actor>>>,
-    ) -> Option<Rc<RefCell<Box<dyn Actor>>>> {
-        let _post_start_msg = actor.borrow_mut().receive(Mail::Blank);
+    pub(super) fn post_start(mut actor: Box<dyn Actor>) -> Option<Box<dyn Actor>> {
+        let _post_start_msg = actor.receive(Mail::Blank);
         Some(actor)
     }
 }
@@ -211,7 +247,7 @@ mod tests {
             let x: u32 = rng.gen();
             if x > 1000 {
                 //let _ctx = CTX.write().unwrap();
-                let _ctx = CTX.lock().unwrap();
+                let _ctx = CTX.lock();
                 assert!(999 <= x);
             }
         }
@@ -234,14 +270,15 @@ mod tests {
         use rand::{thread_rng, Rng};
         let mut rng = thread_rng();
         let mut actors = Actors::new();
+        let identity = "10000";
+        let addr = Addr::new(identity);
         for _ in 0..1000000 {
             let x: u32 = rng.gen();
-            let identity = 10000;
-            actors.remove_actor(identity);
+            actors.remove_actor(&addr);
             let actor: Box<dyn Actor> = Box::new(NewActor);
             let actor = Rc::new(RefCell::new(actor));
-            actors.add_actor(identity, actor.clone());
-            let _actor = actors.get_actor(identity);
+            actors.add_actor(Addr::new(identity), actor);
+            let _actor = actors.get_actor(&addr);
             if x >= 1000 {
                 assert!(999 <= x);
             }
