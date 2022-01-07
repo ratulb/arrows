@@ -1,4 +1,4 @@
-use crate::common::utils::compute_hash;
+use crate::{compute_hash, option_of_bytes};
 use lazy_static::lazy_static;
 use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
@@ -17,17 +17,6 @@ lazy_static! {
     );
 }
 
-#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize, Hash)]
-pub enum Scheme {
-    Email,
-    Inprocess,
-    Http,
-    Https,
-    Tcp,
-    Grpc,
-    Udp,
-}
-
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize, Hash, Default)]
 pub struct Addr {
     id: u64,
@@ -36,7 +25,6 @@ pub struct Addr {
     ns: Option<String>,
     host: Option<String>,
     port: Option<u16>,
-    proto: Option<Scheme>,
 }
 
 impl Addr {
@@ -48,7 +36,6 @@ impl Addr {
             ns: Some("system".to_string()),
             host: Some((&ADDR).to_string()),
             port: Some(*PORT),
-            proto: Some(Scheme::Inprocess),
         };
         Self::addr_hash(&mut addr);
         addr
@@ -104,6 +91,9 @@ impl Addr {
     }
     pub fn get_port(&self) -> Option<u16> {
         self.port
+    }
+    pub fn as_bytes(&self) -> Vec<u8> {
+        option_of_bytes(self).unwrap_or_default()
     }
 }
 

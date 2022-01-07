@@ -1,3 +1,4 @@
+use crate::catalog::Context;
 use crate::DetailedMsg;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
@@ -22,8 +23,18 @@ impl Delegate {
                 Err(poisoned) => poisoned.into_inner(),
             };
             match receiver.recv() {
-                Ok(_msg) => {
-                    println!("Delegate handling message {:?}", thread::current().id());
+                Ok(msg) => {
+                    let ctx = Context::instance();
+                    println!("Here are the actors = {:?}", ctx.actors);
+                    let actor = ctx.actors.get_actor(*msg.0.get_id());
+                    match actor {
+                        Some(actor) => println!("Found actor"),
+                        None => {
+                            eprintln!("Actor not found - reloading..");
+                            crate::catalog::reload_actor(*msg.0.get_id());
+                            eprintln!("Done - reloading..");
+                        },
+                    }
                 }
                 Err(err) => {
                     eprintln!("Error receiving msg {:?}", err);
@@ -45,7 +56,8 @@ impl Router {
         let (sender, receiver) = channel();
         let mut delegates = Vec::with_capacity(count);
         let receiver = Arc::new(Mutex::new(receiver));
-        for _ in 0..count {
+        for i in 0..count {
+            println!("Delegate started = {:?}", i);
             delegates.push(Delegate::new(Arc::clone(&receiver)).start());
         }
         Self { sender, delegates }
@@ -59,8 +71,8 @@ impl Router {
 }
 impl Drop for Router {
     fn drop(&mut self) {
-        for handle in std::mem::take(&mut self.delegates) {
+        /*** for handle in std::mem::take(&mut self.delegates) {
             handle.join();
-        }
+        }***/
     }
 }

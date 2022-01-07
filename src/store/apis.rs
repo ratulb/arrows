@@ -1,8 +1,9 @@
-use crate::common::utils::{from_byte_array, option_of_bytes};
+use crate::common::utils::from_byte_array;
 use crate::constants::*;
 use crate::dbconnection::DBConnection;
 use crate::events::DBEvent;
 use crate::pubsub::Publisher;
+use crate::Addr;
 use crate::DetailedMsg;
 use crate::{Mail, Mail::*, Msg};
 use fallible_streaming_iterator::FallibleStreamingIterator;
@@ -112,7 +113,6 @@ impl Store {
             .inner
             .prepare_cached("SELECT actor_id FROM actors")
             .ok();
-        //TODO check capacity
         let mut actors = Vec::with_capacity(FETCH_LIMIT);
         match stmt {
             Some(ref mut s) => {
@@ -122,7 +122,7 @@ impl Store {
                     actors.push(value);
                 }
             }
-            None => panic!("Error draining inbox - CachedStatement not found"),
+            None => panic!("Error retrieving actors!"),
         }
         Ok(actors)
     }
@@ -164,17 +164,22 @@ impl Store {
         Ok(())
     }
 
-    pub(crate) fn persist_builder(&mut self, identity: &String, build_def: &String) -> Result<()> {
+    pub(crate) fn persist_builder(
+        &mut self,
+        identity: &str,
+        addr: Addr,
+        build_def: &str,
+    ) -> Result<()> {
         let mut stmt = self.conn.inner.prepare_cached(BUILD_DEF_INSERT).ok();
         match stmt {
             Some(ref mut s) => s.execute(
-                named_params! { ":actor_id": identity as &dyn ToSql, ":build_def": build_def as &dyn ToSql },
+                named_params! { ":actor_id": &identity as &dyn ToSql,":addr": &addr.as_bytes() as &dyn ToSql, ":build_def": &build_def as &dyn ToSql },
             )?,
             None => panic!(),
         };
         Ok(())
     }
-    pub(crate) fn remove_actor_permanent(&mut self, identity: &String) -> Result<()> {
+    pub(crate) fn remove_actor_permanent(&mut self, identity: &str) -> Result<()> {
         let mut stmt = self.conn.inner.prepare_cached(DELETE_ACTOR)?;
         stmt.execute(params![identity]).and_then(
             |c| {
@@ -186,7 +191,7 @@ impl Store {
             },
         )
     }
-    pub(crate) fn actor_is_present(&mut self, actor_id: &String) -> Result<()> {
+    pub(crate) fn actor_is_present(&mut self, actor_id: &str) -> Result<()> {
         let mut stmt = self.conn.inner.prepare_cached(ACTOR_ROWID)?;
         let status = stmt
             .query(rusqlite::params![actor_id])?
@@ -194,11 +199,14 @@ impl Store {
             .and_then(|c| if c == 1 { Ok(()) } else { Err(InvalidQuery) });
         status
     }
-    pub(crate) fn retrieve_build_def(&mut self, actor_id: &String) -> Result<Option<String>> {
+    pub(crate) fn retrieve_build_def(&mut self, actor_id: &str) -> Result<Option<(Addr,String)>> {
         let mut stmt = self.conn.inner.prepare_cached(BUILD_DEF)?;
         let mut rows = stmt.query(rusqlite::params![actor_id])?;
         if let Some(row) = rows.next()? {
-            return Ok(Some(row.get(0)?));
+            let value: Value = row.get(0)?;
+            let addr: Addr = value_to_addr(value);
+            let build_def: String = row.get(1)?;
+            return Ok(Some((addr, build_def)));
         }
         Ok(None)
     }
@@ -241,7 +249,7 @@ impl Store {
         let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
         let msg_id = msg.id_as_string();
         let actor_id = msg.get_to_id().to_string();
-        let bytes = option_of_bytes(&msg);
+        let bytes = msg.as_bytes();
         match stmt {
             Some(ref mut s) => s.execute(
                 named_params! {":actor_id": &actor_id as &dyn ToSql, ":msg_id": &msg_id as &dyn ToSql, ":actor_id": &actor_id as &dyn ToSql, ":msg": &bytes as &dyn ToSql },
@@ -365,6 +373,16 @@ pub(crate) fn value_to_msg(v: Value) -> Msg {
         };
     }
     Msg::default()
+}
+
+pub(crate) fn value_to_addr(v: Value) -> Addr {
+    if let Value::Blob(bytes) = v {
+        return match from_byte_array::<'_, Addr>(&bytes) {
+            Ok(addr) => addr,
+            _ => Addr::default(),
+        };
+    }
+    Addr::default()
 }
 
 #[cfg(test)]
@@ -527,12 +545,13 @@ mod tests {
     }
 
     #[test]
-    fn persist_builder_1001_test_1() -> Result<()> {
+    fn persist_builder_1001() -> Result<()> {
         let mut store = Store::new();
         let _ = store.setup();
-        let identity = "1001".to_string();
-        let insert = store.persist_builder(&identity, &r#"{"new_actor_builder":null}"#.to_string());
-        println!("insert = {:?}", insert);
+        let addr = Addr::new("1001");
+        let identity = "1001";
+        let insert =
+            store.persist_builder(identity, addr, &r#"{"new_actor_builder":null}"#.to_string());
         assert!(insert.is_ok());
         Ok(())
     }
@@ -540,9 +559,8 @@ mod tests {
     fn remove_actor_permanent_1001_test_1() -> Result<()> {
         let mut store = Store::new();
         let _ = store.setup();
-        let actor_id = "1001".to_string();
-        let remove = store.remove_actor_permanent(&actor_id);
-        println!("remove = {:?}", remove);
+        let actor_id = "1001";
+        let remove = store.remove_actor_permanent(actor_id);
         assert!(remove.is_ok());
         Ok(())
     }
@@ -551,9 +569,8 @@ mod tests {
     fn actor_is_present_1001_test_1() -> Result<()> {
         let mut store = Store::new();
         let _ = store.setup();
-        let actor_id = "1001".to_string();
-        let present = store.actor_is_present(&actor_id);
-        println!("present = {:?}", present);
+        let actor_id = "1001";
+        let present = store.actor_is_present(actor_id);
         assert!(present.is_ok());
         Ok(())
     }
@@ -562,9 +579,8 @@ mod tests {
     fn retrieve_build_def_1001_test_1() -> Result<()> {
         let mut store = Store::new();
         let _ = store.setup();
-        let actor_id = "1001".to_string();
-        let build_def = store.retrieve_build_def(&actor_id);
-        println!("build_def = {:?}", build_def);
+        let actor_id = "1001";
+        let build_def = store.retrieve_build_def(actor_id);
         assert!(build_def.is_ok());
         Ok(())
     }

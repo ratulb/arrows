@@ -1,4 +1,4 @@
-use arrows::persist_mail;
+use arrows::send_mail;
 use arrows::{from_bytes, Mail};
 use byte_marks::Marked;
 use std::io::{BufReader, BufWriter, Result, Write};
@@ -69,9 +69,9 @@ impl Server {
     fn route_mail(&self, mail: Vec<u8>) -> Result<()> {
         let mail = from_bytes::<'_, Mail>(&mail)?;
         match mail {
-            trade @ Mail::Trade(_) => persist_mail(trade),
+            trade @ Mail::Trade(_) => send_mail(trade),
             bulk @ Mail::Bulk(_) => {
-                persist_mail(bulk);
+                send_mail(bulk);
             }
             Mail::Blank => eprintln!("Blank"),
         }

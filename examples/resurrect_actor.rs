@@ -1,4 +1,4 @@
-use arrows::registry::reload_actor;
+use arrows::catalog::reload_actor;
 
 use arrows::{Actor, ActorBuilder, Addr, Mail, Msg};
 use serde::{Deserialize, Serialize};

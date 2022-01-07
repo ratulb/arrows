@@ -2,13 +2,14 @@
 macro_rules! builder_of {
     ($actor_name:literal, $actor_builder:path) => {{
         let identity = $crate::Addr::new($actor_name).get_id();
-        let res = $crate::registry::register_builder(identity, $actor_builder);
+        let addr = $crate::Addr::new($actor_name);
+        let res = $crate::catalog::register_builder(identity, addr, $actor_builder);
         res
     }};
     ($actor_addr:expr, $actor_builder:path) => {{
         let actor_addr: $crate::Addr = $actor_addr;
         let identity = actor_addr.get_id();
-        let res = $crate::registry::register_builder(identity, $actor_builder);
+        let res = $crate::catalog::register_builder(identity, actor_addr, $actor_builder);
         res
     }};
 }
@@ -18,13 +19,13 @@ macro_rules! send_to {
     ($actor_name:literal, $msg:expr) => {
         let msg: $crate::Msg = $msg;
         let identity = $crate::Addr::new($actor_name).get_id();
-        $crate::registry::send(identity, msg);
+        $crate::catalog::send(identity, msg);
     };
     ($actor_addr:expr, $msg:expr) => {
         let msg: $crate::Msg = $msg;
         let actor_addr: $crate::Addr = $actor_addr;
         let identity = actor_addr.get_id();
-        $crate::registry::send(identity, msg);
+        $crate::catalog::send(identity, msg);
     };
 }
 

@@ -1,10 +1,12 @@
 use crate::apis::Store;
+use crate::catalog::ctxops::*;
 use crate::common::{
     actor::Actor,
     actor::ActorBuilder,
     mail::{Mail, Msg},
 };
-use crate::registry::ctxops::*;
+use std::sync::MutexGuard;
+use crate::Addr;
 use crate::BuilderDeserializer;
 use crate::Error;
 use lazy_static::lazy_static;
@@ -13,13 +15,15 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::RwLock;
 use std::sync::RwLockWriteGuard;
+use std::sync::{Arc, Mutex};
 
 lazy_static! {
-    pub(crate) static ref CTX: RwLock<Context> = RwLock::new(Context::init());
+    //pub(crate) static ref CTX: RwLock<Context> = RwLock::new(Context::init());
+    pub  static ref CTX: Arc<Mutex<Context>> = Arc::new(Mutex::new(Context::init()));
 }
 
 #[derive(Debug)]
-pub(crate) struct Context {
+pub struct Context {
     pub(crate) actors: Actors,
     pub(crate) store: Store,
 }
@@ -32,8 +36,10 @@ impl Context {
         Self { actors, store }
     }
 
-    pub fn instance() -> RwLockWriteGuard<'static, Self> {
-        CTX.write().unwrap()
+    //pub fn instance() -> RwLockWriteGuard<'static, Self> {
+    pub fn instance() -> MutexGuard<'static, Self> {
+        //CTX.write().unwrap()
+        CTX.lock().unwrap()
     }
 }
 
@@ -65,22 +71,22 @@ impl Actors {
 }
 
 pub fn register_builder(
-    addr: u64,
+    identity: u64,
+    addr: Addr,
     mut builder: impl ActorBuilder,
 ) -> Result<Rc<RefCell<Box<dyn Actor>>>, Error> {
-    let identity = addr.to_string();
-    remove_actor(addr).and_then(pre_shutdown);
-    remove_actor_permanent(&identity);
-
-    persist_builder(&identity, &builder)?;
+    remove_actor(identity).and_then(pre_shutdown);
+    remove_actor_permanent(&identity.to_string());
+    let addr_id = addr.get_id();
+    persist_builder(&identity.to_string(), addr, &builder)?;
 
     let actor: Box<dyn Actor> = builder.build();
-    add_actor(addr, actor)
+    add_actor(addr_id, actor)
         .and_then(post_start)
         .ok_or(Error::RegistrationError)
 }
 
-pub fn persist_mail(mail: Mail) {
+pub fn send_mail(mail: Mail) {
     persist(mail);
 }
 
@@ -91,9 +97,12 @@ pub fn send(identity: u64, msg: Msg) {
 pub fn reload_actor(addr: u64) -> Result<Rc<RefCell<Box<dyn Actor>>>, Error> {
     match retrieve_build_def(&addr.to_string()) {
         Some(s) => {
+            println!("check1");
             let mut builder: Box<dyn ActorBuilder> =
-                BuilderDeserializer::default().from_string(s)?;
+                BuilderDeserializer::default().from_string(s.1)?;
+            println!("check2");
             let actor: Box<dyn Actor> = builder.build();
+            println!("check3");
             add_actor(addr, actor)
                 .and_then(post_start)
                 .ok_or(Error::ActorReloadError)
@@ -102,7 +111,7 @@ pub fn reload_actor(addr: u64) -> Result<Rc<RefCell<Box<dyn Actor>>>, Error> {
     }
 }
 
-pub(in crate::registry) mod ctxops {
+pub(in crate::catalog) mod ctxops {
     use super::*;
 
     pub(super) fn persist(mail: Mail) {
@@ -139,18 +148,21 @@ pub(in crate::registry) mod ctxops {
 
     pub(super) fn persist_builder(
         identity: &String,
+        addr: Addr,
         builder: &impl ActorBuilder,
     ) -> Result<(), Error> {
         let builder_def = serde_json::to_string(builder as &dyn ActorBuilder)?;
         Context::instance()
             .store
-            .persist_builder(identity, &builder_def)
+            .persist_builder(identity, addr, &builder_def)
             .map_err(|err| Error::Other(Box::new(err)))
     }
-    pub(super) fn retrieve_build_def(identity: &String) -> Option<String> {
+    pub(super) fn retrieve_build_def(identity: &str) -> Option<(Addr,String)> {
+        println!("retrieve_build_def 1");
         let rs = Context::instance().store.retrieve_build_def(identity);
+        println!("retrieve_build_def 2");
         match rs {
-            Ok(build_def) => build_def,
+            Ok(addr_and_def) => addr_and_def,
             Err(err) => {
                 eprintln!("Error fetching build def = {:?}", err);
                 None
@@ -198,7 +210,8 @@ mod tests {
         for _ in 0..1000000 {
             let x: u32 = rng.gen();
             if x > 1000 {
-                let _ctx = CTX.write().unwrap();
+                //let _ctx = CTX.write().unwrap();
+                let _ctx = CTX.lock().unwrap();
                 assert!(999 <= x);
             }
         }

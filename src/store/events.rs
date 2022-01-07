@@ -1,6 +1,6 @@
+use crate::catalog::Context;
 use crate::constants::EVENTS_INSERT;
 use crate::constants::{BUFFER_MAX_SIZE, EVENT_MAX_AGE};
-use crate::registry::Context;
 
 use crate::routing::Router;
 use crate::DetailedMsg;
@@ -111,7 +111,8 @@ impl EventTracker {
     pub(crate) fn new() -> Self {
         Self {
             buffer: EventBuffer::new(),
-            router: Router::new(num_cpus::get()),
+            //router: Router::new(num_cpus::get()),
+            router: Router::new(2),
         }
     }
     pub(crate) fn track(&mut self, event: DBEvent) {
