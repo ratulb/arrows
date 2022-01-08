@@ -10,7 +10,7 @@ use crate::common::{
 use crate::{Addr, BuilderDeserializer, Error};
 use lazy_static::lazy_static;
 use parking_lot::ReentrantMutex;
-use std::cell::{Ref, RefMut, RefCell};
+use std::cell::{Ref, RefCell, RefMut};
 
 use std::rc::Rc;
 use std::sync::Arc;
@@ -29,7 +29,7 @@ type ActorRefMut<'a> = Option<RefMut<'a, Box<dyn Actor>>>;
 #[derive(Debug)]
 pub struct Context {
     actors: Actors,
-    pub(crate) store: Store,
+    store: Store,
 }
 
 impl Context {
@@ -47,8 +47,8 @@ impl Context {
     pub(crate) fn get_actor_mut(&self, addr: &Addr) -> ActorRefMut<'_> {
         self.actors.get_actor_mut(addr)
     }
-    pub(crate) fn add_actor(&mut self, addr: Addr, actor: CachedActor) {
-        self.actors.add_actor(addr, actor);
+    pub(crate) fn add_actor(&mut self, addr: Addr, actor: CachedActor) -> Option<CachedActor> {
+        self.actors.add_actor(addr, actor)
     }
 
     pub(crate) fn remove_actor(&mut self, addr: &Addr) -> Option<CachedActor> {
@@ -87,22 +87,40 @@ impl Context {
             }
         }
     }
+
+    pub(crate) fn builder_of(
+        &mut self,
+        identity: u64,
+        addr: Addr,
+        mut builder: impl ActorBuilder,
+    ) -> Result<CachedActor, Error> {
+        self.remove_actor(&addr).and_then(Self::pre_shutdown);
+        let identity = identity.to_string();
+        self.remove_actor_permanent(&identity);
+        self.persist_builder(&identity, addr.clone(), &builder)?;
+        let actor: Box<dyn Actor> = builder.build();
+        self.add_actor(addr, Rc::new(RefCell::new(actor)))
+            .and_then(Self::post_start)
+            .ok_or(Error::RegistrationError)
+    }
+    //Pre-shutdown message
+    fn pre_shutdown(actor: CachedActor) -> Option<()> {
+        let _ignored = actor.borrow_mut().receive(Mail::Blank);
+        None
+    }
+    //Post startup message
+    fn post_start(actor: CachedActor) -> Option<CachedActor> {
+        let _post_start_msg = actor.borrow_mut().receive(Mail::Blank);
+        Some(actor)
+    }
 }
 
-pub fn register_builder(
+pub fn builder_of(
     identity: u64,
     addr: Addr,
     mut builder: impl ActorBuilder,
-) -> Result<Box<dyn Actor>, Error> {
-    remove_actor(identity).and_then(pre_shutdown);
-    remove_actor_permanent(&identity.to_string());
-    let addr_id = addr.get_id();
-    persist_builder(&identity.to_string(), addr, &builder)?;
-
-    let actor: Box<dyn Actor> = builder.build();
-    add_actor(addr_id, actor)
-        .and_then(post_start)
-        .ok_or(Error::RegistrationError)
+) -> Result<CachedActor, Error> {
+    CTX.lock().borrow_mut().builder_of(identity, addr, builder)
 }
 
 pub fn send_mail(_mail: Mail) {
@@ -112,6 +130,7 @@ pub fn send_mail(_mail: Mail) {
         CTX.lock().get_mut().store.persist(mail);
     }
     ***/
+    println!("Send mail comes here!");
 }
 
 pub fn send(identity: u64, msg: Msg) {
@@ -174,8 +193,8 @@ pub(in crate::catalog) mod ctxops {
         Ok(())
     }
 
-    pub(super) fn persist_builder(
-        _identity: &String,
+    pub(super) fn persist_builder1(
+        _identity: &str,
         _addr: Addr,
         _builder: &impl ActorBuilder,
     ) -> Result<(), Error> {
@@ -187,6 +206,7 @@ pub(in crate::catalog) mod ctxops {
             .persist_builder(identity, addr, &builder_def)
             .map_err(|err| Error::Other(Box::new(err)))
             ***/
+        println!("Persist builder  comes here!!!!");
         Ok(())
     }
 
@@ -246,7 +266,6 @@ mod tests {
         for _ in 0..1000000 {
             let x: u32 = rng.gen();
             if x > 1000 {
-                //let _ctx = CTX.write().unwrap();
                 let _ctx = CTX.lock();
                 assert!(999 <= x);
             }

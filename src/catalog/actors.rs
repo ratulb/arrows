@@ -1,19 +1,10 @@
-
 use crate::catalog::ActorRef;
 use crate::catalog::ActorRefMut;
 use crate::catalog::CachedActor;
 
-
 use crate::Addr;
 
-
-
-
-
-
 use std::collections::HashMap;
-
-
 
 #[derive(Debug)]
 pub(super) struct Actors {
@@ -37,8 +28,9 @@ impl Actors {
         self.actor_cache.get(addr).map(|entry| entry.borrow_mut())
     }
 
-    pub(super) fn add_actor(&mut self, addr: Addr, actor: CachedActor) {
-        self.actor_cache.insert(addr, actor);
+    pub(super) fn add_actor(&mut self, addr: Addr, actor: CachedActor) -> Option<CachedActor> {
+        self.actor_cache.insert(addr, actor.clone());
+        Some(actor)
     }
 
     pub(super) fn remove_actor(&mut self, addr: &Addr) -> Option<CachedActor> {

@@ -3,13 +3,13 @@ macro_rules! builder_of {
     ($actor_name:literal, $actor_builder:path) => {{
         let identity = $crate::Addr::new($actor_name).get_id();
         let addr = $crate::Addr::new($actor_name);
-        let res = $crate::catalog::register_builder(identity, addr, $actor_builder);
+        let res = $crate::catalog::builder_of(identity, addr, $actor_builder);
         res
     }};
     ($actor_addr:expr, $actor_builder:path) => {{
         let actor_addr: $crate::Addr = $actor_addr;
         let identity = actor_addr.get_id();
-        let res = $crate::catalog::register_builder(identity, actor_addr, $actor_builder);
+        let res = $crate::catalog::builder_of(identity, actor_addr, $actor_builder);
         res
     }};
 }

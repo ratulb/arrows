@@ -1,6 +1,5 @@
 //use crate::catalog::CTX;
 
-
 use crate::constants::EVENTS_INSERT;
 use crate::constants::{BUFFER_MAX_SIZE, EVENT_MAX_AGE};
 

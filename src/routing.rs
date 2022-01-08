@@ -1,5 +1,3 @@
-
-
 use crate::DetailedMsg;
 use parking_lot::Mutex;
 use std::sync::mpsc::{channel, Receiver, Sender};
