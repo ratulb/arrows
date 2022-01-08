@@ -9,7 +9,7 @@ use crate::common::{
 
 use crate::{Addr, BuilderDeserializer, Error};
 use lazy_static::lazy_static;
-use parking_lot::ReentrantMutex;
+use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 use std::cell::{Ref, RefCell, RefMut};
 
 use std::rc::Rc;
@@ -54,7 +54,7 @@ impl Context {
     pub(crate) fn remove_actor(&mut self, addr: &Addr) -> Option<CachedActor> {
         self.actors.remove_actor(addr)
     }
-
+    //Example
     pub fn send_mail(&mut self, mail: Mail) {
         self.store.persist(mail);
     }
@@ -113,23 +113,21 @@ impl Context {
         let _post_start_msg = actor.borrow_mut().receive(Mail::Blank);
         Some(actor)
     }
+    pub fn reference() -> ReentrantMutexGuard<'static, RefCell<Context>> {
+        CTX.lock()
+    }
 }
 
 pub fn builder_of(
     identity: u64,
     addr: Addr,
-    mut builder: impl ActorBuilder,
+    builder: impl ActorBuilder,
 ) -> Result<CachedActor, Error> {
-    CTX.lock().borrow_mut().builder_of(identity, addr, builder)
+    Context::reference().borrow_mut().builder_of(identity, addr, builder)
 }
 
-pub fn send_mail(_mail: Mail) {
-    /***  persist(mail);
-     pub(super) fn persist(mail: Mail) {
-        //CTX.lock().borrow_mut().store.persist(mail);
-        CTX.lock().get_mut().store.persist(mail);
-    }
-    ***/
+pub fn send_mail(mail: Mail) {
+    Context::reference().borrow_mut().send_mail(mail);
     println!("Send mail comes here!");
 }
 
@@ -157,11 +155,6 @@ pub fn reload_actor(addr: u64) -> Result<Box<dyn Actor>, Error> {
 pub(in crate::catalog) mod ctxops {
     use super::*;
 
-    /***pub(super) fn persist(mail: Mail) {
-        //CTX.lock().borrow_mut().store.persist(mail);
-        CTX.lock().get_mut().store.persist(mail);
-    }***/
-
     pub(super) fn send_msg(_identity: u64, _msg: Msg) {
         /***let mut mutex = CTX.lock();
         if let Some(actor) =  mutex.get_mut().actors.get_actor(identity) {
@@ -170,76 +163,6 @@ pub(in crate::catalog) mod ctxops {
         } else {
             eprintln!("Actor not found");
         }***/
-    }
-
-    pub(super) fn remove_actor(_identity: u64) -> Option<Box<dyn Actor>> {
-        //CTX.lock().get_mut().actors.remove_actor(identity)
-        None
-    }
-
-    //Send a shutdown msg to the actor that is being removed
-    pub(super) fn pre_shutdown(mut actor: Box<dyn Actor>) -> Option<()> {
-        let _ignored = actor.receive(Mail::Blank);
-        None
-    }
-
-    pub(super) fn remove_actor_permanent(_identity: &String) -> Result<(), Error> {
-        /*** //CTX.lock().get_mut().borrow_mut()
-        CTX.lock()
-            .get_mut()
-            .store
-            .remove_actor_permanent(identity)
-            .map_err(|err| Error::Other(Box::new(err)))***/
-        Ok(())
-    }
-
-    pub(super) fn persist_builder1(
-        _identity: &str,
-        _addr: Addr,
-        _builder: &impl ActorBuilder,
-    ) -> Result<(), Error> {
-        /***let builder_def = serde_json::to_string(builder as &dyn ActorBuilder)?;
-        //CTX.lock().get_mut().borrow_mut()
-        CTX.lock()
-            .get_mut()
-            .store
-            .persist_builder(identity, addr, &builder_def)
-            .map_err(|err| Error::Other(Box::new(err)))
-            ***/
-        println!("Persist builder  comes here!!!!");
-        Ok(())
-    }
-
-    pub(super) fn retrieve_build_def(_identity: &str) -> Option<(Addr, String)> {
-        /***     //let rs = CTX.lock().get_mut().borrow_mut().store.retrieve_build_def(identity);
-        let mut locked = CTX.lock();
-        type_of(&locked);
-        let muted = locked.get_mut();
-        type_of(&muted);
-        println!("retrieve 4");
-        //let rs = CTX.clone().lock().get_mut().store.retrieve_build_def(identity);
-        let rs = muted.store.retrieve_build_def(identity);
-        println!("retrieve_build_def 2");
-        match rs {
-            Ok(addr_and_def) => addr_and_def,
-            Err(err) => {
-                eprintln!("Error fetching build def = {:?}", err);
-                None
-            }
-        }***/
-
-        None
-    }
-
-    pub(super) fn add_actor(_addr: u64, actor: Box<dyn Actor>) -> Option<Box<dyn Actor>> {
-        //CTX.lock().get_mut().borrow_mut().actors.add_actor(addr, actor);
-        //CTX.lock().get_mut().actors.add_actor(addr, actor);
-        Some(actor)
-    }
-
-    pub(super) fn post_start(mut actor: Box<dyn Actor>) -> Option<Box<dyn Actor>> {
-        let _post_start_msg = actor.receive(Mail::Blank);
-        Some(actor)
     }
 }
 
