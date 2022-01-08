@@ -1,4 +1,4 @@
-use arrows::send_mail;
+use arrows::send_off;
 use arrows::{from_bytes, Mail};
 use byte_marks::Marked;
 use std::io::{BufReader, BufWriter, Result, Write};
@@ -66,12 +66,12 @@ impl Server {
         Ok(())
     }
 
-    fn route_mail(&self, mail: Vec<u8>) -> Result<()> {
-        let mail = from_bytes::<'_, Mail>(&mail)?;
-        match mail {
-            trade @ Mail::Trade(_) => send_mail(trade),
+    fn route_mail(&self, payload: Vec<u8>) -> Result<()> {
+        let payload = from_bytes::<'_, Mail>(&payload)?;
+        match payload {
+            trade @ Mail::Trade(_) => send_off(trade),
             bulk @ Mail::Bulk(_) => {
-                send_mail(bulk);
+                send_off(bulk);
             }
             Mail::Blank => eprintln!("Blank"),
         }

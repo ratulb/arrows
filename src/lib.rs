@@ -1,11 +1,9 @@
 #![deny(rust_2018_idioms)]
-pub use catalog::restore;
-pub use catalog::send_mail;
+pub use catalog::{restore, send_off};
 pub use common::actor::{Actor, ActorBuilder, BuilderDeserializer};
 pub use common::addr::Addr;
 pub use common::errs::{Error, Result};
-pub use common::mail::Mail;
-pub use common::mail::Msg;
+pub use common::mail::{Mail, Msg};
 pub use common::utils::*;
 
 pub(crate) use store::*;

@@ -73,12 +73,6 @@ macro_rules! send {
     };
 }
 
-/***pub(crate) fn recv(msgs: HashMap<&Addr, Vec<Msg>>) {
-    for (k, v) in msgs.iter() {
-        println!("Key({:?}) and msg count({:?})", k.get_name(), v.len());
-    }
-}***/
-
 #[cfg(test)]
 mod tests {
     use crate::{Actor, ActorBuilder, Addr, Mail, Msg};
@@ -119,3 +113,65 @@ mod tests {
         send_to!(addr, Msg::default());
     }
 }
+
+/***
+  send!(
+        "actor3",
+        (Mail::Blank),
+        "actor1",
+        (Mail::Blank, Mail::Blank),
+        "actor3",
+        (Mail::Blank, Mail::Blank)
+    );
+    send!(
+        "actor1",
+        (Mail::Blank, Mail::Blank, Mail::Blank, Mail::Blank),
+        "actor5",
+        (Mail::Blank),
+        "actor1",
+        (Mail::Blank)
+    );
+    send!(
+        Addr::new("actor2"),
+        (Mail::Blank, Mail::Blank, Mail::Blank),
+        Addr::new("actor2"),
+         (Mail::Blank)
+        );
+        send!("actor4", Mail::Blank, Mail::Blank);
+        send!("actor3", (Mail::Blank, Mail::Blank, Mail::Blank));
+        send!("actor3", (Mail::Blank));
+        send!("actor3", Mail::Blank);
+        send!(Addr::new("actor4"), (Mail::Blank, Mail::Blank));
+        send!(
+            Addr::new("actor3"),
+            (Mail::Blank),
+            Addr::new("actor4"),
+            (Mail::Blank, Mail::Blank)
+        );
+        send!(Addr::new("actor3"), Mail::Blank);
+        send!("actor3", Mail::Blank);
+        send!(Addr::new("actor6"), (Mail::Blank));
+        let m = Mail::Blank;
+        send!(Addr::new("actor7"), m);
+}
+
+***/
+
+/***
+ Key("actor1") and msg count(2)
+Key("actor3") and msg count(3)
+Key("actor1") and msg count(5)
+Key("actor5") and msg count(1)
+Key("actor2") and msg count(4)
+Key("actor4") and msg count(2)
+Key("actor3") and msg count(3)
+Key("actor3") and msg count(1)
+Key("actor3") and msg count(1)
+Key("actor4") and msg count(2)
+Key("actor3") and msg count(1)
+Key("actor4") and msg count(2)
+Key("actor3") and msg count(1)
+Key("actor3") and msg count(1)
+Key("actor6") and msg count(1)
+Key("actor7") and msg count(1)
+***/

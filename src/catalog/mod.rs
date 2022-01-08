@@ -54,9 +54,10 @@ impl Context {
     pub(crate) fn remove_actor(&mut self, addr: &Addr) -> Option<CachedActor> {
         self.actors.remove_actor(addr)
     }
-    //cargo run --example
-    pub fn send_mail(&mut self, mail: Mail) {
-        self.store.persist(mail);
+    //cargo run --example - TODO this need to be changed to support remoting - only messages
+    //destined to local system should be looped back
+    pub fn send_off(&mut self, payload: Mail) {
+        self.store.persist(payload);
     }
     //Numeric identity of the actor
     pub(crate) fn remove_actor_permanent(&mut self, identity: &str) -> Result<(), Error> {
@@ -151,9 +152,11 @@ register_actor.rs -> define_actor.rs - define
 send_to -> send
 builder_of - define_actor -> define
 ***/
-
-pub fn send_mail(mail: Mail) {
-    Context::handle().borrow_mut().send_mail(mail);
+//Send off a payload of messages which could be directed to different actors in local or
+//remote systems. Where messages would be delivered is decided on the host field to of the to
+//address(Addr) of each message
+pub fn send_off(payload: Mail) {
+    Context::handle().borrow_mut().send_off(payload);
     println!("Send mail comes here!");
 }
 
