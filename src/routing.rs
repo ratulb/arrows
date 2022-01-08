@@ -1,5 +1,7 @@
-use crate::DetailedMsg;
+use crate::catalog::send_off;
+use crate::{Addr, DetailedMsg, Mail, Msg, Result};
 use parking_lot::Mutex;
+use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
@@ -77,5 +79,22 @@ impl Drop for Router {
         /*** for handle in std::mem::take(&mut self.delegates) {
             handle.join();
         }***/
+    }
+}
+
+pub(crate) struct Messenger;
+impl Messenger {
+    pub(crate) fn send(mut messages: HashMap<&Addr, Vec<Msg>>) -> Result<()> {
+        for (addr, mut msgs) in messages.into_iter() {
+            for msg in msgs.iter_mut() {
+                msg.set_recipient_add(addr);
+            }
+            if addr.is_local() {
+                send_off(Mail::Bulk(msgs));
+            } else {
+                //TODO send_off_remote
+            }
+        }
+        Ok(())
     }
 }

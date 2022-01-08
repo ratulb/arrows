@@ -19,7 +19,6 @@ pub(crate) type DetailedMsg = (Msg, bool, i64);
 
 use std::collections::HashMap;
 pub fn recv(msgs: HashMap<&Addr, Vec<Msg>>) {
-    for (k, v) in msgs.iter() {
-        println!("Key({:?}) and msg count({:?})", k.get_name(), v.len());
-    }
+    use crate::routing::Messenger;
+    Messenger::send(msgs);
 }

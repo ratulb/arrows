@@ -83,6 +83,10 @@ impl Msg {
         self.content = Some(Binary(new_content));
     }
 
+    pub fn set_recipient_add(&mut self, addr: &Addr) {
+        self.to = Some(addr.clone());
+    }
+
     pub fn set_recipient(&mut self, new_to: &str) {
         self.to = Some(Addr::new(new_to));
     }
