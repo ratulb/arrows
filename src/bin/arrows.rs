@@ -69,11 +69,8 @@ impl Server {
     fn route_mail(&self, payload: Vec<u8>) -> Result<()> {
         let payload = from_bytes::<'_, Mail>(&payload)?;
         match payload {
-            trade @ Mail::Trade(_) => send_off(trade),
-            bulk @ Mail::Bulk(_) => {
-                send_off(bulk);
-            }
-            Mail::Blank => eprintln!("Blank"),
+            m @ Mail::Trade(_) | m @ Mail::Bulk(_) | m @ Mail::Blank => send_off(m),
+            _ => eprintln!("Engulfed by blackhole!"),
         }
         Ok(())
     }
