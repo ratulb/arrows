@@ -54,7 +54,7 @@ impl Context {
     pub(crate) fn remove_actor(&mut self, addr: &Addr) -> Option<CachedActor> {
         self.actors.remove_actor(addr)
     }
-    //Example
+    //cargo run --example
     pub fn send_mail(&mut self, mail: Mail) {
         self.store.persist(mail);
     }
@@ -64,8 +64,9 @@ impl Context {
             .remove_actor_permanent(identity)
             .map_err(|err| Error::Other(Box::new(err)))
     }
-
-    pub(crate) fn persist_builder(
+    //Save an actor builder defintion in the backing store. Current active actor, if any, will
+    //not be disturbed
+    pub(crate) fn save_builder(
         &mut self,
         identity: &str,
         addr: Addr,
@@ -73,12 +74,12 @@ impl Context {
     ) -> Result<(), Error> {
         let builder_def = serde_json::to_string(builder as &dyn ActorBuilder)?;
         self.store
-            .persist_builder(identity, addr, &builder_def)
+            .save_builder(identity, addr, &builder_def)
             .map_err(|err| Error::Other(Box::new(err)))
     }
-
-    pub(crate) fn retrieve_build_def(&mut self, identity: &str) -> Option<(Addr, String)> {
-        let result = self.store.retrieve_build_def(identity);
+    //identity - numeric string
+    pub(crate) fn retrieve_actor_def(&mut self, identity: &str) -> Option<(Addr, String)> {
+        let result = self.store.retrieve_actor_def(identity);
         match result {
             Ok(addr_and_def) => addr_and_def,
             Err(err) => {
@@ -87,47 +88,72 @@ impl Context {
             }
         }
     }
-
-    pub(crate) fn builder_of(
+    //Defines an actor in the system. The builder instantiates actors.
+    pub(crate) fn define_actor(
         &mut self,
         identity: u64,
         addr: Addr,
         mut builder: impl ActorBuilder,
     ) -> Result<CachedActor, Error> {
-        self.remove_actor(&addr).and_then(Self::pre_shutdown);
+        self.remove_actor(&addr).and_then(pre_shutdown);
         let identity = identity.to_string();
         self.remove_actor_permanent(&identity);
-        self.persist_builder(&identity, addr.clone(), &builder)?;
+        self.save_builder(&identity, addr.clone(), &builder)?;
         let actor: Box<dyn Actor> = builder.build();
         self.add_actor(addr, Rc::new(RefCell::new(actor)))
-            .and_then(Self::post_start)
+            .and_then(post_start)
             .ok_or(Error::RegistrationError)
     }
-    //Pre-shutdown message
-    fn pre_shutdown(actor: CachedActor) -> Option<()> {
-        let _ignored = actor.borrow_mut().receive(Mail::Blank);
-        None
+
+    //Restore an actor from the backing storage. Active actor will be replaced on successful
+    //retrieval. Left undisturbed if not found.
+    pub fn restore(&mut self, addr: Addr) -> Result<Option<CachedActor>, Error> {
+        let identity = addr.get_id().to_string();
+        match self.retrieve_actor_def(&identity) {
+            Some(saved_acor_def) => {
+                let mut builder: Box<dyn ActorBuilder> =
+                    BuilderDeserializer::default().from_string(saved_acor_def.1)?;
+                let actor: Box<dyn Actor> = builder.build();
+                let actor = Rc::new(RefCell::new(actor));
+                self.add_actor(addr, actor.clone())
+                    .and_then(post_start)
+                    .ok_or(Error::ActorReloadError)
+                    .map(Some)
+            }
+            None => Err(Error::ActorReloadError),
+        }
     }
-    //Post startup message
-    fn post_start(actor: CachedActor) -> Option<CachedActor> {
-        let _post_start_msg = actor.borrow_mut().receive(Mail::Blank);
-        Some(actor)
-    }
-    pub fn reference() -> ReentrantMutexGuard<'static, RefCell<Context>> {
+
+    //Exclusive mutable handle to Context - sigleton lock. Discretionary usage advisable
+    pub fn handle() -> ReentrantMutexGuard<'static, RefCell<Context>> {
         CTX.lock()
     }
 }
 
-pub fn builder_of(
+pub fn define_actor(
     identity: u64,
     addr: Addr,
     builder: impl ActorBuilder,
 ) -> Result<CachedActor, Error> {
-    Context::reference().borrow_mut().builder_of(identity, addr, builder)
+    Context::handle()
+        .borrow_mut()
+        .define_actor(identity, addr, builder)
 }
+/***
+retrieve_build_def -> retrieve_actor_def
+
+
+activate_actor.rs -> restore_actor -> restore
+dectivate_actor.rs -> deactivate
+purge_actor.rs -> purge
+register_actor.rs -> define_actor.rs - define
+
+send_to -> send
+builder_of - define_actor -> define
+***/
 
 pub fn send_mail(mail: Mail) {
-    Context::reference().borrow_mut().send_mail(mail);
+    Context::handle().borrow_mut().send_mail(mail);
     println!("Send mail comes here!");
 }
 
@@ -135,21 +161,19 @@ pub fn send(identity: u64, msg: Msg) {
     send_msg(identity, msg);
 }
 
-pub fn reload_actor(addr: u64) -> Result<Box<dyn Actor>, Error> {
-    match retrieve_build_def(&addr.to_string()) {
-        Some(s) => {
-            println!("check1");
-            let mut builder: Box<dyn ActorBuilder> =
-                BuilderDeserializer::default().from_string(s.1)?;
-            println!("check2");
-            let actor: Box<dyn Actor> = builder.build();
-            println!("check3");
-            add_actor(addr, actor)
-                .and_then(post_start)
-                .ok_or(Error::ActorReloadError)
-        }
-        None => Err(Error::ActorReloadError),
-    }
+pub fn restore(addr: Addr) -> Result<Option<CachedActor>, Error> {
+    Context::handle().borrow_mut().restore(addr)
+}
+
+//Pre-shutdown message
+fn pre_shutdown(actor: CachedActor) -> Option<()> {
+    let _ignored = actor.borrow_mut().receive(Mail::Blank);
+    None
+}
+//Post startup message
+fn post_start(actor: CachedActor) -> Option<CachedActor> {
+    let _post_start_msg = actor.borrow_mut().receive(Mail::Blank);
+    Some(actor)
 }
 
 pub(in crate::catalog) mod ctxops {

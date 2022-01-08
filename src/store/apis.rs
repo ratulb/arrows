@@ -164,16 +164,16 @@ impl Store {
         Ok(())
     }
 
-    pub(crate) fn persist_builder(
+    pub(crate) fn save_builder(
         &mut self,
         identity: &str,
         addr: Addr,
-        build_def: &str,
+        actor_def: &str,
     ) -> Result<()> {
-        let mut stmt = self.conn.inner.prepare_cached(BUILD_DEF_INSERT).ok();
+        let mut stmt = self.conn.inner.prepare_cached(ACTOR_DEF_INSERT).ok();
         match stmt {
             Some(ref mut s) => s.execute(
-                named_params! { ":actor_id": &identity as &dyn ToSql,":addr": &addr.as_bytes() as &dyn ToSql, ":build_def": &build_def as &dyn ToSql },
+                named_params! { ":actor_id": &identity as &dyn ToSql,":addr": &addr.as_bytes() as &dyn ToSql, ":actor_def": &actor_def as &dyn ToSql },
             )?,
             None => panic!(),
         };
@@ -199,14 +199,14 @@ impl Store {
             .and_then(|c| if c == 1 { Ok(()) } else { Err(InvalidQuery) });
         status
     }
-    pub(crate) fn retrieve_build_def(&mut self, actor_id: &str) -> Result<Option<(Addr, String)>> {
-        let mut stmt = self.conn.inner.prepare_cached(BUILD_DEF)?;
+    pub(crate) fn retrieve_actor_def(&mut self, actor_id: &str) -> Result<Option<(Addr, String)>> {
+        let mut stmt = self.conn.inner.prepare_cached(ACTOR_DEF)?;
         let mut rows = stmt.query(rusqlite::params![actor_id])?;
         if let Some(row) = rows.next()? {
             let value: Value = row.get(0)?;
             let addr: Addr = value_to_addr(value);
-            let build_def: String = row.get(1)?;
-            return Ok(Some((addr, build_def)));
+            let actor_def: String = row.get(1)?;
+            return Ok(Some((addr, actor_def)));
         }
         Ok(None)
     }
@@ -545,13 +545,13 @@ mod tests {
     }
 
     #[test]
-    fn persist_builder_1001() -> Result<()> {
+    fn save_builder_1001() -> Result<()> {
         let mut store = Store::new();
         let _ = store.setup();
         let addr = Addr::new("1001");
         let identity = "1001";
         let insert =
-            store.persist_builder(identity, addr, &r#"{"new_actor_builder":null}"#.to_string());
+            store.save_builder(identity, addr, &r#"{"new_actor_builder":null}"#.to_string());
         assert!(insert.is_ok());
         Ok(())
     }
@@ -576,12 +576,12 @@ mod tests {
     }
 
     #[test]
-    fn retrieve_build_def_1001_test_1() -> Result<()> {
+    fn retrieve_actor_def_1001_test_1() -> Result<()> {
         let mut store = Store::new();
         let _ = store.setup();
         let actor_id = "1001";
-        let build_def = store.retrieve_build_def(actor_id);
-        assert!(build_def.is_ok());
+        let actor_def = store.retrieve_actor_def(actor_id);
+        assert!(actor_def.is_ok());
         Ok(())
     }
 

@@ -1,4 +1,7 @@
-use arrows::catalog::reload_actor;
+use arrows::catalog::restore;
+use arrows::define_actor;
+use arrows::send;
+use std::collections::HashMap;
 
 use arrows::{Actor, ActorBuilder, Addr, Mail, Msg};
 use serde::{Deserialize, Serialize};
@@ -22,23 +25,23 @@ impl ActorBuilder for NewActorBuilder {
 }
 
 fn main() {
-    let identity = Addr::new("new_actor").get_id();
-    let rs = reload_actor(identity);
+    let identity = Addr::new("new_actor");
+    let rs = restore(identity);
     println!("The rs = {:?}", rs);
 
-    //let builder = NewActorBuilder::default();
+    let builder = NewActorBuilder::default();
 
-    /***let rs = builder_of!("new_actor", builder);
+    let rs = define_actor!("new_actor", builder);
     println!("The reg result is = {:?}", rs);
 
     let builder = NewActorBuilder;
-    builder_of!(Addr::new("new_actor"), builder);
+    define_actor!(Addr::new("new_actor"), builder);
 
     let m = Msg::default();
-    send_to!("new_actor", m);
+    send!("new_actor", m);
 
-    send_to!(Addr::new("new_actor"), Msg::default());
+    send!(Addr::new("new_actor"), Msg::default());
 
     let msg_to_unregisterd = Msg::new_with_text("Mis-directed message", "from", "to");
-    send_to!("Unknown actor", msg_to_unregisterd);***/
+    send!("Unknown actor", msg_to_unregisterd);
 }

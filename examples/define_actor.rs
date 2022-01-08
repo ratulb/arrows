@@ -1,7 +1,8 @@
-use arrows::builder_of;
-use arrows::send_to;
+use arrows::define_actor;
+use arrows::send;
 use arrows::{Actor, ActorBuilder, Addr, Mail, Msg};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 pub struct NewActor;
 
@@ -24,17 +25,17 @@ impl ActorBuilder for NewActorBuilder {
 fn main() {
     let builder = NewActorBuilder::default();
 
-    let rs = builder_of!("new_actor", builder);
+    let rs = define_actor!("new_actor", builder);
     println!("The reg result is = {:?}", rs);
 
     let builder = NewActorBuilder;
-    builder_of!(Addr::new("new_actor"), builder);
+    define_actor!(Addr::new("new_actor"), builder);
 
     let m = Msg::default();
-    send_to!("new_actor", m);
+    send!("new_actor", m);
 
-    send_to!(Addr::new("new_actor"), Msg::default());
+    send!(Addr::new("new_actor"), Msg::default());
 
     let msg_to_unregisterd = Msg::new_with_text("Mis-directed message", "from", "to");
-    send_to!("Unknown actor", msg_to_unregisterd);
+    send!("Unknown actor", msg_to_unregisterd);
 }
