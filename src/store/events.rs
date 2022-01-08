@@ -1,8 +1,9 @@
-//use crate::catalog::CTX;
+use crate::catalog::fetch_past_events;
+use crate::catalog::load_messages;
+use crate::catalog::perist_buffered;
 
 use crate::constants::EVENTS_INSERT;
 use crate::constants::{BUFFER_MAX_SIZE, EVENT_MAX_AGE};
-
 use crate::routing::Router;
 use crate::DetailedMsg;
 use rusqlite::{hooks::Action, Result, ToSql, Transaction};
@@ -112,8 +113,8 @@ impl EventTracker {
     pub(crate) fn new() -> Self {
         Self {
             buffer: EventBuffer::new(),
-            //router: Router::new(num_cpus::get()),
-            router: Router::new(2),
+            router: Router::new(num_cpus::get()),
+            //router: Router::new(2),
         }
     }
     pub(crate) fn track(&mut self, event: DBEvent) {
@@ -126,38 +127,17 @@ impl EventTracker {
     }
 
     //Persists the events to db
-    pub(crate) fn perist_buffered(_events: Vec<DBEvent>) -> Vec<i64> {
-        /*** let persisted_events = CTX
-            .lock()
-            .get_mut()
-            .borrow_mut()
-            .store
-            .persist_events(events.into_iter())
-            .expect("Events persisted");
+    pub(crate) fn perist_buffered(events: Vec<DBEvent>) -> Vec<i64> {
+        let persisted_events = perist_buffered(events);
         println!("Clearing buffer. Persisted events = {:?}", persisted_events);
-        persisted_events***/
-        vec![]
+        persisted_events
     }
-    pub(crate) fn load_messages(_rowids: Vec<i64>) -> Vec<DetailedMsg> {
-        /***CTX.lock()
-            .get_mut()
-            .borrow_mut()
-            .store
-            .from_messages(rowids)
-            .expect("Messages")
-        ***/
-        vec![]
+    pub(crate) fn load_messages(rowids: Vec<i64>) -> Vec<DetailedMsg> {
+        load_messages(rowids)
     }
     pub(crate) fn hand_off_past_events(&mut self) {
-        /***let events = CTX
-            .lock()
-            .get_mut()
-            .borrow_mut()
-            .store
-            .read_events()
-            .expect("Past events");
-        let msgs = Self::load_messages(events);
+        let msgs = fetch_past_events();
         println!("Handling past mags. Events = {:?}", msgs.len());
-        self.router.route(msgs);***/
+        self.router.route(msgs);
     }
 }

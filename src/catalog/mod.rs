@@ -6,6 +6,8 @@ use crate::common::{
     actor::ActorBuilder,
     mail::{Mail, Msg},
 };
+use crate::events::DBEvent;
+use crate::DetailedMsg;
 
 use crate::{Addr, BuilderDeserializer, Error};
 use lazy_static::lazy_static;
@@ -116,6 +118,7 @@ impl Context {
                     BuilderDeserializer::default().from_string(saved_acor_def.1)?;
                 let actor: Box<dyn Actor> = builder.build();
                 let actor = Rc::new(RefCell::new(actor));
+                println!("Sure enough");
                 self.add_actor(addr, actor.clone())
                     .and_then(post_start)
                     .ok_or(Error::ActorReloadError)
@@ -129,6 +132,39 @@ impl Context {
     pub fn handle() -> ReentrantMutexGuard<'static, RefCell<Context>> {
         CTX.lock()
     }
+
+    pub(crate) fn perist_buffered(&mut self, events: Vec<DBEvent>) -> Vec<i64> {
+        let persisted_events = self
+            .store
+            .persist_events(events.into_iter())
+            .expect("Events persisted");
+        println!("Persisted events = {:?}", persisted_events);
+        persisted_events
+    }
+
+    pub(crate) fn load_messages(&mut self, rowids: Vec<i64>) -> Vec<DetailedMsg> {
+        self.store.from_messages(rowids).expect("Messages")
+    }
+
+    pub(crate) fn fetch_past_events(&mut self) -> Vec<DetailedMsg> {
+        let events = self.store.read_events().expect("Past events");
+        let msgs = self.load_messages(events);
+        println!("Loading past mags. Events = {:?}", msgs.len());
+        //self.router.route(msgs);
+        msgs
+    }
+}
+
+pub(crate) fn perist_buffered(events: Vec<DBEvent>) -> Vec<i64> {
+    Context::handle().borrow_mut().perist_buffered(events)
+}
+
+pub(crate) fn load_messages(rowids: Vec<i64>) -> Vec<DetailedMsg> {
+    Context::handle().borrow_mut().load_messages(rowids)
+}
+
+pub(crate) fn fetch_past_events() -> Vec<DetailedMsg> {
+    Context::handle().borrow_mut().fetch_past_events()
 }
 
 pub fn define_actor(
@@ -140,6 +176,7 @@ pub fn define_actor(
         .borrow_mut()
         .define_actor(identity, addr, builder)
 }
+
 /***
 retrieve_build_def -> retrieve_actor_def
 
@@ -157,7 +194,6 @@ builder_of - define_actor -> define
 //address(Addr) of each message
 pub fn send_off(payload: Mail) {
     Context::handle().borrow_mut().send_off(payload);
-    println!("Send mail comes here!");
 }
 
 pub fn send(identity: u64, msg: Msg) {

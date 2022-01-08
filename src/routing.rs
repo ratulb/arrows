@@ -19,26 +19,10 @@ impl Delegate {
         let receiver = self.receiver.take().expect("Receiver");
 
         thread::spawn(move || loop {
-            let receiver = receiver.lock(); /*** {
-                                                Ok(receiver) => receiver,
-                                                Err(poisoned) => poisoned.into_inner(),
-                                            };***/
+            let receiver = receiver.lock();
             match receiver.recv() {
                 Ok(_msg) => {
-                    /***println!("Is it locked here = {:?}", CTX.is_locked());
-                    let mutex = CTX.lock();
-                    println!("Is it locked here ???= {:?}", CTX.is_locked());
-                    println!("Here are the actors = {:?}", mutex.borrow().actors);
-                    let actor: Option<Box<dyn Actor>> = None; //mutex.borrow().actors.get_actor(*msg.0.get_id());
-                    match actor {
-                        Some(_actor) => println!("Found actor"),
-                        None => {
-                            parking_lot::MutexGuard::unlock_fair(mutex);
-                            eprintln!("Actor not found - reloading..");
-                            crate::catalog::reload_actor(*msg.0.get_id());
-                            eprintln!("Done - reloading..");
-                        }
-                    }***/
+                    println!("Received a message = {:?}", std::thread::current().id());
                 }
                 Err(err) => {
                     eprintln!("Error receiving msg {:?}", err);
@@ -62,8 +46,7 @@ impl Router {
         let receiver = Arc::new(Mutex::new(receiver));
         for i in 0..count {
             println!("Delegate started = {:?}", i);
-            //delegates.push(Delegate::new(Arc::clone(&receiver)).start());
-            delegates.push(Delegate::new(receiver.clone()).start());
+            delegates.push(Delegate::new(Arc::clone(&receiver)).start());
         }
         Self { sender, delegates }
     }
@@ -84,15 +67,16 @@ impl Drop for Router {
 
 pub(crate) struct Messenger;
 impl Messenger {
-    pub(crate) fn send(mut messages: HashMap<&Addr, Vec<Msg>>) -> Result<()> {
+    pub(crate) fn send(messages: HashMap<&Addr, Vec<Msg>>) -> Result<()> {
         for (addr, mut msgs) in messages.into_iter() {
             for msg in msgs.iter_mut() {
                 msg.set_recipient_add(addr);
             }
             if addr.is_local() {
                 send_off(Mail::Bulk(msgs));
+                println!("I am very much alive and kicking!");
             } else {
-                //TODO send_off_remote
+                //TODO send_off_remote//In fact everything should hit the server
             }
         }
         Ok(())
