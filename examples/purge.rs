@@ -1,7 +1,6 @@
 use arrows::catalog::restore;
 use arrows::define_actor;
 use arrows::send;
-use std::collections::HashMap;
 
 use arrows::{Actor, ActorBuilder, Addr, Mail, Msg};
 use serde::{Deserialize, Serialize};

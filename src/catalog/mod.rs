@@ -1,18 +1,13 @@
 mod actors;
 use crate::apis::Store;
-use crate::catalog::ctxops::*;
-use crate::common::{
-    actor::Actor,
-    actor::ActorBuilder,
-    mail::{Mail, Msg},
-};
+use crate::common::{actor::Actor, actor::ActorBuilder, mail::Mail};
 use crate::events::DBEvent;
 use crate::DetailedMsg;
 
 use crate::{Addr, BuilderDeserializer, Error};
 use lazy_static::lazy_static;
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
-use std::cell::{Ref, RefCell, RefMut};
+use std::cell::{RefCell, RefMut};
 
 use std::rc::Rc;
 use std::sync::Arc;
@@ -25,7 +20,6 @@ lazy_static! {
 }
 
 type CachedActor = Rc<RefCell<Box<dyn Actor>>>;
-type ActorRef<'a> = Option<Ref<'a, Box<dyn Actor>>>;
 type ActorRefMut<'a> = Option<RefMut<'a, Box<dyn Actor>>>;
 
 #[derive(Debug)]
@@ -40,10 +34,6 @@ impl Context {
         let mut store = Store::new();
         store.setup();
         Self { actors, store }
-    }
-
-    pub(crate) fn get_actor(&self, addr: &Addr) -> ActorRef<'_> {
-        self.actors.get_actor(addr)
     }
 
     pub(crate) fn get_actor_mut(&self, addr: &Addr) -> ActorRefMut<'_> {
@@ -118,7 +108,6 @@ impl Context {
                     BuilderDeserializer::default().from_string(saved_acor_def.1)?;
                 let actor: Box<dyn Actor> = builder.build();
                 let actor = Rc::new(RefCell::new(actor));
-                println!("Sure enough");
                 self.add_actor(addr, actor.clone())
                     .and_then(post_start)
                     .ok_or(Error::ActorReloadError)
@@ -134,24 +123,18 @@ impl Context {
     }
 
     pub(crate) fn perist_buffered(&mut self, events: Vec<DBEvent>) -> Vec<i64> {
-        let persisted_events = self
-            .store
+        self.store
             .persist_events(events.into_iter())
-            .expect("Events persisted");
-        println!("Persisted events = {:?}", persisted_events);
-        persisted_events
+            .expect("Events persisted")
     }
 
     pub(crate) fn load_messages(&mut self, rowids: Vec<i64>) -> Vec<DetailedMsg> {
         self.store.from_messages(rowids).expect("Messages")
     }
 
-    pub(crate) fn fetch_past_events(&mut self) -> Vec<DetailedMsg> {
+    pub(crate) fn past_events(&mut self) -> Vec<DetailedMsg> {
         let events = self.store.read_events().expect("Past events");
-        let msgs = self.load_messages(events);
-        println!("Loading past mags. Events = {:?}", msgs.len());
-        //self.router.route(msgs);
-        msgs
+        self.load_messages(events)
     }
 }
 
@@ -163,8 +146,8 @@ pub(crate) fn load_messages(rowids: Vec<i64>) -> Vec<DetailedMsg> {
     Context::handle().borrow_mut().load_messages(rowids)
 }
 
-pub(crate) fn fetch_past_events() -> Vec<DetailedMsg> {
-    Context::handle().borrow_mut().fetch_past_events()
+pub(crate) fn past_events() -> Vec<DetailedMsg> {
+    Context::handle().borrow_mut().past_events()
 }
 
 pub fn define_actor(
@@ -177,27 +160,11 @@ pub fn define_actor(
         .define_actor(identity, addr, builder)
 }
 
-/***
-retrieve_build_def -> retrieve_actor_def
-
-
-activate_actor.rs -> restore_actor -> restore
-dectivate_actor.rs -> deactivate
-purge_actor.rs -> purge
-register_actor.rs -> define_actor.rs - define
-
-send_to -> send
-builder_of - define_actor -> define
-***/
 //Send off a payload of messages which could be directed to different actors in local or
 //remote systems. Where messages would be delivered is decided on the host field to of the to
 //address(Addr) of each message
 pub fn send_off(payload: Mail) {
     Context::handle().borrow_mut().send_off(payload);
-}
-
-pub fn send(identity: u64, msg: Msg) {
-    send_msg(identity, msg);
 }
 
 pub fn restore(addr: Addr) -> Result<Option<CachedActor>, Error> {
@@ -215,20 +182,6 @@ fn post_start(actor: CachedActor) -> Option<CachedActor> {
     Some(actor)
 }
 
-pub(in crate::catalog) mod ctxops {
-    use super::*;
-
-    pub(super) fn send_msg(_identity: u64, _msg: Msg) {
-        /***let mut mutex = CTX.lock();
-        if let Some(actor) =  mutex.get_mut().actors.get_actor(identity) {
-            actor.receive(msg.into());
-            println!("Msg delivered");
-        } else {
-            eprintln!("Actor not found");
-        }***/
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -237,24 +190,6 @@ mod tests {
     impl Actor for NewActor {
         fn receive(&mut self, _incoming: Mail) -> std::option::Option<Mail> {
             Some(Msg::new_with_text("Reply from new actor", "from", "to").into())
-        }
-    }
-    /***
-        real    0m0.576s
-        user    0m0.562s
-        sys     0m0.014s
-    ***/
-    #[test]
-    fn context_add_get_remove_speed_test1() {
-        use rand::{thread_rng, Rng};
-        let mut rng = thread_rng();
-
-        for _ in 0..1000000 {
-            let x: u32 = rng.gen();
-            if x > 1000 {
-                let _ctx = CTX.lock();
-                assert!(999 <= x);
-            }
         }
     }
     /***
@@ -283,7 +218,7 @@ mod tests {
             let actor: Box<dyn Actor> = Box::new(NewActor);
             let actor = Rc::new(RefCell::new(actor));
             actors.add_actor(Addr::new(identity), actor);
-            let _actor = actors.get_actor(&addr);
+            let _actor = actors.get_actor_mut(&addr);
             if x >= 1000 {
                 assert!(999 <= x);
             }

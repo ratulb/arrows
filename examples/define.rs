@@ -2,7 +2,6 @@ use arrows::define_actor;
 use arrows::send;
 use arrows::{Actor, ActorBuilder, Addr, Mail, Msg};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 pub struct NewActor;
 

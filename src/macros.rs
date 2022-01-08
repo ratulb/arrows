@@ -15,21 +15,6 @@ macro_rules! define_actor {
 }
 
 #[macro_export]
-macro_rules! send_to {
-    ($actor_name:literal, $msg:expr) => {
-        let msg: $crate::Msg = $msg;
-        let identity = $crate::Addr::new($actor_name).get_id();
-        $crate::catalog::send(identity, msg);
-    };
-    ($actor_addr:expr, $msg:expr) => {
-        let msg: $crate::Msg = $msg;
-        let actor_addr: $crate::Addr = $actor_addr;
-        let identity = actor_addr.get_id();
-        $crate::catalog::send(identity, msg);
-    };
-}
-
-#[macro_export]
 macro_rules! send {
     ($($actor_name:literal, ($($msg:expr),*)),*)  => {
         $crate::send!(@DELEGATE; $($crate::send!(@TO_ADDR; $actor_name), ($($msg),*)),*);
@@ -48,7 +33,7 @@ macro_rules! send {
     };
 
     (@DELEGATE; $($addr:expr, ($($msg:expr),*)),*) => {
-        let mut actor_msgs = HashMap::new();
+        let mut actor_msgs = std::collections::HashMap::new();
             $(
                 let addr: $crate::Addr = $addr;
                 let size = $crate::send![@SIZE; $($msg),*];
@@ -107,10 +92,10 @@ mod tests {
         let addr = Addr::new("new_actor");
         define_actor!(addr, builder);
 
-        send_to!("new_actor", Msg::default());
-        send_to!(Addr::new("new_actor"), Msg::default());
+        send!("new_actor", Msg::default());
+        send!(Addr::new("new_actor"), Msg::default());
         let addr = Addr::new("new_actor");
-        send_to!(addr, Msg::default());
+        send!(addr, Msg::default());
     }
 }
 

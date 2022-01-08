@@ -1,11 +1,8 @@
-use crate::catalog::fetch_past_events;
-use crate::catalog::load_messages;
-use crate::catalog::perist_buffered;
+use crate::catalog::{self};
 
-use crate::constants::EVENTS_INSERT;
-use crate::constants::{BUFFER_MAX_SIZE, EVENT_MAX_AGE};
+use crate::constants::{BUFFER_MAX_SIZE, EVENTS_INSERT, EVENT_MAX_AGE};
 use crate::routing::Router;
-use crate::DetailedMsg;
+
 use rusqlite::{hooks::Action, Result, ToSql, Transaction};
 use serde::{ser::SerializeTupleStruct, Deserialize, Serialize, Serializer};
 use std::mem;
@@ -64,20 +61,20 @@ impl From<Action> for DBAction {
 
 pub(crate) struct EventBuffer {
     events: Vec<DBEvent>,
-    first_event_receipt_at: Option<Instant>,
+    earliest_event_instant: Option<Instant>,
 }
 impl EventBuffer {
     pub(crate) fn new() -> Self {
         Self {
             events: Vec::new(),
-            first_event_receipt_at: None,
+            earliest_event_instant: None,
         }
     }
     pub(crate) fn overflown(&self) -> bool {
         self.events.len() >= BUFFER_MAX_SIZE
     }
     pub fn has_matured(&self) -> bool {
-        match self.first_event_receipt_at {
+        match self.earliest_event_instant {
             None => false,
             Some(instant) => instant.elapsed() >= Duration::new(EVENT_MAX_AGE, 0),
         }
@@ -89,7 +86,7 @@ impl EventBuffer {
         println!("Bufferingg event = {:?}", event);
         self.events.push(event);
         if self.events.len() == 1 {
-            self.first_event_receipt_at = Some(Instant::now());
+            self.earliest_event_instant = Some(Instant::now());
         }
     }
     pub(crate) fn flush(&mut self) -> Vec<DBEvent> {
@@ -100,7 +97,7 @@ impl Drop for EventBuffer {
     fn drop(&mut self) {
         let events = self.flush();
         if !events.is_empty() {
-            EventTracker::perist_buffered(events);
+            catalog::perist_buffered(events);
         }
     }
 }
@@ -114,29 +111,19 @@ impl EventTracker {
         Self {
             buffer: EventBuffer::new(),
             router: Router::new(num_cpus::get()),
-            //router: Router::new(2),
         }
     }
     pub(crate) fn track(&mut self, event: DBEvent) {
         self.buffer.add(event);
         if self.buffer.should_flush() {
-            let persisted_events = Self::perist_buffered(self.buffer.flush());
-            let persisted_msgs = Self::load_messages(persisted_events);
+            let persisted_events = catalog::perist_buffered(self.buffer.flush());
+            let persisted_msgs = catalog::load_messages(persisted_events);
             self.router.route(persisted_msgs);
         }
     }
 
-    //Persists the events to db
-    pub(crate) fn perist_buffered(events: Vec<DBEvent>) -> Vec<i64> {
-        let persisted_events = perist_buffered(events);
-        println!("Clearing buffer. Persisted events = {:?}", persisted_events);
-        persisted_events
-    }
-    pub(crate) fn load_messages(rowids: Vec<i64>) -> Vec<DetailedMsg> {
-        load_messages(rowids)
-    }
-    pub(crate) fn hand_off_past_events(&mut self) {
-        let msgs = fetch_past_events();
+    pub(crate) fn route_past_events(&mut self) {
+        let msgs = catalog::past_events();
         println!("Handling past mags. Events = {:?}", msgs.len());
         self.router.route(msgs);
     }

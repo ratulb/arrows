@@ -1,9 +1,5 @@
-use crate::catalog::ActorRef;
-use crate::catalog::ActorRefMut;
-use crate::catalog::CachedActor;
-
+use crate::catalog::{ActorRefMut, CachedActor};
 use crate::Addr;
-
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -18,10 +14,6 @@ impl Actors {
         Self {
             actor_cache: HashMap::new(),
         }
-    }
-
-    pub(super) fn get_actor(&self, addr: &Addr) -> ActorRef<'_> {
-        self.actor_cache.get(addr).map(|entry| entry.borrow())
     }
 
     pub(super) fn get_actor_mut(&self, addr: &Addr) -> ActorRefMut<'_> {
