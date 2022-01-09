@@ -1,6 +1,7 @@
 use crate::{Actor, ActorBuilder, Addr, BuilderDeserializer, Mail};
 use std::collections::HashMap;
 
+
 #[derive(Debug)]
 pub(super) struct Actors {
     pub(crate) actor_cache: HashMap<Addr, CachedActor>,
@@ -31,22 +32,22 @@ impl Actors {
         self.actor_cache.remove(addr)
     }
 }
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct CachedActor {
     exe: Option<Box<dyn Actor>>,
-    sequence: i64,
+    pub(crate) sequence: i64,
     outputs: Vec<Option<Mail>>,
 }
 
 impl CachedActor {
-    pub(crate) fn new(text: &str, msg_seq: i64) -> Option<Self> {
+    pub(crate) fn new(text: &str) -> Option<Self> {
         let builder = BuilderDeserializer::default().from_string(text.to_string());
         match builder {
             Ok(mut builder) => {
                 let actor: Box<dyn Actor> = builder.build();
                 Some(Self {
                     exe: Some(actor),
-                    sequence: msg_seq,
+                    sequence: 0,
                     outputs: Vec::new(),
                 })
             }
@@ -65,13 +66,35 @@ impl CachedActor {
         let re_incarnate = Self::new(text);
         match re_incarnate {
             Some(mut re_incarnate) => {
-                re_incarnate.sequence = self.sequence;
                 re_incarnate.outputs = std::mem::take(&mut self.outputs);
+                re_incarnate.sequence = self.sequence;
                 *self = re_incarnate;
                 true
             }
             None => false,
         }
+    }
+
+    pub(crate) fn from(text: &str, mut other: Option<&mut Self>) -> Option<Self> {
+        let mut new_actor = Self::new(text);
+        if let Some(ref mut materialized) = new_actor {
+            if let Some(state) = other.take() {
+                materialized.sequence = state.sequence;
+                materialized.outputs = std::mem::take(&mut state.outputs);
+            }
+        }
+        if new_actor.is_some() {
+            new_actor
+        } else {
+            other
+                .take()
+                .map(std::mem::take)
+        }
+    }
+
+    pub(crate) fn attributes_from(&mut self, other: &CachedActor) {
+        self.sequence = other.sequence;
+        self.outputs = other.outputs.clone();
     }
 
     pub(crate) fn receive(&mut self, mail: Mail) -> Option<Mail> {

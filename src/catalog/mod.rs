@@ -17,11 +17,6 @@ lazy_static! {
         Arc::new(ReentrantMutex::new(RefCell::new(Context::init())));
 }
 
-/***type CachedActor = Rc<RefCell<Box<dyn Actor>>>;
-type ActorRef<'a> = Option<Ref<'a, Box<dyn Actor>>>;
-type ActorRefMut<'a> = Option<RefMut<'a, Box<dyn Actor>>>;
-***/
-
 #[derive(Debug)]
 pub struct Context {
     actors: Actors,
@@ -94,11 +89,14 @@ impl Context {
     ) -> Result<CachedActor, Error> {
         let text = serde_json::to_string(&builder as &dyn ActorBuilder)?;
         match CachedActor::new(&text) {
-            Some(actor) => {
-                self.actors.remove_actor(&addr).and_then(pre_shutdown);
-                let identity = identity.to_string();
-                self.remove_actor_permanent(&identity);
-                self.save_builder(&identity, addr.clone(), &builder)?;
+            Some(mut actor) => {
+                let old = self.actors.remove_actor(&addr).and_then(pre_shutdown);
+                if let Some(old_actor) = old {
+                    actor.attributes_from(&old_actor);
+                    let identity = identity.to_string();
+                    self.remove_actor_permanent(&identity);
+                }
+                self.save_builder(&identity.to_string(), addr.clone(), &builder)?;
                 self.actors
                     .add_actor(addr, actor)
                     .and_then(post_start)
@@ -116,15 +114,15 @@ impl Context {
             Some(definition) => {
                 let text = definition.1;
                 let msg_seq = definition.2;
-                let _builder: Box<dyn ActorBuilder> =
-                    BuilderDeserializer::default().from_string(text.clone())?;
-                match CachedActor::new(&text, msg_seq) {
-                    Some(actor) => self
-                        .actors
-                        .add_actor(addr, actor)
-                        .and_then(post_start)
-                        .ok_or(Error::RestorationError)
-                        .map(Some),
+                match CachedActor::new(&text) {
+                    Some(mut actor) => {
+                        actor.sequence = msg_seq;
+                        self.actors
+                            .add_actor(addr, actor)
+                            .and_then(post_start)
+                            .ok_or(Error::RestorationError)
+                            .map(Some)
+                    }
                     None => Err(Error::RestorationError),
                 }
             }
@@ -137,14 +135,12 @@ impl Context {
             Some(_) => true,
             None => {
                 let rs = restore(addr.clone());
-                //restore(addr.clone());
                 rs.is_ok() && rs.ok().is_some()
-                // true
             }
         }
     }
 
-    pub(crate) fn min_msg_seq(&mut self, actor_id: &str) -> Option<(i64, i64, i64)> {
+    /***pub(crate) fn min_msg_seq(&mut self, actor_id: &str) -> Option<(i64, i64, i64)> {
         let result = self.store.min_msg_seq(actor_id);
         match result {
             Ok(inner) => {
@@ -158,11 +154,11 @@ impl Context {
                 None
             }
         }
-    }
+    }***/
 
-    pub(crate) fn update_events(&mut self, row_id: i64) {
+    /***pub(crate) fn update_events(&mut self, row_id: i64) {
         self.store.update_events(row_id);
-    }
+    }***/
 
     pub(crate) fn handle_invocation(&mut self, rich_mail: RichMail) {
         let addr = rich_mail.to();
@@ -265,14 +261,14 @@ pub(crate) fn update_events(row_id: i64) {
     Context::handle().borrow_mut().update_events(row_id);
 }
 
-pub(crate) fn min_msg_seq(actor_id: &str) -> Option<(i64, i64, i64)> {
+/***pub(crate) fn min_msg_seq(actor_id: &str) -> Option<(i64, i64, i64)> {
     Context::handle().borrow_mut().min_msg_seq(actor_id)
-}
+}***/
 
 //Pre-shutdown message
-fn pre_shutdown(mut actor: CachedActor) -> Option<()> {
+fn pre_shutdown(mut actor: CachedActor) -> Option<CachedActor> {
     let _ignored = actor.receive(Mail::Blank);
-    None
+    Some(actor)
 }
 //Post startup message
 fn post_start(mut actor: CachedActor) -> Option<CachedActor> {
