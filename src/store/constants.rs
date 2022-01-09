@@ -15,7 +15,7 @@ pub(crate) const MESSAGES: &str =
 "CREATE TABLE IF NOT EXISTS messages (actor_id TEXT, msg_id TEXT, inbound INTEGER DEFAULT 1, msg_seq INTEGER, msg BLOB, PRIMARY KEY (actor_id, msg_id))";
 
 pub(crate) const ACTORS: &str =
-    "CREATE TABLE IF NOT EXISTS actors (actor_id TEXT PRIMARY KEY, addr BLOB DEFAULT NULL, actor_def TEXT, state BLOB DEFAULT NULL)";
+    "CREATE TABLE IF NOT EXISTS actors (actor_id TEXT PRIMARY KEY, addr BLOB DEFAULT NULL, actor_def TEXT, state BLOB DEFAULT NULL, msg_seq INTEGER)";
 pub(crate) const EVENTS: &str =
     "CREATE TABLE IF NOT EXISTS events (row_id INTEGER PRIMARY KEY, status TEXT DEFAULT 'N')";
 
@@ -27,7 +27,7 @@ pub(crate) const INSERT_INTO_MESSAGES: &str =
 pub(crate) const EVENTS_INSERT: &str = "INSERT INTO events (row_id) VALUES (:row_id)";
 pub(crate) const DELETE_ACTOR: &str = "DELETE FROM actors WHERE actor_id = ?";
 pub(crate) const ACTOR_ROWID: &str = "SELECT rowid FROM actors WHERE actor_id = ?";
-pub(crate) const ACTOR_DEF: &str = "SELECT addr, actor_def FROM actors WHERE actor_id = ?";
+pub(crate) const ACTOR_DEF: &str = "SELECT addr, actor_def, msg_seq FROM actors WHERE actor_id = ?";
 
 pub(crate) const EVENTS_SELECT: &str = "SELECT row_id FROM events WHERE status ='N'";
 

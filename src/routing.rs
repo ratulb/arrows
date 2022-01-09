@@ -1,17 +1,17 @@
 use crate::catalog::send_off;
 use crate::catalog::{self};
-use crate::{Addr, DetailedMsg, Mail, Msg, Result};
+use crate::{Addr, Mail, Msg, Result, RichMail};
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 pub(crate) struct Delegate {
-    receiver: Option<Arc<Mutex<Receiver<DetailedMsg>>>>,
+    receiver: Option<Arc<Mutex<Receiver<RichMail>>>>,
 }
 
 impl Delegate {
-    pub(crate) fn new(receiver: Arc<Mutex<Receiver<DetailedMsg>>>) -> Self {
+    pub(crate) fn new(receiver: Arc<Mutex<Receiver<RichMail>>>) -> Self {
         Self {
             receiver: Some(receiver),
         }
@@ -22,13 +22,13 @@ impl Delegate {
         thread::spawn(move || loop {
             let receiver = receiver.lock();
             match receiver.recv() {
-                Ok(msg) => {
+                Ok(rich_mail) => {
                     println!(
-                        "Received a message = {:?} {:?}",
+                        "Received a mail msg = {:?} {:?}",
                         std::thread::current().id(),
-                        msg.0.get_to()
+                        rich_mail.to()
                     );
-                    catalog::handle_invocation(msg);
+                    catalog::handle_invocation(rich_mail);
                 }
                 Err(err) => {
                     eprintln!("Error receiving msg {:?}", err);
@@ -40,7 +40,7 @@ impl Delegate {
 }
 
 pub(crate) struct Router {
-    sender: Sender<DetailedMsg>,
+    sender: Sender<RichMail>,
     delegates: Vec<JoinHandle<()>>,
 }
 
@@ -57,7 +57,7 @@ impl Router {
         Self { sender, delegates }
     }
 
-    pub(crate) fn route(&mut self, msgs: Vec<DetailedMsg>) {
+    pub(crate) fn route(&mut self, msgs: Vec<RichMail>) {
         for msg in msgs {
             self.sender.send(msg).expect("Routing messages");
         }

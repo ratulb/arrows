@@ -21,6 +21,22 @@ pub enum Mail {
     Bulk(Vec<Msg>),
     Blank,
 }
+use Mail::*;
+impl Mail {
+    pub fn message(&self) -> &Msg {
+        match self {
+            Trade(ref msg) => msg,
+            _ => panic!("message is supported only on Trade variant"),
+        }
+    }
+
+    pub fn messages(&self) -> &Vec<Msg> {
+        match self {
+            Bulk(ref msgs) => msgs,
+            _ => panic!("messages is supported only on Bulk variant"),
+        }
+    }
+}
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Msg {

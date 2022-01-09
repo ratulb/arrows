@@ -4,7 +4,7 @@ use crate::dbconnection::DBConnection;
 use crate::events::DBEvent;
 use crate::pubsub::Publisher;
 use crate::Addr;
-use crate::DetailedMsg;
+use crate::RichMail;
 use crate::{Mail, Mail::*, Msg};
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use rusqlite::{named_params, params, types::Value, Error::InvalidQuery, Result, ToSql};
@@ -151,7 +151,7 @@ impl Store {
 
     pub(crate) fn delete_from_inbox(
         &mut self,
-        actor_id: &String,
+        actor_id: &str,
         msg_ids: Vec<&str>,
     ) -> std::io::Result<()> {
         let stmt = format!("DELETE FROM inbox_{} WHERE msg_id = ?", actor_id);
@@ -199,14 +199,18 @@ impl Store {
             .and_then(|c| if c == 1 { Ok(()) } else { Err(InvalidQuery) });
         status
     }
-    pub(crate) fn retrieve_actor_def(&mut self, actor_id: &str) -> Result<Option<(Addr, String)>> {
+    pub(crate) fn retrieve_actor_def(
+        &mut self,
+        actor_id: &str,
+    ) -> Result<Option<(Addr, String, i64)>> {
         let mut stmt = self.conn.inner.prepare_cached(ACTOR_DEF)?;
         let mut rows = stmt.query(rusqlite::params![actor_id])?;
         if let Some(row) = rows.next()? {
             let value: Value = row.get(0)?;
             let addr: Addr = value_to_addr(value);
             let actor_def: String = row.get(1)?;
-            return Ok(Some((addr, actor_def)));
+            let msg_seq: i64 = row.get(2)?;
+            return Ok(Some((addr, actor_def, msg_seq)));
         }
         Ok(None)
     }
@@ -222,7 +226,7 @@ impl Store {
         }
     }
 
-    pub(crate) fn from_messages(&mut self, rowids: Vec<i64>) -> Result<Vec<DetailedMsg>> {
+    pub(crate) fn from_messages(&mut self, rowids: Vec<i64>) -> Result<Vec<RichMail>> {
         let rowids = rowids
             .iter()
             .map(|id| id.to_string())
@@ -239,12 +243,18 @@ impl Store {
             let value: Value = row.get(0)?;
             let inbound: i64 = row.get(1)?;
             let msg_seq: i64 = row.get(2)?;
-            msgs.push((value_to_msg(value), inbound == 1, msg_seq));
+            let msg = value_to_msg(value);
+            let to = msg.get_to().clone();
+            msgs.push(RichMail::Content(
+                Mail::Trade(msg),
+                inbound == 1,
+                msg_seq,
+                None,
+                to,
+            ));
         }
         Ok(msgs)
     }
-    //"SELECT MIN(msg_seq), M.rowid, E.row_id  FROM  messages M,
-    // events E WHERE M.actor_id = ? AND M.inbound = 1 AND M.rowid=E.row_id AND E.status = 'N'";
 
     pub(crate) fn min_msg_seq(&mut self, actor_id: &str) -> Result<Option<(i64, i64, i64)>> {
         let mut stmt = self.conn.inner.prepare_cached(MIN_MSG_SEQ)?;
@@ -446,7 +456,7 @@ mod tests {
         let msgs = store.from_messages(rowids).unwrap();
         let count = msgs
             .iter()
-            .filter(|msg| msg.0.content_as_text() == Some(&message))
+            .filter(|msg| msg.mail().message().content_as_text() == Some(&message))
             .count();
         assert!(count == BUFFER_MAX_SIZE);
         Ok(())
