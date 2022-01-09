@@ -1,11 +1,11 @@
 use crate::catalog::send_off;
+use crate::catalog::{self};
 use crate::{Addr, DetailedMsg, Mail, Msg, Result};
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
-
 pub(crate) struct Delegate {
     receiver: Option<Arc<Mutex<Receiver<DetailedMsg>>>>,
 }
@@ -28,6 +28,7 @@ impl Delegate {
                         std::thread::current().id(),
                         msg.0.get_to()
                     );
+                    catalog::handle_invocation(msg);
                 }
                 Err(err) => {
                     eprintln!("Error receiving msg {:?}", err);

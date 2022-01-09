@@ -243,6 +243,26 @@ impl Store {
         }
         Ok(msgs)
     }
+    //"SELECT MIN(msg_seq), M.rowid, E.row_id  FROM  messages M,
+    // events E WHERE M.actor_id = ? AND M.inbound = 1 AND M.rowid=E.row_id AND E.status = 'N'";
+
+    pub(crate) fn min_msg_seq(&mut self, actor_id: &str) -> Result<Option<(i64, i64, i64)>> {
+        let mut stmt = self.conn.inner.prepare_cached(MIN_MSG_SEQ)?;
+        let mut rows = stmt.query(rusqlite::params![actor_id])?;
+        if let Some(row) = rows.next()? {
+            let seq: i64 = row.get(0)?;
+            let rowid: i64 = row.get(1)?;
+            let row_id: i64 = row.get(2)?;
+            return Ok(Some((seq, rowid, row_id)));
+        }
+        Ok(None)
+    }
+
+    pub(crate) fn update_events(&mut self, row_id: i64) -> Result<()> {
+        let mut stmt = self.conn.inner.prepare_cached("UPDATE_EVENTS")?;
+        stmt.execute(params![row_id])?;
+        Ok(())
+    }
 
     pub(crate) fn into_inbox(&mut self, msg: Msg) -> Result<()> {
         let stmt = Self::message_insert_stmt(&mut self.message_insert_stmt);

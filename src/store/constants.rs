@@ -30,3 +30,7 @@ pub(crate) const ACTOR_ROWID: &str = "SELECT rowid FROM actors WHERE actor_id = 
 pub(crate) const ACTOR_DEF: &str = "SELECT addr, actor_def FROM actors WHERE actor_id = ?";
 
 pub(crate) const EVENTS_SELECT: &str = "SELECT row_id FROM events WHERE status ='N'";
+
+pub(crate) const MIN_MSG_SEQ: &str = "SELECT MIN(msg_seq), M.rowid, E.row_id  FROM  messages M, events E WHERE M.actor_id = ? AND M.inbound = 1 AND M.rowid=E.row_id AND E.status = 'N'";
+
+pub(crate) const UPDATE_EVENTS: &str = "UPDATE events SET status = 'Y' WHERE row_id = ?";

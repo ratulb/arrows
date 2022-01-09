@@ -3,11 +3,10 @@ use crate::apis::Store;
 use crate::common::{actor::Actor, actor::ActorBuilder, mail::Mail};
 use crate::events::DBEvent;
 use crate::DetailedMsg;
-
 use crate::{Addr, BuilderDeserializer, Error};
 use lazy_static::lazy_static;
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
-use std::cell::{RefCell, RefMut};
+use std::cell::{Ref, RefCell, RefMut};
 
 use std::rc::Rc;
 use std::sync::Arc;
@@ -19,7 +18,8 @@ lazy_static! {
         Arc::new(ReentrantMutex::new(RefCell::new(Context::init())));
 }
 
-type CachedActor = Rc<RefCell<Box<dyn Actor>>>;
+type ActorWrapper = Rc<RefCell<Box<dyn Actor>>>;
+type ActorRef<'a> = Option<Ref<'a, Box<dyn Actor>>>;
 type ActorRefMut<'a> = Option<RefMut<'a, Box<dyn Actor>>>;
 
 #[derive(Debug)]
@@ -36,14 +36,18 @@ impl Context {
         Self { actors, store }
     }
 
+    pub(crate) fn get_actor(&self, addr: &Addr) -> ActorRef<'_> {
+        self.actors.get_actor(addr)
+    }
+
     pub(crate) fn get_actor_mut(&self, addr: &Addr) -> ActorRefMut<'_> {
         self.actors.get_actor_mut(addr)
     }
-    pub(crate) fn add_actor(&mut self, addr: Addr, actor: CachedActor) -> Option<CachedActor> {
+    pub(crate) fn add_actor(&mut self, addr: Addr, actor: ActorWrapper) -> Option<ActorWrapper> {
         self.actors.add_actor(addr, actor)
     }
 
-    pub(crate) fn remove_actor(&mut self, addr: &Addr) -> Option<CachedActor> {
+    pub(crate) fn remove_actor(&mut self, addr: &Addr) -> Option<ActorWrapper> {
         self.actors.remove_actor(addr)
     }
     //cargo run --example - TODO this need to be changed to support remoting - only messages
@@ -87,7 +91,7 @@ impl Context {
         identity: u64,
         addr: Addr,
         mut builder: impl ActorBuilder,
-    ) -> Result<CachedActor, Error> {
+    ) -> Result<ActorWrapper, Error> {
         self.remove_actor(&addr).and_then(pre_shutdown);
         let identity = identity.to_string();
         self.remove_actor_permanent(&identity);
@@ -100,7 +104,7 @@ impl Context {
 
     //Restore an actor from the backing storage. Active actor will be replaced on successful
     //retrieval. Left undisturbed if not found.
-    pub fn restore(&mut self, addr: Addr) -> Result<Option<CachedActor>, Error> {
+    pub fn restore(&mut self, addr: Addr) -> Result<Option<ActorWrapper>, Error> {
         let identity = addr.get_id().to_string();
         match self.retrieve_actor_def(&identity) {
             Some(saved_acor_def) => {
@@ -108,12 +112,74 @@ impl Context {
                     BuilderDeserializer::default().from_string(saved_acor_def.1)?;
                 let actor: Box<dyn Actor> = builder.build();
                 let actor = Rc::new(RefCell::new(actor));
-                self.add_actor(addr, actor.clone())
+                self.add_actor(addr, actor)
                     .and_then(post_start)
                     .ok_or(Error::ActorReloadError)
                     .map(Some)
             }
             None => Err(Error::ActorReloadError),
+        }
+    }
+
+    pub(crate) fn is_actor_defined(&mut self, addr: &Addr) -> bool {
+        match self.get_actor(addr) {
+            Some(_) => true,
+            None => {
+                //let rs = restore(addr.clone());
+                restore(addr.clone());
+                //return rs.is_ok() && rs.ok().is_some();
+                true
+            }
+        }
+    }
+
+    pub(crate) fn min_msg_seq(&mut self, actor_id: &str) -> Option<(i64, i64, i64)> {
+        let result = self.store.min_msg_seq(actor_id);
+        match result {
+            Ok(inner) => inner,
+            Err(err) => {
+                eprintln!("Error fetching seq {:?}", err);
+                None
+            }
+        }
+    }
+
+    pub(crate) fn update_events(&mut self, row_id: i64) {
+        self.store.update_events(row_id);
+    }
+
+    pub fn handle_invocation(&mut self, message: DetailedMsg) {
+        let msg = message.0;
+        let msg_seq = message.2;
+        let addr = msg.get_to().as_ref();
+        match addr {
+            Some(addr_inner) => {
+                if !is_actor_defined(addr_inner) {
+                    eprintln!("Actor not defined ={:?}", addr);
+                } else {
+                    let actor_id = addr_inner.get_id().to_string();
+                    let curr_msg_seq = min_msg_seq(&actor_id);
+                    match curr_msg_seq {
+                        Some(sequence) => {
+                            if sequence.0 < msg_seq {
+                                eprintln!("Out of sequence message!");
+                            } else {
+                                let actor = self.get_actor_mut(addr_inner);
+                                match actor {
+                                    Some(mut actor) => {
+                                        let invocation_outcome = actor.receive(Mail::Trade(msg));
+                                        println!("Invocation outcome = {:?}", invocation_outcome);
+                                        update_events(sequence.1);
+                                    }
+                                    None => {}
+                                }
+                            }
+                        }
+                        None => {}
+                    }
+                }
+            }
+            None => {}
         }
     }
 
@@ -154,7 +220,7 @@ pub fn define_actor(
     identity: u64,
     addr: Addr,
     builder: impl ActorBuilder,
-) -> Result<CachedActor, Error> {
+) -> Result<ActorWrapper, Error> {
     Context::handle()
         .borrow_mut()
         .define_actor(identity, addr, builder)
@@ -167,19 +233,36 @@ pub fn send_off(payload: Mail) {
     Context::handle().borrow_mut().send_off(payload);
 }
 
-pub fn restore(addr: Addr) -> Result<Option<CachedActor>, Error> {
+pub fn restore(addr: Addr) -> Result<Option<ActorWrapper>, Error> {
     Context::handle().borrow_mut().restore(addr)
 }
 
+pub(crate) fn is_actor_defined(addr: &Addr) -> bool {
+    let defined = Context::handle().borrow_mut().is_actor_defined(addr);
+    defined
+}
+
+pub(crate) fn update_events(row_id: i64) {
+    Context::handle().borrow_mut().update_events(row_id);
+}
+
+pub(crate) fn min_msg_seq(actor_id: &str) -> Option<(i64, i64, i64)> {
+    Context::handle().borrow_mut().min_msg_seq(actor_id)
+}
+
 //Pre-shutdown message
-fn pre_shutdown(actor: CachedActor) -> Option<()> {
+fn pre_shutdown(actor: ActorWrapper) -> Option<()> {
     let _ignored = actor.borrow_mut().receive(Mail::Blank);
     None
 }
 //Post startup message
-fn post_start(actor: CachedActor) -> Option<CachedActor> {
+fn post_start(actor: ActorWrapper) -> Option<ActorWrapper> {
     let _post_start_msg = actor.borrow_mut().receive(Mail::Blank);
     Some(actor)
+}
+
+pub fn handle_invocation(message: DetailedMsg) {
+    Context::handle().borrow_mut().handle_invocation(message);
 }
 
 #[cfg(test)]
