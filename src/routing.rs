@@ -29,6 +29,7 @@ impl Delegate {
                         rich_mail.to()
                     );
                     catalog::handle_invocation(rich_mail);
+                    //let defined = catalog::is_actor_defined(rich_mail.to().as_ref().unwrap());
                 }
                 Err(err) => {
                     eprintln!("Error receiving msg {:?}", err);

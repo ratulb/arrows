@@ -16,7 +16,7 @@ pub(crate) const MESSAGES: &str =
 "CREATE TABLE IF NOT EXISTS messages (actor_id TEXT, msg_id TEXT, inbound INTEGER DEFAULT 1, msg_seq INTEGER, msg BLOB, PRIMARY KEY (actor_id, msg_id))";
 
 pub(crate) const ACTORS: &str =
-    "CREATE TABLE IF NOT EXISTS actors (actor_id TEXT PRIMARY KEY, addr BLOB DEFAULT NULL, actor_def TEXT, state BLOB DEFAULT NULL, msg_seq INTEGER)";
+    "CREATE TABLE IF NOT EXISTS actors (actor_id TEXT PRIMARY KEY, addr BLOB DEFAULT NULL, actor_def TEXT, state BLOB DEFAULT NULL, msg_seq INTEGER DEFAULT 0)";
 pub(crate) const EVENTS: &str =
     "CREATE TABLE IF NOT EXISTS events (row_id INTEGER PRIMARY KEY, status TEXT DEFAULT 'N')";
 

@@ -7,14 +7,14 @@ use crate::{Addr, Error};
 use lazy_static::lazy_static;
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 use std::cell::RefCell;
-
+use std::cell::RefMut;
 use std::sync::Arc;
 
 use crate::catalog::actors::{Actors, CachedActor};
 
 lazy_static! {
     pub(crate) static ref CTX: Arc<ReentrantMutex<RefCell<Context>>> =
-        Arc::new(ReentrantMutex::new(RefCell::new(Context::init())));
+        Arc::new(ReentrantMutex::new(Context::init()));
 }
 
 #[derive(Debug)]
@@ -24,11 +24,11 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn init() -> Self {
+    pub fn init() -> RefCell<Self> {
         let actors = Actors::new();
         let mut store = Store::new();
         store.setup();
-        Self { actors, store }
+        RefCell::new(Self { actors, store })
     }
 
     //cargo run --example - TODO this need to be changed to support remoting - only messages
@@ -95,6 +95,7 @@ impl Context {
     //Restore an actor from the backing storage. Active actor will be replaced on successful
     //retrieval. Left undisturbed if not found.
     pub(crate) fn restore(&mut self, addr: Addr) -> Result<Option<CachedActor>, Error> {
+        println!("The actor: {:?}", addr);
         let identity = addr.get_id().to_string();
         match self.retrieve_actor_def(&identity) {
             Some(definition) => {
@@ -123,7 +124,7 @@ impl Context {
         match self.actors.get_actor(addr) {
             Some(_) => true,
             None => {
-                let rs = restore(addr.clone());
+                let rs = self.restore(addr.clone());
                 rs.is_ok() && rs.ok().is_some()
             }
         }
@@ -131,9 +132,12 @@ impl Context {
 
     pub(crate) fn handle_invocation(&mut self, rich_mail: RichMail) {
         let addr = rich_mail.to();
-        if let Some(addr_inner) = addr {
+        if let Some(ref addr_inner) = addr {
+            let defined = self.is_actor_defined(addr_inner);
+
             let _actor_id = addr_inner.get_id().to_string();
             let actor = self.actors.get_actor_mut(addr_inner);
+            println!("Here it is : {:?}", defined);
             if let Some(actor) = actor {
                 println!("Check1");
                 CachedActor::receive(actor, rich_mail);
@@ -215,7 +219,6 @@ fn post_start(mut actor: CachedActor) -> Option<CachedActor> {
     );
     Some(actor)
 }
-
 pub(crate) fn handle_invocation(message: RichMail) {
     Context::handle().borrow_mut().handle_invocation(message);
 }

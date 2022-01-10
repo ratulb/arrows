@@ -49,6 +49,21 @@ impl Producer for ProducerDeserializer {
         panic!("Should not be called on ProducerDeserializer");
     }
 }
+//Sample actor and actor producer
+pub struct NewActor;
+impl Actor for NewActor {
+    fn receive(&mut self, _incoming: Mail) -> std::option::Option<Mail> {
+        Some(Msg::new_with_text("Reply from new actor", "from", "to").into())
+    }
+}
+#[derive(Debug, Serialize, Deserialize, Default)]
+struct NewProducer;
+#[typetag::serde(name = "new_actor_builder")]
+impl Producer for NewProducer {
+    fn build(&mut self) -> Box<dyn Actor> {
+        Box::new(NewActor)
+    }
+}
 
 #[cfg(test)]
 mod tests {
