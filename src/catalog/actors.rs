@@ -95,19 +95,29 @@ impl CachedActor {
         }
     }
 
-    pub(crate) fn attributes_from(&mut self, other: &CachedActor) {
-        self.sequence = other.sequence;
-        self.outputs = other.outputs.clone();
+    pub(crate) fn attributes_from(this: &mut CachedActor, other: &CachedActor) {
+        this.sequence = other.sequence;
+        this.outputs = other.outputs.clone();
     }
 
-    pub(crate) fn receive(&mut self, mail: Mail) -> Option<Mail> {
-        if CachedActor::is_loaded(self) {
+    pub(crate) fn receive(actor: &mut CachedActor, mail: Mail) -> Option<Mail> {
+        if CachedActor::is_loaded(actor) {
             return None;
         }
-        match self.exe {
+        match CachedActor::actor_exe(actor) {
             Some(ref mut executable) => executable.receive(mail),
             None => None,
         }
+    }
+
+    pub(crate) fn push_outcome(output_buffer: &mut VecDeque<Option<Mail>>, mail: Option<Mail>) {
+        if mail.is_some() {
+            output_buffer.push_back(mail);
+        }
+    }
+
+    pub(crate) fn actor_exe(actor: &mut CachedActor) -> &mut Option<Box<dyn Actor>> {
+        &mut actor.exe
     }
 
     pub(crate) fn should_flush(buffer_size: usize) -> bool {

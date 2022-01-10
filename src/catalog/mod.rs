@@ -78,7 +78,7 @@ impl Context {
             Some(mut actor) => {
                 let previous = self.actors.remove_actor(&addr).and_then(pre_shutdown);
                 if let Some(previous) = previous {
-                    actor.attributes_from(&previous);
+                    CachedActor::attributes_from(&mut actor, &previous);
                     let identity = identity.to_string();
                     self.remove_actor_permanent(&identity);
                 }
@@ -227,12 +227,12 @@ pub(crate) fn is_actor_defined(addr: &Addr) -> bool {
 
 //Pre-shutdown message
 fn pre_shutdown(mut actor: CachedActor) -> Option<CachedActor> {
-    let _ignored = actor.receive(Mail::Blank);
+    let _ignored = CachedActor::receive(&mut actor, Mail::Blank);
     Some(actor)
 }
 //Post startup message
 fn post_start(mut actor: CachedActor) -> Option<CachedActor> {
-    let _post_start_msg = actor.receive(Mail::Blank);
+    let _post_start_msg = CachedActor::receive(&mut actor, Mail::Blank);
     Some(actor)
 }
 
