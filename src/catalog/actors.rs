@@ -113,7 +113,7 @@ impl CachedActor {
                     //Do flush here
                 }
             }
-            None => return,
+            None => {}
         }
     }
 

@@ -133,38 +133,12 @@ impl Context {
         let addr = rich_mail.to();
         if let Some(addr_inner) = addr {
             let _actor_id = addr_inner.get_id().to_string();
-        }
-
-        /***let addr = msg.get_to().as_ref();
-        match addr {
-            Some(addr_inner) => {
-                if !is_actor_defined(addr_inner) {
-                    eprintln!("Actor not defined ={:?}", addr);
-                } else {
-                    let actor_id = addr_inner.get_id().to_string();
-                    let curr_msg_seq = min_msg_seq(&actor_id);
-                    match curr_msg_seq {
-                        Some(sequence) => {
-                            if sequence.0 < msg_seq {
-                                eprintln!("Out of sequence message!");
-                            } else {
-                                let actor = self.actors.get_actor_mut(addr_inner);
-                                match actor {
-                                    Some(actor) => {
-                                        let invocation_outcome = actor.receive(Mail::Trade(msg));
-                                        println!("Invocation outcome = {:?}", invocation_outcome);
-                                        update_events(sequence.1);
-                                    }
-                                    None => {}
-                                }
-                            }
-                        }
-                        None => {}
-                    }
-                }
+            let actor = self.actors.get_actor_mut(addr_inner);
+            if let Some(actor) = actor {
+                println!("Check1");
+                CachedActor::receive(actor, rich_mail);
             }
-            None => {}
-        }***/
+        }
     }
 
     //Exclusive mutable handle to Context - sigleton lock. Discretionary usage advisable
