@@ -227,12 +227,18 @@ pub(crate) fn is_actor_defined(addr: &Addr) -> bool {
 
 //Pre-shutdown message
 fn pre_shutdown(mut actor: CachedActor) -> Option<CachedActor> {
-    let _ignored = CachedActor::receive(&mut actor, Mail::Blank);
+    let _ignored = CachedActor::receive(
+        &mut actor,
+        RichMail::Content(Mail::Blank, true, 0, None, None),
+    );
     Some(actor)
 }
 //Post startup message
 fn post_start(mut actor: CachedActor) -> Option<CachedActor> {
-    let _post_start_msg = CachedActor::receive(&mut actor, Mail::Blank);
+    let _post_start_msg = CachedActor::receive(
+        &mut actor,
+        RichMail::Content(Mail::Blank, true, 0, None, None),
+    );
     Some(actor)
 }
 

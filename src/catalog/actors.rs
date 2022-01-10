@@ -100,13 +100,20 @@ impl CachedActor {
         this.outputs = other.outputs.clone();
     }
 
-    pub(crate) fn receive(actor: &mut CachedActor, mail: Mail) -> Option<Mail> {
-        if CachedActor::is_loaded(actor) {
-            return None;
+    pub(crate) fn receive(actor: &mut CachedActor, mut mail: RichMail) {
+        if !CachedActor::is_loaded(actor) || !CachedActor::should_handle_message(actor, &mail) {
+            return;
         }
         match CachedActor::actor_exe(actor) {
-            Some(ref mut executable) => executable.receive(mail),
-            None => None,
+            Some(ref mut executable) => {
+                let outcome = executable.receive(mail.mail_out());
+                CachedActor::push_outcome(CachedActor::output_buffer(actor), outcome);
+                CachedActor::increment_sequence(CachedActor::get_sequence_mut(actor));
+                if CachedActor::should_flush(CachedActor::buffer_size(actor)) {
+                    //Do flush here
+                }
+            }
+            None => return,
         }
     }
 
@@ -126,5 +133,9 @@ impl CachedActor {
 
     pub(crate) fn buffer_size(actor: &CachedActor) -> usize {
         actor.outputs.len()
+    }
+
+    pub(crate) fn output_buffer(actor: &mut CachedActor) -> &mut VecDeque<Option<Mail>> {
+        &mut actor.outputs
     }
 }
