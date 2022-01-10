@@ -1,6 +1,6 @@
-use crate::{Actor, ActorBuilder, Addr, BuilderDeserializer, Mail};
-use std::collections::HashMap;
-
+use crate::constants::ACTOR_BUFFER_SIZE;
+use crate::{Actor, Addr, Mail, Producer, ProducerDeserializer, RichMail};
+use std::collections::{HashMap, VecDeque};
 
 #[derive(Debug)]
 pub(super) struct Actors {
@@ -32,23 +32,23 @@ impl Actors {
         self.actor_cache.remove(addr)
     }
 }
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct CachedActor {
     exe: Option<Box<dyn Actor>>,
-    pub(crate) sequence: i64,
-    outputs: Vec<Option<Mail>>,
+    sequence: i64,
+    outputs: VecDeque<Option<Mail>>,
 }
 
 impl CachedActor {
     pub(crate) fn new(text: &str) -> Option<Self> {
-        let builder = BuilderDeserializer::default().from_string(text.to_string());
+        let builder = ProducerDeserializer::default().from_string(text.to_string());
         match builder {
             Ok(mut builder) => {
                 let actor: Box<dyn Actor> = builder.build();
                 Some(Self {
                     exe: Some(actor),
                     sequence: 0,
-                    outputs: Vec::new(),
+                    outputs: VecDeque::new(),
                 })
             }
             Err(err) => {
@@ -58,11 +58,31 @@ impl CachedActor {
         }
     }
 
-    pub(crate) fn is_loaded(&self) -> bool {
-        self.exe.is_some()
+    pub(crate) fn should_handle_message(actor: &CachedActor, mail: &RichMail) -> bool {
+        actor.sequence <= mail.seq()
     }
 
-    pub(crate) fn re_define(&mut self, text: &str) -> bool {
+    pub(crate) fn get_sequence(actor: &CachedActor) -> i64 {
+        actor.sequence
+    }
+
+    pub(crate) fn get_sequence_mut(actor: &mut CachedActor) -> &mut i64 {
+        &mut actor.sequence
+    }
+
+    pub(crate) fn increment_sequence(actor_seq: &mut i64) {
+        *actor_seq += 1;
+    }
+
+    pub(crate) fn set_sequence(actor_seq: &mut i64, seq: i64) {
+        *actor_seq = seq;
+    }
+
+    pub(crate) fn is_loaded(actor: &CachedActor) -> bool {
+        actor.exe.is_some()
+    }
+
+    pub(crate) fn re_define_self(&mut self, text: &str) -> bool {
         let re_incarnate = Self::new(text);
         match re_incarnate {
             Some(mut re_incarnate) => {
@@ -75,35 +95,26 @@ impl CachedActor {
         }
     }
 
-    pub(crate) fn from(text: &str, mut other: Option<&mut Self>) -> Option<Self> {
-        let mut new_actor = Self::new(text);
-        if let Some(ref mut materialized) = new_actor {
-            if let Some(state) = other.take() {
-                materialized.sequence = state.sequence;
-                materialized.outputs = std::mem::take(&mut state.outputs);
-            }
-        }
-        if new_actor.is_some() {
-            new_actor
-        } else {
-            other
-                .take()
-                .map(std::mem::take)
-        }
-    }
-
     pub(crate) fn attributes_from(&mut self, other: &CachedActor) {
         self.sequence = other.sequence;
         self.outputs = other.outputs.clone();
     }
 
     pub(crate) fn receive(&mut self, mail: Mail) -> Option<Mail> {
-        if !self.is_loaded() {
+        if CachedActor::is_loaded(self) {
             return None;
         }
         match self.exe {
             Some(ref mut executable) => executable.receive(mail),
             None => None,
         }
+    }
+
+    pub(crate) fn should_flush(buffer_size: usize) -> bool {
+        buffer_size >= ACTOR_BUFFER_SIZE
+    }
+
+    pub(crate) fn buffer_size(actor: &CachedActor) -> usize {
+        actor.outputs.len()
     }
 }

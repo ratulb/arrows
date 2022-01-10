@@ -60,7 +60,7 @@ macro_rules! send {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Actor, ActorBuilder, Addr, Mail, Msg};
+    use crate::{Actor, Addr, Mail, Msg, Producer};
     use serde::{Deserialize, Serialize};
 
     pub struct NewActor;
@@ -72,23 +72,23 @@ mod tests {
     }
 
     #[derive(Debug, Serialize, Deserialize, Default)]
-    struct NewActorBuilder;
+    struct NewProducer;
 
     #[typetag::serde(name = "new_actor_builder")]
-    impl ActorBuilder for NewActorBuilder {
+    impl Producer for NewProducer {
         fn build(&mut self) -> Box<dyn Actor> {
             Box::new(NewActor)
         }
     }
     #[test]
     fn macro_register_actor_test1() {
-        let builder = NewActorBuilder::default();
+        let builder = NewProducer::default();
         define_actor!("new_actor", builder);
 
-        let builder = NewActorBuilder::default();
+        let builder = NewProducer::default();
         define_actor!(Addr::new("new_actor"), builder);
 
-        let builder = NewActorBuilder::default();
+        let builder = NewProducer::default();
         let addr = Addr::new("new_actor");
         define_actor!(addr, builder);
 

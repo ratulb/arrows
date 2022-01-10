@@ -2,7 +2,7 @@ use arrows::catalog::restore;
 use arrows::define_actor;
 use arrows::send;
 
-use arrows::{Actor, ActorBuilder, Addr, Mail, Msg};
+use arrows::{Actor, Addr, Mail, Msg, Producer};
 use serde::{Deserialize, Serialize};
 
 pub struct NewActor;
@@ -14,10 +14,10 @@ impl Actor for NewActor {
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
-struct NewActorBuilder;
+struct NewProducer;
 
 #[typetag::serde(name = "new_actor_builder")]
-impl ActorBuilder for NewActorBuilder {
+impl Producer for NewProducer {
     fn build(&mut self) -> Box<dyn Actor> {
         Box::new(NewActor)
     }
@@ -28,12 +28,12 @@ fn main() {
     let rs = restore(identity);
     println!("The rs = {:?}", rs);
 
-    let builder = NewActorBuilder::default();
+    let builder = NewProducer::default();
 
     let rs = define_actor!("new_actor", builder);
     println!("The reg result is = {:?}", rs);
 
-    let builder = NewActorBuilder;
+    let builder = NewProducer;
     define_actor!(Addr::new("new_actor"), builder);
 
     let m = Msg::default();

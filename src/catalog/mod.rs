@@ -1,9 +1,9 @@
 mod actors;
 use crate::apis::Store;
-use crate::common::{actor::ActorBuilder, mail::Mail};
+use crate::common::{actor::Producer, mail::Mail};
 use crate::events::DBEvent;
 use crate::RichMail;
-use crate::{Addr, BuilderDeserializer, Error};
+use crate::{Addr, Error};
 use lazy_static::lazy_static;
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 use std::cell::RefCell;
@@ -31,20 +31,6 @@ impl Context {
         Self { actors, store }
     }
 
-    /***pub(crate) fn get_actor(&self, addr: &Addr) -> ActorRef<'_> {
-        self.actors.get_actor(addr)
-    }
-
-    pub(crate) fn get_actor_mut(&self, addr: &Addr) -> ActorRefMut<'_> {
-        self.actors.get_actor_mut(addr)
-    }
-    pub(crate) fn add_actor(&mut self, addr: Addr, actor: CachedActor) -> Option<CachedActor> {
-        self.actors.add_actor(addr, actor)
-    }
-
-    pub(crate) fn remove_actor(&mut self, addr: &Addr) -> Option<CachedActor> {
-        self.actors.remove_actor(addr)
-    }***/
     //cargo run --example - TODO this need to be changed to support remoting - only messages
     //destined to local system should be looped back
     pub fn send_off(&mut self, payload: Mail) {
@@ -62,9 +48,9 @@ impl Context {
         &mut self,
         identity: &str,
         addr: Addr,
-        builder: &impl ActorBuilder,
+        builder: &impl Producer,
     ) -> Result<(), Error> {
-        let text = serde_json::to_string(builder as &dyn ActorBuilder)?;
+        let text = serde_json::to_string(builder as &dyn Producer)?;
         self.store
             .save_builder(identity, addr, &text)
             .map_err(|err| Error::Other(Box::new(err)))
@@ -85,14 +71,14 @@ impl Context {
         &mut self,
         identity: u64,
         addr: Addr,
-        builder: impl ActorBuilder,
+        builder: impl Producer,
     ) -> Result<CachedActor, Error> {
-        let text = serde_json::to_string(&builder as &dyn ActorBuilder)?;
+        let text = serde_json::to_string(&builder as &dyn Producer)?;
         match CachedActor::new(&text) {
             Some(mut actor) => {
-                let old = self.actors.remove_actor(&addr).and_then(pre_shutdown);
-                if let Some(old_actor) = old {
-                    actor.attributes_from(&old_actor);
+                let previous = self.actors.remove_actor(&addr).and_then(pre_shutdown);
+                if let Some(previous) = previous {
+                    actor.attributes_from(&previous);
                     let identity = identity.to_string();
                     self.remove_actor_permanent(&identity);
                 }
@@ -116,7 +102,10 @@ impl Context {
                 let msg_seq = definition.2;
                 match CachedActor::new(&text) {
                     Some(mut actor) => {
-                        actor.sequence = msg_seq;
+                        CachedActor::set_sequence(
+                            CachedActor::get_sequence_mut(&mut actor),
+                            msg_seq,
+                        );
                         self.actors
                             .add_actor(addr, actor)
                             .and_then(post_start)
@@ -140,31 +129,10 @@ impl Context {
         }
     }
 
-    /***pub(crate) fn min_msg_seq(&mut self, actor_id: &str) -> Option<(i64, i64, i64)> {
-        let result = self.store.min_msg_seq(actor_id);
-        match result {
-            Ok(inner) => {
-                if let Some(ref seq_data) = inner {
-                    assert!(seq_data.1 == seq_data.2);
-                }
-                inner
-            }
-            Err(err) => {
-                eprintln!("Error fetching seq {:?}", err);
-                None
-            }
-        }
-    }***/
-
-    /***pub(crate) fn update_events(&mut self, row_id: i64) {
-        self.store.update_events(row_id);
-    }***/
-
     pub(crate) fn handle_invocation(&mut self, rich_mail: RichMail) {
         let addr = rich_mail.to();
         if let Some(addr_inner) = addr {
-            let actor_id = addr_inner.get_id().to_string();
-            let _last_seq = min_msg_seq(&actor_id);
+            let _actor_id = addr_inner.get_id().to_string();
         }
 
         /***let addr = msg.get_to().as_ref();
@@ -235,7 +203,7 @@ pub(crate) fn past_events() -> Vec<RichMail> {
 pub fn define_actor(
     identity: u64,
     addr: Addr,
-    builder: impl ActorBuilder,
+    builder: impl Producer,
 ) -> Result<CachedActor, Error> {
     Context::handle()
         .borrow_mut()
@@ -256,14 +224,6 @@ pub fn restore(addr: Addr) -> Result<Option<CachedActor>, Error> {
 pub(crate) fn is_actor_defined(addr: &Addr) -> bool {
     Context::handle().borrow_mut().is_actor_defined(addr)
 }
-
-pub(crate) fn update_events(row_id: i64) {
-    Context::handle().borrow_mut().update_events(row_id);
-}
-
-/***pub(crate) fn min_msg_seq(actor_id: &str) -> Option<(i64, i64, i64)> {
-    Context::handle().borrow_mut().min_msg_seq(actor_id)
-}***/
 
 //Pre-shutdown message
 fn pre_shutdown(mut actor: CachedActor) -> Option<CachedActor> {

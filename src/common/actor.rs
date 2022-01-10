@@ -26,27 +26,27 @@ impl Debug for dyn Actor {
 }
 
 #[typetag::serde]
-pub trait ActorBuilder {
+pub trait Producer {
     //This method must be implemented to register an actor implementation. There is a one-to-one
-    //corresponds between an 'Actor implementation' and its builder('ActorBuilder'). ActorBuilders are
+    //corresponds between an 'Actor implementation' and its builder('Producer'). Producers are
     //persisted so that actors can be resurrected after a failure or restart. Actor builders are
     //identified by their #[typetag::serde(name = "an_actor_builder")] name. These names should not
     //collide in a running system.
     fn build(&mut self) -> Box<dyn Actor>;
-    fn from_string(&self, content: String) -> std::io::Result<Box<dyn ActorBuilder>> {
-        let builder: Box<dyn ActorBuilder> = serde_json::from_str(&content)?;
+    fn from_string(&self, content: String) -> std::io::Result<Box<dyn Producer>> {
+        let builder: Box<dyn Producer> = serde_json::from_str(&content)?;
         Ok(builder)
     }
 }
-//BuilderDeserializer is used to rebuild actor builders from their serialized state.
+//ProducerDeserializer is used to rebuild actor builders from their serialized state.
 
 #[derive(Debug, Serialize, Deserialize, Default)]
-pub struct BuilderDeserializer;
+pub struct ProducerDeserializer;
 
 #[typetag::serde(name = "builder_deserializer")]
-impl ActorBuilder for BuilderDeserializer {
+impl Producer for ProducerDeserializer {
     fn build(&mut self) -> Box<dyn Actor> {
-        panic!("Should not be called on BuilderDeserializer");
+        panic!("Should not be called on ProducerDeserializer");
     }
 }
 
@@ -86,18 +86,18 @@ mod tests {
         impl Actor for MyActor {}
 
         #[derive(Clone, Debug, Serialize, Deserialize, Default)]
-        struct MyActorBuilder;
+        struct MyProducer;
 
         //Tag the impl with distinguishable name - actor builder's name should not collide in
         //each specific running system
         #[typetag::serde(name = "my_actor_builder")]
-        impl ActorBuilder for MyActorBuilder {
+        impl Producer for MyProducer {
             fn build(&mut self) -> Box<dyn Actor> {
                 Box::new(MyActor)
             }
         }
 
-        let mut builder = MyActorBuilder::default();
+        let mut builder = MyProducer::default();
         let mut built_actor = builder.build();
         println!("The type name is = {:?}", built_actor.type_name());
         //Send a blank message and get a response back
