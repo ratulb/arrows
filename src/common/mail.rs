@@ -207,9 +207,9 @@ impl Msg {
     pub fn get_from(&self) -> &Option<Addr> {
         &self.from
     }
-    pub fn is_outbound(&self) -> bool {
+    pub fn inbound(&self) -> bool {
         match self.to {
-            Some(ref addr) => !addr.is_local(),
+            Some(ref addr) => addr.is_local(),
             None => false,
         }
     }
@@ -296,10 +296,10 @@ mod tests {
     #[test]
     fn outbound_mgs_test_1() {
         let mut trade_msg = Msg::new(option_of_bytes(&"Content"), "addr_from", "addr_to");
-        assert!(!trade_msg.is_outbound());
+        assert!(trade_msg.inbound());
 
         trade_msg.set_recipient_ip("89.89.89.89");
-        assert!(trade_msg.is_outbound());
+        assert!(!trade_msg.inbound());
     }
     #[test]
     fn test_mail_partition() {
