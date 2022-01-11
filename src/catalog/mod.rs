@@ -200,23 +200,6 @@ pub fn restore(addr: Addr) -> Result<Option<CachedActor>, Error> {
     Context::handle().borrow_mut().restore(addr)
 }
 //TODO Make Receive(in routing take mail) -> Send mail
-
-//Pre-shutdown message
-fn pre_shutdown(mut actor: CachedActor) -> Option<CachedActor> {
-    let _ignored = CachedActor::receive(
-        &mut actor,
-        RichMail::Content(Mail::Blank, true, 0, None, None),
-    );
-    Some(actor)
-}
-//Post startup message
-fn post_start(mut actor: CachedActor) -> Option<CachedActor> {
-    let _post_start_msg = CachedActor::receive(
-        &mut actor,
-        RichMail::Content(Mail::Blank, true, 0, None, None),
-    );
-    Some(actor)
-}
 pub(crate) fn handle_invocation(message: RichMail) {
     Context::handle().borrow_mut().handle_invocation(message);
 }
