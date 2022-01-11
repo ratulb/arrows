@@ -14,7 +14,7 @@ impl Actor for NewActor {
 #[derive(Debug, Serialize, Deserialize, Default)]
 struct NewProducer;
 
-#[typetag::serde(name = "new_actor_builder")]
+#[typetag::serde(name = "new_actor_producer")]
 impl Producer for NewProducer {
     fn build(&mut self) -> Box<dyn Actor> {
         Box::new(NewActor)
@@ -25,7 +25,7 @@ fn main() {
     let builder = NewProducer::default();
 
     let rs = define_actor!("new_actor", builder);
-    println!("The reg result is = {:?}", rs);
+    println!("The registration result is = {:?}", rs);
 
     let builder = NewProducer;
     define_actor!(Addr::new("new_actor"), builder);

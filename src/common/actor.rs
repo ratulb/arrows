@@ -50,25 +50,39 @@ impl Producer for ProducerDeserializer {
     }
 }
 //Sample actor and actor producer
-pub struct NewActor;
-impl Actor for NewActor {
+pub struct ExampleActor;
+impl Actor for ExampleActor {
     fn receive(&mut self, _incoming: Mail) -> std::option::Option<Mail> {
-        Some(Msg::new_with_text("Reply from new actor", "from", "to").into())
+        Some(Msg::new_with_text("Reply from ExampleActor", "from", "to").into())
     }
 }
 #[derive(Debug, Serialize, Deserialize, Default)]
-struct NewProducer;
-#[typetag::serde(name = "new_actor_builder")]
-impl Producer for NewProducer {
+struct ExampleActorProducer;
+#[typetag::serde(name = "example_actor_producer")]
+impl Producer for ExampleActorProducer {
     fn build(&mut self) -> Box<dyn Actor> {
-        Box::new(NewActor)
+        Box::new(ExampleActor)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{define_actor, send, Addr};
     use serde::{Deserialize, Serialize};
+
+    #[test]
+    fn example_actor() {
+        let producer = ExampleActorProducer;
+        let rs = define_actor!("example_actor1", producer);
+        println!("The registration result is = {:?}", rs);
+
+        let _rs = define_actor!(Addr::new("example_actor2"), ExampleActorProducer);
+
+        let m = Msg::default();
+        send!("example_actor1", m);
+        send!(Addr::new("example_actor2"), Msg::default());
+    }
 
     #[test]
     fn create_actor_test1() {

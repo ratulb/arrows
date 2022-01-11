@@ -17,7 +17,7 @@ impl Actors {
         }
     }
 
-    pub(super) fn get_actor(&self, addr: &Addr) -> Option<&CachedActor> {
+    pub(super) fn get(&self, addr: &Addr) -> Option<&CachedActor> {
         self.actor_cache.get(addr)
     }
 
@@ -25,11 +25,11 @@ impl Actors {
         self.actor_cache.get_mut(addr)
     }
 
-    pub(super) fn add_actor(&mut self, addr: Addr, actor: CachedActor) -> Option<CachedActor> {
+    pub(super) fn add(&mut self, addr: Addr, actor: CachedActor) -> Option<CachedActor> {
         self.actor_cache.insert(addr, actor)
     }
 
-    pub(super) fn remove_actor(&mut self, addr: &Addr) -> Option<CachedActor> {
+    pub(super) fn remove(&mut self, addr: &Addr) -> Option<CachedActor> {
         self.actor_cache.remove(addr)
     }
 
@@ -38,11 +38,11 @@ impl Actors {
         addr: Addr,
         actor: CachedActor,
     ) -> Result<Option<CachedActor>, Error> {
-        let evicted = Self::add_actor(actors, addr.clone(), actor).and_then(pre_shutdown);
-        let admitted = Self::remove_actor(actors, &addr).and_then(post_start);
+        let evicted = Self::add(actors, addr.clone(), actor).and_then(pre_shutdown);
+        let admitted = Self::remove(actors, &addr).and_then(post_start);
         match admitted {
             Some(admitted) => {
-                Self::add_actor(actors, addr, admitted);
+                Self::add(actors, addr, admitted);
                 Ok(evicted)
             }
             None => Err(RegistrationError),

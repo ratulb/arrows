@@ -77,9 +77,9 @@ impl Context {
         let text = serde_json::to_string(&producer as &dyn Producer)?;
         match CachedActor::new(&text) {
             Some(mut actor) => {
-                let previous = self.actors.remove_actor(&addr).and_then(pre_shutdown);
+                let previous = Actors::get(&self.actors, &addr);
                 if let Some(previous) = previous {
-                    CachedActor::take_over_from(&mut actor, &previous);
+                    CachedActor::take_over_from(&mut actor, previous);
                     let identity = identity.to_string();
                     self.remove_actor_permanent(&identity);
                 }
@@ -114,11 +114,10 @@ impl Context {
     }
 
     fn is_actor_defined(&mut self, addr: &Addr) -> bool {
-        match self.actors.get_actor(addr) {
+        match Actors::get(&self.actors, addr) {
             Some(_) => true,
             None => {
                 let rs = self.restore(addr.clone());
-                println!("Actor restore result {:?}", rs);
                 rs.is_ok() && rs.ok().is_some()
             }
         }
