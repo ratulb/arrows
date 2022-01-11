@@ -60,7 +60,7 @@ impl Mail {
             .filter(|mail| !Mail::is_blank(mail))
             .flat_map(|mail| match mail {
                 trade @ Trade(_) => vec![trade],
-                Bulk(msgs) => msgs.into_iter().map(Trade).collect(),
+                Bulk(msgs) => msgs.into_iter().map(|msg|Trade(Box::new(msg))).collect(),
                 _ => panic!(),
             })
             .partition::<Vec<Mail>, _>(Mail::inbound)
@@ -220,7 +220,7 @@ impl Default for Mail {
 
 impl From<Msg> for Mail {
     fn from(msg: Msg) -> Self {
-        Mail::Trade(msg)
+        Mail::Trade(Box::new(msg))
     }
 }
 
@@ -304,12 +304,12 @@ mod tests {
         mails.push(Some(Mail::Blank));
         mails.push(Some(Mail::Blank));
         mails.push(None);
-        mails.push(Some(Trade(Msg::new_with_text("mail", "from", "to"))));
+        mails.push(Some(Trade(Box::new(Msg::new_with_text("mail", "from", "to")))));
         let mut m1 = Msg::new_with_text("mail", "from1", "to1");
         let mut addr1 = Addr::new("add1");
         addr1.with_port(9999);
         m1.set_recipient_add(&addr1);
-        mails.push(Some(Trade(m1)));
+        mails.push(Some(Trade(Box::new(m1))));
         let mut addr2 = addr1.clone();
         addr2.with_port(1111);
         let mut m2 = Msg::new_with_text("mail", "from2", "to2");
