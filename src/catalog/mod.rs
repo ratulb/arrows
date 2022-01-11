@@ -2,10 +2,10 @@ mod actors;
 use crate::apis::Store;
 use crate::common::{actor::Producer, mail::Mail};
 use crate::events::DBEvent;
-use crate::Error::{self, RegistrationError, RestorationError};
 use crate::{Addr, RichMail};
 use lazy_static::lazy_static;
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
+use crate::Error::{self, RegistrationError, RestorationError};
 use std::cell::RefCell;
 
 use std::sync::Arc;
@@ -192,14 +192,14 @@ pub fn define_actor(
 //Send off a payload of messages which could be directed to different actors in local or
 //remote systems. Where messages would be delivered is decided on the host field to of the to
 //address(Addr) of each message
-pub fn ingress(payload: Mail) {
-    Context::handle().borrow_mut().ingress(payload);
+pub fn ingress(mail: Mail) {
+    Context::handle().borrow_mut().ingress(mail);
 }
 
 pub fn restore(addr: Addr) -> Result<Option<CachedActor>, Error> {
     Context::handle().borrow_mut().restore(addr)
 }
 //TODO Make Receive(in routing take mail) -> Send mail
-pub(crate) fn handle_invocation(message: RichMail) {
-    Context::handle().borrow_mut().handle_invocation(message);
+pub(crate) fn handle_invocation(mail: RichMail) {
+    Context::handle().borrow_mut().handle_invocation(mail);
 }
