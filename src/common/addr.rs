@@ -72,7 +72,7 @@ impl Addr {
         }
         None
     }
-    pub fn is_local(&self) -> bool {
+    pub fn is_local_ip(&self) -> bool {
         match self.get_socket_addr() {
             None => false,
             Some(sa) => {
@@ -84,6 +84,17 @@ impl Addr {
                 }
             }
         }
+    }
+
+    pub fn is_local_port(&self) -> bool {
+        match self.get_port() {
+            Some(port) => port == *PORT,
+            None => false,
+        }
+    }
+
+    pub fn is_local(&self) -> bool {
+        self.is_local_ip() && self.is_local_port()
     }
 
     pub fn get_host(&self) -> Option<&String> {

@@ -2,10 +2,10 @@ mod actors;
 use crate::apis::Store;
 use crate::common::{actor::Producer, mail::Mail};
 use crate::events::DBEvent;
+use crate::Error::{self, RegistrationError, RestorationError};
 use crate::{Addr, RichMail};
 use lazy_static::lazy_static;
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
-use crate::Error::{self, RegistrationError, RestorationError};
 use std::cell::RefCell;
 
 use std::sync::Arc;

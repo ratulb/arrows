@@ -1,3 +1,4 @@
+use crate::Result;
 use crate::{
     common::utils::{compute_hash, from_bytes, option_of_bytes},
     Addr,
@@ -36,6 +37,50 @@ impl Mail {
             _ => panic!("messages is supported only on Bulk variant"),
         }
     }
+
+    pub fn is_blank(mail: &Mail) -> bool {
+        match mail {
+            Blank => true,
+            _ => false,
+        }
+    }
+    //Checks only for the variant of Trade!
+    pub fn inbound(mail: &Mail) -> bool {
+        match mail {
+            Trade(m) => match m.get_to() {
+                Some(ref addr) => addr.is_local(),
+                None => false,
+            },
+            _ => false,
+        }
+    }
+
+    //partition as inbound/outbound messages
+    pub fn partition(mails: Vec<Option<Mail>>) -> Option<(Vec<Mail>, Vec<Mail>)> {
+        match mails
+            .into_iter()
+            .map(Mail::from)
+            .filter(|mail| !Mail::is_blank(mail))
+            .flat_map(|mail| match mail {
+                trade @ Trade(_) => vec![trade],
+                Bulk(msgs) => msgs.into_iter().map(Trade).collect(),
+                _ => panic!(),
+            })
+            .partition::<Vec<Mail>, _>(Mail::inbound)
+        {
+            (v1, v2) if v1.is_empty() & v2.is_empty() => None,
+            otherwise @ (_, _) => Some(otherwise),
+        }
+    }
+}
+
+impl From<Option<Mail>> for Mail {
+    fn from(opt: Option<Mail>) -> Self {
+        match opt {
+            Some(mail) => mail,
+            None => Mail::Blank,
+        }
+    }
 }
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Default)]
@@ -70,7 +115,7 @@ impl Msg {
     pub fn content_as_text(&self) -> Option<&str> {
         match self.content {
             Some(Binary(ref bytes)) => {
-                let text: crate::Result<&str> = from_bytes(bytes);
+                let text: Result<&str> = from_bytes(bytes);
                 text.ok()
             }
             Some(Text(ref s)) => Some(s),
@@ -255,5 +300,37 @@ mod tests {
 
         trade_msg.set_recipient_ip("89.89.89.89");
         assert!(trade_msg.is_outbound());
+    }
+    #[test]
+    fn test_mail_partition() {
+        let mut mails = Vec::new();
+        mails.push(Some(Mail::Blank));
+        mails.push(Some(Mail::Blank));
+        mails.push(None);
+        mails.push(Some(Trade(Msg::new_with_text("mail", "from", "to"))));
+        let _add1 = Addr::new("other machine1");
+        let mut m1 = Msg::new_with_text("mail", "from1", "to1");
+        let mut addr1 = Addr::new("add1");
+        addr1.with_port(9999);
+        m1.set_recipient_add(&addr1);
+        mails.push(Some(Trade(m1)));
+        let mut addr2 = addr1.clone();
+        addr2.with_port(1111);
+        let mut m2 = Msg::new_with_text("mail", "from2", "to2");
+        m2.set_recipient_add(&addr2);
+        mails.push(Some(Bulk(vec![m2])));
+        let rs = Mail::partition(mails);
+        match rs {
+            Some((ref v1, ref v2)) => {
+                v1.iter().for_each(|m| {
+                    println!("{:?}", m.message().get_to());
+                });
+                println!("================");
+                v2.iter().for_each(|m| {
+                    println!("{:?}", m.message().get_to());
+                });
+            }
+            None => (),
+        }
     }
 }
