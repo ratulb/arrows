@@ -69,7 +69,7 @@ impl Mail {
             .partition::<Vec<Mail>, _>(Mail::inbound)
         {
             (v1, v2) if v1.is_empty() & v2.is_empty() => None,
-            otherwise @ (_, _) => Some(otherwise),
+            others @ (_, _) => Some(others),
         }
     }
 }
