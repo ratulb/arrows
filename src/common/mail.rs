@@ -47,10 +47,7 @@ impl Mail {
     //Checks only for the variant of Trade!
     pub fn inbound(mail: &Mail) -> bool {
         match mail {
-            Trade(m) => match m.get_to() {
-                Some(ref addr) => addr.is_local(),
-                None => false,
-            },
+            Trade(ref msg) => msg.inbound(),
             _ => false,
         }
     }
