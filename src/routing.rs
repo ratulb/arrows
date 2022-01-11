@@ -1,4 +1,4 @@
-use crate::catalog::send_off;
+use crate::catalog::ingress;
 use crate::catalog::{self};
 use crate::{Addr, Mail, Msg, Result, RichMail};
 use parking_lot::Mutex;
@@ -23,11 +23,11 @@ impl Delegate {
             let receiver = receiver.lock();
             match receiver.recv() {
                 Ok(rich_mail) => {
-                    println!(
+                    /***println!(
                         "Received a mail msg = {:?} {:?}",
                         std::thread::current().id(),
                         rich_mail.to()
-                    );
+                    );***/
                     catalog::handle_invocation(rich_mail);
                     //let defined = catalog::is_actor_defined(rich_mail.to().as_ref().unwrap());
                 }
@@ -66,9 +66,9 @@ impl Router {
 }
 impl Drop for Router {
     fn drop(&mut self) {
-        /*** for handle in std::mem::take(&mut self.delegates) {
+        for handle in std::mem::take(&mut self.delegates) {
             handle.join();
-        }***/
+        }
     }
 }
 
@@ -80,10 +80,10 @@ impl Messenger {
                 msg.set_recipient_add(addr);
             }
             if addr.is_local() {
-                send_off(Mail::Bulk(msgs));
+                ingress(Mail::Bulk(msgs));
                 println!("I am very much alive and kicking!");
             } else {
-                //TODO send_off_remote//In fact everything should hit the server
+                //TODO ingress_remote//In fact everything should hit the server
             }
         }
         Ok(())

@@ -1,4 +1,4 @@
-use arrows::send_off;
+use arrows::ingress;
 use arrows::{from_bytes, Mail};
 use byte_marks::Marked;
 use std::io::{BufReader, BufWriter, Result, Write};
@@ -59,17 +59,20 @@ impl Server {
 
         for mail in marked {
             println!("Received mail length = {}", mail.len());
-            self.route_mail(mail);
+            let rs = self.ingress(mail);
+            if let Err(err) = rs {
+                eprintln!("Error ingressing mail {:?}", err);
+            }
         }
         writer.write_all("Server received request".as_bytes())?;
         writer.flush()?;
         Ok(())
     }
 
-    fn route_mail(&self, payload: Vec<u8>) -> Result<()> {
+    fn ingress(&self, payload: Vec<u8>) -> Result<()> {
         let payload = from_bytes::<'_, Mail>(&payload)?;
         match payload {
-            m @ Mail::Trade(_) | m @ Mail::Bulk(_) | m @ Mail::Blank => send_off(m),
+            m @ Mail::Trade(_) | m @ Mail::Bulk(_) | m @ Mail::Blank => ingress(m),
             _ => eprintln!("Engulfed by blackhole!"),
         }
         Ok(())

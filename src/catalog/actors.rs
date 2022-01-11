@@ -1,6 +1,6 @@
 use crate::constants::ACTOR_BUFFER_SIZE;
 use crate::{Actor, Addr, Mail, Producer, ProducerDeserializer, RichMail};
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub(super) struct Actors {
@@ -36,7 +36,7 @@ impl Actors {
 pub struct CachedActor {
     exe: Option<Box<dyn Actor>>,
     sequence: i64,
-    outputs: VecDeque<Option<Mail>>,
+    outputs: Vec<Option<Mail>>,
 }
 
 impl CachedActor {
@@ -48,7 +48,7 @@ impl CachedActor {
                 Some(Self {
                     exe: Some(actor),
                     sequence: 0,
-                    outputs: VecDeque::new(),
+                    outputs: Vec::new(),
                 })
             }
             Err(err) => {
@@ -95,7 +95,7 @@ impl CachedActor {
         }
     }
 
-    pub(crate) fn attributes_from(this: &mut CachedActor, other: &CachedActor) {
+    pub(crate) fn take_over_from(this: &mut CachedActor, other: &CachedActor) {
         this.sequence = other.sequence;
         this.outputs = other.outputs.clone();
     }
@@ -109,17 +109,28 @@ impl CachedActor {
                 let outcome = executable.receive(mail.mail_out());
                 CachedActor::push_outcome(CachedActor::output_buffer(actor), outcome);
                 CachedActor::increment_sequence(CachedActor::get_sequence_mut(actor));
+                println!(
+                    "CachedActor current message seq {:?}",
+                    CachedActor::get_sequence_mut(actor)
+                );
+                println!(
+                    "CachedActor buffer size {:?}",
+                    CachedActor::get_sequence(actor)
+                );
                 if CachedActor::should_flush(CachedActor::buffer_size(actor)) {
                     //Do flush here
+                    let _buffered = std::mem::take(CachedActor::output_buffer(actor));
+                    //TODO egress
+                    //ingress(Mail::Bulk(buffered));
                 }
             }
             None => {}
         }
     }
 
-    pub(crate) fn push_outcome(output_buffer: &mut VecDeque<Option<Mail>>, mail: Option<Mail>) {
+    pub(crate) fn push_outcome(output_buffer: &mut Vec<Option<Mail>>, mail: Option<Mail>) {
         if mail.is_some() {
-            output_buffer.push_back(mail);
+            output_buffer.push(mail);
         }
     }
 
@@ -135,7 +146,7 @@ impl CachedActor {
         actor.outputs.len()
     }
 
-    pub(crate) fn output_buffer(actor: &mut CachedActor) -> &mut VecDeque<Option<Mail>> {
+    pub(crate) fn output_buffer(actor: &mut CachedActor) -> &mut Vec<Option<Mail>> {
         &mut actor.outputs
     }
 }

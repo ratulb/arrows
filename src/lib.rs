@@ -1,5 +1,5 @@
 #![deny(rust_2018_idioms)]
-pub use catalog::{restore, send_off};
+pub use catalog::{ingress, restore};
 pub use common::actor::{Actor, Producer, ProducerDeserializer};
 pub use common::addr::Addr;
 pub use common::errs::{Error, Result};

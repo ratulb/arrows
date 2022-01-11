@@ -97,6 +97,23 @@ impl Store {
         self.conn.inner.execute_batch(TX_COMMIT)?;
         Ok(())
     }
+    pub(crate) fn egress(&mut self) -> Result<()> {
+        self.conn.inner.execute_batch(TX_BEGIN)?;
+        let stmt = Self::message_insert_stmt(&mut self.message_insert_stmt);
+        let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
+        match stmt {
+            Some(ref mut s) => {
+                for msg in self.buffer.drain(..) {
+                    let actor_id = msg.get_to_id().to_string();
+                    let bytes = msg.as_bytes();
+                    let _status = s.execute(named_params! {":actor_id": &actor_id as &dyn ToSql, ":msg_id": &msg.id_as_string() as &dyn ToSql,":actor_id": &actor_id as &dyn ToSql, ":msg": &bytes as &dyn ToSql })?;
+                }
+            }
+            None => panic!(),
+        }
+        self.conn.inner.execute_batch(TX_COMMIT)?;
+        Ok(())
+    }
 
     pub(crate) fn setup(&mut self) -> Result<()> {
         self.conn.inner.execute(MESSAGES, [])?;
@@ -127,7 +144,7 @@ impl Store {
         Ok(actors)
     }
 
-    pub(crate) fn purge_inbox_of(&mut self, actor_id: &String) -> Result<()> {
+    pub(crate) fn purge_inbox_of(&mut self, actor_id: &str) -> Result<()> {
         let stmt = format!(
             "SELECT count(1) FROM sqlite_master WHERE type='table' AND name='inbox_{}'",
             actor_id
@@ -164,7 +181,7 @@ impl Store {
         Ok(())
     }
 
-    pub(crate) fn save_builder(
+    pub(crate) fn save_producer(
         &mut self,
         identity: &str,
         addr: Addr,
@@ -575,13 +592,13 @@ mod tests {
     }
 
     #[test]
-    fn save_builder_1001() -> Result<()> {
+    fn save_producer_1001() -> Result<()> {
         let mut store = Store::new();
         let _ = store.setup();
         let addr = Addr::new("1001");
         let identity = "1001";
         let insert =
-            store.save_builder(identity, addr, &r#"{"new_actor_builder":null}"#.to_string());
+            store.save_producer(identity, addr, &r#"{"new_actor_builder":null}"#.to_string());
         assert!(insert.is_ok());
         Ok(())
     }

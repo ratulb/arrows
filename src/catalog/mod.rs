@@ -7,7 +7,7 @@ use crate::{Addr, Error};
 use lazy_static::lazy_static;
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 use std::cell::RefCell;
-use std::cell::RefMut;
+
 use std::sync::Arc;
 
 use crate::catalog::actors::{Actors, CachedActor};
@@ -33,7 +33,7 @@ impl Context {
 
     //cargo run --example - TODO this need to be changed to support remoting - only messages
     //destined to local system should be looped back
-    pub fn send_off(&mut self, payload: Mail) {
+    pub fn ingress(&mut self, payload: Mail) {
         self.store.persist(payload);
     }
     //Numeric identity of the actor
@@ -42,22 +42,23 @@ impl Context {
             .remove_actor_permanent(identity)
             .map_err(|err| Error::Other(Box::new(err)))
     }
-    //Save an actor builder defintion in the backing store. Current active actor, if any, will
+    //Save an actor producer defintion in the backing store. Current active actor, if any, will
     //not be disturbed
-    pub(crate) fn save_builder(
+    pub(crate) fn save_producer(
         &mut self,
         identity: &str,
         addr: Addr,
-        builder: &impl Producer,
+        producer: &impl Producer,
     ) -> Result<(), Error> {
-        let text = serde_json::to_string(builder as &dyn Producer)?;
+        let text = serde_json::to_string(producer as &dyn Producer)?;
         self.store
-            .save_builder(identity, addr, &text)
+            .save_producer(identity, addr, &text)
             .map_err(|err| Error::Other(Box::new(err)))
     }
     //identity - numeric string of actor address(Addr)
     pub(crate) fn retrieve_actor_def(&mut self, identity: &str) -> Option<(Addr, String, i64)> {
         let result = self.store.retrieve_actor_def(identity);
+        println!("Actor retrieved result {:?}", result);
         match result {
             Ok(addr_text_seq) => addr_text_seq,
             Err(err) => {
@@ -66,25 +67,27 @@ impl Context {
             }
         }
     }
-    //Defines an actor in the system. The builder instantiates actors.
+    //Defines an actor in the system. The producer instantiates actors.
     pub(crate) fn define_actor(
         &mut self,
         identity: u64,
         addr: Addr,
-        builder: impl Producer,
+        producer: impl Producer,
     ) -> Result<CachedActor, Error> {
-        let text = serde_json::to_string(&builder as &dyn Producer)?;
+        let text = serde_json::to_string(&producer as &dyn Producer)?;
         match CachedActor::new(&text) {
             Some(mut actor) => {
                 let previous = self.actors.remove_actor(&addr).and_then(pre_shutdown);
                 if let Some(previous) = previous {
-                    CachedActor::attributes_from(&mut actor, &previous);
+                    CachedActor::take_over_from(&mut actor, &previous);
                     let identity = identity.to_string();
                     self.remove_actor_permanent(&identity);
                 }
-                self.save_builder(&identity.to_string(), addr.clone(), &builder)?;
+                self.save_producer(&identity.to_string(), addr.clone(), &producer)?;
                 self.actors
                     .add_actor(addr, actor)
+                    //It will be fired on outgoing actor -TODO fix
+                    //.and_then(pre_shutdown)
                     .and_then(post_start)
                     .ok_or(Error::RegistrationError)
             }
@@ -95,7 +98,6 @@ impl Context {
     //Restore an actor from the backing storage. Active actor will be replaced on successful
     //retrieval. Left undisturbed if not found.
     pub(crate) fn restore(&mut self, addr: Addr) -> Result<Option<CachedActor>, Error> {
-        println!("The actor: {:?}", addr);
         let identity = addr.get_id().to_string();
         match self.retrieve_actor_def(&identity) {
             Some(definition) => {
@@ -108,6 +110,8 @@ impl Context {
                             msg_seq,
                         );
                         self.actors
+                            //TODO add ejects out prev actor which is None that leads to missing
+                            //the first message after restoration which needs to be taken care of
                             .add_actor(addr, actor)
                             .and_then(post_start)
                             .ok_or(Error::RestorationError)
@@ -120,11 +124,12 @@ impl Context {
         }
     }
 
-    pub(crate) fn is_actor_defined(&mut self, addr: &Addr) -> bool {
+    fn is_actor_defined(&mut self, addr: &Addr) -> bool {
         match self.actors.get_actor(addr) {
             Some(_) => true,
             None => {
                 let rs = self.restore(addr.clone());
+                println!("Actor restore result {:?}", rs);
                 rs.is_ok() && rs.ok().is_some()
             }
         }
@@ -134,12 +139,16 @@ impl Context {
         let addr = rich_mail.to();
         if let Some(ref addr_inner) = addr {
             let defined = self.is_actor_defined(addr_inner);
-
-            let _actor_id = addr_inner.get_id().to_string();
+            if !defined {
+                eprintln!(
+                    "Actor definition not found in the system for :{:?}!",
+                    addr_inner
+                );
+                return;
+            }
+            //let _actor_id = addr_inner.get_id().to_string();
             let actor = self.actors.get_actor_mut(addr_inner);
-            println!("Here it is : {:?}", defined);
             if let Some(actor) = actor {
-                println!("Check1");
                 CachedActor::receive(actor, rich_mail);
             }
         }
@@ -181,27 +190,24 @@ pub(crate) fn past_events() -> Vec<RichMail> {
 pub fn define_actor(
     identity: u64,
     addr: Addr,
-    builder: impl Producer,
+    producer: impl Producer,
 ) -> Result<CachedActor, Error> {
     Context::handle()
         .borrow_mut()
-        .define_actor(identity, addr, builder)
+        .define_actor(identity, addr, producer)
 }
 
 //Send off a payload of messages which could be directed to different actors in local or
 //remote systems. Where messages would be delivered is decided on the host field to of the to
 //address(Addr) of each message
-pub fn send_off(payload: Mail) {
-    Context::handle().borrow_mut().send_off(payload);
+pub fn ingress(payload: Mail) {
+    Context::handle().borrow_mut().ingress(payload);
 }
 
 pub fn restore(addr: Addr) -> Result<Option<CachedActor>, Error> {
     Context::handle().borrow_mut().restore(addr)
 }
 //TODO Make Receive(in routing take mail) -> Send mail
-pub(crate) fn is_actor_defined(addr: &Addr) -> bool {
-    Context::handle().borrow_mut().is_actor_defined(addr)
-}
 
 //Pre-shutdown message
 fn pre_shutdown(mut actor: CachedActor) -> Option<CachedActor> {
