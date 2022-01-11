@@ -135,7 +135,7 @@ impl Context {
                 return;
             }
             //let _actor_id = addr_inner.get_id().to_string();
-            let actor = self.actors.get_actor_mut(addr_inner);
+            let actor = self.actors.get_mut(addr_inner);
             if let Some(actor) = actor {
                 CachedActor::receive(actor, rich_mail);
             }

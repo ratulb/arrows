@@ -21,7 +21,7 @@ impl Actors {
         self.actor_cache.get(addr)
     }
 
-    pub(super) fn get_actor_mut(&mut self, addr: &Addr) -> Option<&mut CachedActor> {
+    pub(super) fn get_mut(&mut self, addr: &Addr) -> Option<&mut CachedActor> {
         self.actor_cache.get_mut(addr)
     }
 
