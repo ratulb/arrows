@@ -2,8 +2,8 @@ mod actors;
 use crate::apis::Store;
 use crate::common::{actor::Producer, mail::Mail};
 use crate::events::DBEvent;
-use crate::RichMail;
-use crate::{Addr, Error};
+use crate::Error::{self, RegistrationError, RestorationError};
+use crate::{Addr, RichMail};
 use lazy_static::lazy_static;
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 use std::cell::RefCell;
@@ -73,7 +73,7 @@ impl Context {
         identity: u64,
         addr: Addr,
         producer: impl Producer,
-    ) -> Result<CachedActor, Error> {
+    ) -> Result<Option<CachedActor>, Error> {
         let text = serde_json::to_string(&producer as &dyn Producer)?;
         match CachedActor::new(&text) {
             Some(mut actor) => {
@@ -84,14 +84,9 @@ impl Context {
                     self.remove_actor_permanent(&identity);
                 }
                 self.save_producer(&identity.to_string(), addr.clone(), &producer)?;
-                self.actors
-                    .add_actor(addr, actor)
-                    //It will be fired on outgoing actor -TODO fix
-                    //.and_then(pre_shutdown)
-                    .and_then(post_start)
-                    .ok_or(Error::RegistrationError)
+                Actors::play_registration_acts(&mut self.actors, addr, actor)
             }
-            None => Err(Error::RegistrationError),
+            None => Err(RegistrationError),
         }
     }
 
@@ -109,18 +104,12 @@ impl Context {
                             CachedActor::get_sequence_mut(&mut actor),
                             msg_seq,
                         );
-                        self.actors
-                            //TODO add ejects out prev actor which is None that leads to missing
-                            //the first message after restoration which needs to be taken care of
-                            .add_actor(addr, actor)
-                            .and_then(post_start)
-                            .ok_or(Error::RestorationError)
-                            .map(Some)
+                        Actors::play_restoration_acts(&mut self.actors, addr, actor)
                     }
-                    None => Err(Error::RestorationError),
+                    None => Err(RestorationError),
                 }
             }
-            None => Err(Error::RestorationError),
+            None => Err(RestorationError),
         }
     }
 
@@ -186,12 +175,16 @@ pub(crate) fn load_messages(rowids: Vec<i64>) -> Vec<RichMail> {
 pub(crate) fn past_events() -> Vec<RichMail> {
     Context::handle().borrow_mut().past_events()
 }
-
+//Define an actor in the system providing the actor id, actor address(Addr) and actor
+//producer implmentation of `Producer`. Existing actor with the same identity, if any, would
+//be returned after running pre shutdown/post start up calls. Producer definition would be
+//peristed in the backing store. On restart - actors will be restored on demand to process
+//pending or incoming messages. Actors will restart from where they left off.
 pub fn define_actor(
     identity: u64,
     addr: Addr,
     producer: impl Producer,
-) -> Result<CachedActor, Error> {
+) -> Result<Option<CachedActor>, Error> {
     Context::handle()
         .borrow_mut()
         .define_actor(identity, addr, producer)

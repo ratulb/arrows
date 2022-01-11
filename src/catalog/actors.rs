@@ -1,4 +1,5 @@
 use crate::constants::ACTOR_BUFFER_SIZE;
+use crate::Error::{self, RegistrationError, RestorationError};
 use crate::{Actor, Addr, Mail, Producer, ProducerDeserializer, RichMail};
 use std::collections::HashMap;
 
@@ -30,6 +31,29 @@ impl Actors {
 
     pub(super) fn remove_actor(&mut self, addr: &Addr) -> Option<CachedActor> {
         self.actor_cache.remove(addr)
+    }
+
+    pub(super) fn play_registration_acts(
+        actors: &mut Self,
+        addr: Addr,
+        actor: CachedActor,
+    ) -> Result<Option<CachedActor>, Error> {
+        let evicted = Self::add_actor(actors, addr.clone(), actor).and_then(pre_shutdown);
+        let admitted = Self::remove_actor(actors, &addr).and_then(post_start);
+        match admitted {
+            Some(admitted) => {
+                Self::add_actor(actors, addr, admitted);
+                Ok(evicted)
+            }
+            None => Err(RegistrationError),
+        }
+    }
+    pub(super) fn play_restoration_acts(
+        actors: &mut Self,
+        addr: Addr,
+        actor: CachedActor,
+    ) -> Result<Option<CachedActor>, Error> {
+        Self::play_registration_acts(actors, addr, actor).map_err(|_| RestorationError)
     }
 }
 #[derive(Debug)]
@@ -149,4 +173,21 @@ impl CachedActor {
     pub(crate) fn output_buffer(actor: &mut CachedActor) -> &mut Vec<Option<Mail>> {
         &mut actor.outputs
     }
+}
+
+//Pre-shutdown message
+fn pre_shutdown(mut actor: CachedActor) -> Option<CachedActor> {
+    let _ignored = CachedActor::receive(
+        &mut actor,
+        RichMail::Content(Mail::Blank, true, 0, None, None),
+    );
+    Some(actor)
+}
+//Post startup message
+fn post_start(mut actor: CachedActor) -> Option<CachedActor> {
+    let _post_start_msg = CachedActor::receive(
+        &mut actor,
+        RichMail::Content(Mail::Blank, true, 0, None, None),
+    );
+    Some(actor)
 }
