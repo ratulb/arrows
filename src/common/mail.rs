@@ -18,7 +18,7 @@ use Content::*;
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Mail {
-    Trade(Msg),
+    Trade(Box<Msg>),
     Bulk(Vec<Msg>),
     Blank,
 }
