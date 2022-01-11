@@ -58,7 +58,6 @@ impl Context {
     //identity - numeric string of actor address(Addr)
     pub(crate) fn retrieve_actor_def(&mut self, identity: &str) -> Option<(Addr, String, i64)> {
         let result = self.store.retrieve_actor_def(identity);
-        println!("Actor retrieved result {:?}", result);
         match result {
             Ok(addr_text_seq) => addr_text_seq,
             Err(err) => {
