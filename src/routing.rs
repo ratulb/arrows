@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
+
 pub(crate) struct Delegate {
     receiver: Option<Arc<Mutex<Receiver<RichMail>>>>,
 }
@@ -18,7 +19,6 @@ impl Delegate {
     }
     pub(crate) fn start(&mut self) -> JoinHandle<()> {
         let receiver = self.receiver.take().expect("Receiver");
-
         thread::spawn(move || loop {
             let receiver = receiver.lock();
             match receiver.recv() {
@@ -29,7 +29,6 @@ impl Delegate {
                         rich_mail.to()
                     );***/
                     catalog::handle_invocation(rich_mail);
-                    //let defined = catalog::is_actor_defined(rich_mail.to().as_ref().unwrap());
                 }
                 Err(err) => {
                     eprintln!("Error receiving msg {:?}", err);

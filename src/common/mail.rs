@@ -308,7 +308,6 @@ mod tests {
         mails.push(Some(Mail::Blank));
         mails.push(None);
         mails.push(Some(Trade(Msg::new_with_text("mail", "from", "to"))));
-        let _add1 = Addr::new("other machine1");
         let mut m1 = Msg::new_with_text("mail", "from1", "to1");
         let mut addr1 = Addr::new("add1");
         addr1.with_port(9999);
@@ -319,18 +318,23 @@ mod tests {
         let mut m2 = Msg::new_with_text("mail", "from2", "to2");
         m2.set_recipient_add(&addr2);
         mails.push(Some(Bulk(vec![m2])));
-        let rs = Mail::partition(mails);
-        match rs {
-            Some((ref v1, ref v2)) => {
-                v1.iter().for_each(|m| {
-                    println!("{:?}", m.message().get_to());
-                });
-                println!("================");
-                v2.iter().for_each(|m| {
-                    println!("{:?}", m.message().get_to());
-                });
-            }
-            None => (),
+       
+        let mut m3 = Msg::new_with_text("mail", "from3", "to3");
+        m3.set_recipient_ip("89.89.89.89");
+        mails.push(Some(Bulk(vec![m3])));
+
+        if  let Some((ref v1, ref v2)) = Mail::partition(mails) {
+            v1.iter().for_each(|mail| {
+               if let Some(ref addr) = mail.message().get_to() {
+                  assert!(addr.is_local());
+               }
+            });
+
+            v2.iter().for_each(|mail| {
+               if let Some(ref addr) = mail.message().get_to() {
+                  assert!(!addr.is_local());
+               }
+            });
         }
     }
 }

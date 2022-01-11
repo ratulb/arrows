@@ -185,7 +185,7 @@ fn pre_shutdown(mut actor: CachedActor) -> Option<CachedActor> {
 }
 //Post startup message
 fn post_start(mut actor: CachedActor) -> Option<CachedActor> {
-    let _post_start_msg = CachedActor::receive(
+    let _ignored = CachedActor::receive(
         &mut actor,
         RichMail::Content(Mail::Blank, true, 0, None, None),
     );
