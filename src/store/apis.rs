@@ -70,7 +70,7 @@ impl Store {
             Blank if self.buffer.is_empty() => Ok(()),
             Blank => self.persist_buffer(),
             Trade(msg) => {
-                self.buffer.push(*msg);
+                self.buffer.push(msg);
                 self.flush_buffer()
             }
             Bulk(msgs) => {
@@ -263,7 +263,7 @@ impl Store {
             let msg = value_to_msg(value);
             let to = msg.get_to().clone();
             msgs.push(RichMail::Content(
-                Mail::Trade(Box::new(msg)),
+                Mail::Trade(msg),
                 inbound == 1,
                 msg_seq,
                 None,

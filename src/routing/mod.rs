@@ -1,8 +1,9 @@
-use crate::catalog::ingress;
+pub(crate) mod messenger;
+
 use crate::catalog::{self};
-use crate::{Addr, Mail, Msg, Result, RichMail};
+use crate::RichMail;
 use parking_lot::Mutex;
-use std::collections::HashMap;
+
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
@@ -68,23 +69,5 @@ impl Drop for Router {
         for handle in std::mem::take(&mut self.delegates) {
             handle.join();
         }
-    }
-}
-
-pub(crate) struct Messenger;
-impl Messenger {
-    pub(crate) fn send(messages: HashMap<&Addr, Vec<Msg>>) -> Result<()> {
-        for (addr, mut msgs) in messages.into_iter() {
-            for msg in msgs.iter_mut() {
-                msg.set_recipient_add(addr);
-            }
-            if addr.is_local() {
-                ingress(Mail::Bulk(msgs));
-                println!("I am very much alive and kicking!");
-            } else {
-                //TODO ingress_remote//In fact everything should hit the server
-            }
-        }
-        Ok(())
     }
 }

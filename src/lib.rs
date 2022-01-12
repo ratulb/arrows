@@ -17,7 +17,7 @@ mod store;
 
 use std::collections::HashMap;
 pub fn recv(msgs: HashMap<&Addr, Vec<Msg>>) {
-    use crate::routing::Messenger;
+    use crate::routing::messenger::Messenger;
     Messenger::send(msgs);
 }
 

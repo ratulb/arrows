@@ -3,6 +3,7 @@ pub enum Error {
     Registration(std::io::Error),
     SerdeJson(serde_json::Error),
     Other(Box<dyn std::error::Error>),
+    InvalidData,
     RegistrationError,
     RestorationError,
     Bincode(bincode::ErrorKind),

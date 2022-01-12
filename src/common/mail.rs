@@ -3,6 +3,7 @@ use crate::{
     common::utils::{compute_hash, from_bytes, option_of_bytes},
     Addr,
 };
+
 use serde::{Deserialize, Serialize};
 use std::mem::{replace, swap};
 use std::time::SystemTime;
@@ -18,7 +19,7 @@ use Content::*;
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Mail {
-    Trade(Box<Msg>),
+    Trade(Msg),
     Bulk(Vec<Msg>),
     Blank,
 }
@@ -37,6 +38,12 @@ impl Mail {
             _ => panic!("messages is supported only on Bulk variant"),
         }
     }
+    pub fn take(self) -> Msg {
+        match self {
+            Trade(msg) => msg,
+            _ => panic!(),
+        }
+    }
 
     pub fn is_blank(mail: &Mail) -> bool {
         match mail {
@@ -51,19 +58,32 @@ impl Mail {
             _ => false,
         }
     }
+    //Split into inbound and outbound(local vs remote)
+    pub fn split(mail: Mail) -> Option<(Vec<Msg>, Vec<Msg>)> {
+        match mail {
+            Blank => None,
+            trade @ Trade(_) if Mail::inbound(&trade) => Some((vec![trade.take()], Vec::new())),
+            trade @ Trade(_) if !Mail::inbound(&trade) => Some((Vec::new(), vec![trade.take()])),
+            Trade(_) => unreachable!(),
+            Bulk(msgs) => match msgs.into_iter().partition::<Vec<Msg>, _>(Msg::inbound) {
+                (v1, v2) if v1.is_empty() & v2.is_empty() => None,
+                others @ (_, _) => Some(others),
+            },
+        }
+    }
 
     //partition as inbound/outbound messages
-    pub fn partition(mails: Vec<Option<Mail>>) -> Option<(Vec<Mail>, Vec<Mail>)> {
+    pub fn partition(mails: Vec<Option<Mail>>) -> Option<(Vec<Msg>, Vec<Msg>)> {
         match mails
             .into_iter()
             .map(Mail::from)
             .filter(|mail| !Mail::is_blank(mail))
             .flat_map(|mail| match mail {
-                trade @ Trade(_) => vec![trade],
-                Bulk(msgs) => msgs.into_iter().map(|msg|Trade(Box::new(msg))).collect(),
+                trade @ Trade(_) => vec![trade.take()],
+                Bulk(msgs) => msgs,
                 _ => panic!(),
             })
-            .partition::<Vec<Mail>, _>(Mail::inbound)
+            .partition::<Vec<Msg>, _>(Msg::inbound)
         {
             (v1, v2) if v1.is_empty() & v2.is_empty() => None,
             others @ (_, _) => Some(others),
@@ -193,7 +213,6 @@ impl Msg {
         self.get_id().to_string()
     }
 
-    //Callers would be better served by cloning the returned &u64
     pub fn get_to_id(&self) -> u64 {
         match self.to {
             Some(ref addr) => addr.get_id(),
@@ -220,7 +239,7 @@ impl Default for Mail {
 
 impl From<Msg> for Mail {
     fn from(msg: Msg) -> Self {
-        Mail::Trade(Box::new(msg))
+        Mail::Trade(msg)
     }
 }
 
@@ -304,33 +323,33 @@ mod tests {
         mails.push(Some(Mail::Blank));
         mails.push(Some(Mail::Blank));
         mails.push(None);
-        mails.push(Some(Trade(Box::new(Msg::new_with_text("mail", "from", "to")))));
+        mails.push(Some(Trade(Msg::new_with_text("mail", "from", "to"))));
         let mut m1 = Msg::new_with_text("mail", "from1", "to1");
         let mut addr1 = Addr::new("add1");
         addr1.with_port(9999);
         m1.set_recipient_add(&addr1);
-        mails.push(Some(Trade(Box::new(m1))));
+        mails.push(Some(Trade(m1)));
         let mut addr2 = addr1.clone();
         addr2.with_port(1111);
         let mut m2 = Msg::new_with_text("mail", "from2", "to2");
         m2.set_recipient_add(&addr2);
         mails.push(Some(Bulk(vec![m2])));
-       
+
         let mut m3 = Msg::new_with_text("mail", "from3", "to3");
         m3.set_recipient_ip("89.89.89.89");
         mails.push(Some(Bulk(vec![m3])));
 
-        if  let Some((ref v1, ref v2)) = Mail::partition(mails) {
-            v1.iter().for_each(|mail| {
-               if let Some(ref addr) = mail.message().get_to() {
-                  assert!(addr.is_local());
-               }
+        if let Some((ref v1, ref v2)) = Mail::partition(mails) {
+            v1.iter().for_each(|msg| {
+                if let Some(ref addr) = msg.get_to() {
+                    assert!(addr.is_local());
+                }
             });
 
-            v2.iter().for_each(|mail| {
-               if let Some(ref addr) = mail.message().get_to() {
-                  assert!(!addr.is_local());
-               }
+            v2.iter().for_each(|msg| {
+                if let Some(ref addr) = msg.get_to() {
+                    assert!(!addr.is_local());
+                }
             });
         }
     }
