@@ -34,7 +34,8 @@ impl Context {
     //cargo run --example - TODO this need to be changed to support remoting - only messages
     //destined to local system should be looped back
     pub fn ingress(&mut self, payload: Mail) {
-        self.store.persist(payload);
+        let rs = self.store.persist(payload);
+        println!("catalog ingress {:?}", rs);
     }
     //Numeric identity of the actor
     pub(crate) fn remove_actor_permanent(&mut self, identity: &str) -> Result<(), Error> {

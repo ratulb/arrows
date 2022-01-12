@@ -32,7 +32,7 @@ macro_rules! send {
         $crate::send!(@DELEGATE; $($addr, ($($msg),*)),*);
     };
 
-    (@DELEGATE; $($addr:expr, ($($msg:expr),*)),*) => {
+    (@DELEGATE; $($addr:expr, ($($msg:expr),*)),*) => {{
         let mut actor_msgs = std::collections::HashMap::new();
             $(
                 let addr: $crate::Addr = $addr;
@@ -45,7 +45,7 @@ macro_rules! send {
                     )*
             )*
             $crate::recv(actor_msgs);
-    };
+    } };
 
     (@SIZE; $($msg:expr),*) => {
         <[()]>::len(&[$($crate::send![@SUB; $msg]),*])

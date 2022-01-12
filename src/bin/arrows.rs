@@ -23,6 +23,7 @@ struct Opt {
 fn main() -> Result<()> {
     let opt = Opt::from_args();
     println!("Server listening on {}", opt.addr);
+    define_example_actors();
     let server = Server::default();
     server.run(opt.addr);
     Ok(())
@@ -77,4 +78,13 @@ impl Server {
         }
         Ok(())
     }
+}
+use arrows::define_actor;
+use arrows::Addr;
+use arrows::ExampleActorProducer;
+
+fn define_example_actors() {
+    let producer = ExampleActorProducer;
+    let _rs = define_actor!("example_actor1", producer);
+    println!("Defined example actors");
 }

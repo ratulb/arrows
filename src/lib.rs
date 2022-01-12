@@ -1,6 +1,6 @@
 #![deny(rust_2018_idioms)]
 pub use catalog::{ingress, restore};
-pub use common::actor::{Actor, Producer, ProducerDeserializer};
+pub use common::actor::{Actor, ExampleActorProducer, Producer, ProducerDeserializer};
 pub use common::addr::Addr;
 pub use common::errs::{Error, Result};
 pub use common::mail::{Mail, Msg};

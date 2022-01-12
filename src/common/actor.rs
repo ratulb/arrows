@@ -57,7 +57,7 @@ impl Actor for ExampleActor {
     }
 }
 #[derive(Debug, Serialize, Deserialize, Default)]
-struct ExampleActorProducer;
+pub struct ExampleActorProducer;
 #[typetag::serde(name = "example_actor_producer")]
 impl Producer for ExampleActorProducer {
     fn build(&mut self) -> Box<dyn Actor> {

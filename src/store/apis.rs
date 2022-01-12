@@ -66,6 +66,7 @@ impl Store {
     }
 
     pub(crate) fn persist(&mut self, mail: Mail) -> Result<()> {
+        println!("Entered perist");
         match mail {
             Blank if self.buffer.is_empty() => Ok(()),
             Blank => self.persist_buffer(),
@@ -74,6 +75,7 @@ impl Store {
                 self.flush_buffer()
             }
             Bulk(msgs) => {
+                println!("Entered perist bulk");
                 self.buffer.extend(msgs);
                 self.flush_buffer()
             }
@@ -81,6 +83,13 @@ impl Store {
     }
 
     fn persist_buffer(&mut self) -> Result<()> {
+        println!("Entered perist_buffer");
+        //Commit any active tx to avoid nested transaction issue
+        match self.conn.inner.execute_batch(TX_COMMIT) {
+            Ok(_any_tx) => (),
+            Err(err) => println!("{}", err),
+        }
+        println!("Entered perist_buffer 1");
         self.conn.inner.execute_batch(TX_BEGIN)?;
         let stmt = Self::message_insert_stmt(&mut self.message_insert_stmt);
         let mut stmt = self.conn.inner.prepare_cached(stmt).ok();

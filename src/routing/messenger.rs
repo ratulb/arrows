@@ -1,9 +1,12 @@
 use crate::catalog::ingress;
+use crate::routing::messenger::client::Client;
 use crate::{Addr, Mail, Msg, Result};
 use std::collections::HashMap;
 
 pub(crate) struct Messenger;
+
 impl Messenger {
+
     pub(crate) fn send(messages: HashMap<&Addr, Vec<Msg>>) -> Result<()> {
         let mut ins = 0;
         let mut outs = 0;
@@ -32,11 +35,18 @@ impl Messenger {
             ingress(Mail::Bulk(ins));
         }
         if !outs.is_empty() {
-            let _groups = Self::group_by(outs);
+            let mut groups = Self::group_by(outs);
+            for (host, msgs) in groups.into_iter() {
+                let socket_addr = host.get_socket_addr().expect("Host address");
+                let mut client = Client::connect(socket_addr).expect("Connection");
+                client.send(msgs);
+                println!("Outbound host call to host {:?}", host);
+            }
         }
         println!("I am very much alive and kicking!");
         Ok(())
     }
+    
     pub(crate) fn mail(mail: Mail) -> Result<()> {
         let split = Mail::split(mail);
         match split {
@@ -52,6 +62,7 @@ impl Messenger {
         }
         Ok(())
     }
+    
     fn group_by(outs: Vec<Msg>) -> HashMap<Addr, Vec<Msg>> {
         let mut groups: HashMap<Addr, Vec<Msg>> = HashMap::new();
         for msg in outs {
@@ -95,7 +106,7 @@ pub(super) mod client {
                     self.marker.mark_tail(bytes);
                     self.writer.write_all(bytes)?;
                     self.writer.flush()?;
-                    let mut buf = vec![0; 1024];
+                    let mut buf = vec![0; 256];
                     let len = self.reader.read(&mut buf)?;
                     println!(
                         "Server response = {:?}",
