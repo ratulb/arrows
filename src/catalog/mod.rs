@@ -3,6 +3,7 @@ use crate::apis::Store;
 use crate::catalog::actors::{Actors, CachedActor};
 use crate::common::{actor::Producer, mail::Mail};
 use crate::events::DBEvent;
+use crate::routing::messenger::Messenger;
 use crate::Error::{self, RegistrationError, RestorationError};
 use crate::{Addr, RichMail};
 use lazy_static::lazy_static;
@@ -37,11 +38,11 @@ impl Context {
         let actors = Actors::new();
         let mut store = Store::new();
         store.setup();
-        let wip = Arc::new(AtomicBool::new(true));
-        let cloned = Arc::clone(&wip);
-        let (dispatcher, channel) = channel();
+        let ctx_init = Arc::new(AtomicBool::new(true));
+        let init_watch = Arc::clone(&ctx_init);
+        let (dispatcher, channel): (Sender<RichMail>, Receiver<_>) = channel();
         let handle = std::thread::spawn(move || {
-            while cloned.load(Ordering::Acquire) {
+            while init_watch.load(Ordering::Acquire) {
                 println!("Never leave a possibility of accessing Context halfway through!");
             }
             //Let there be Context
@@ -49,9 +50,18 @@ impl Context {
 
             loop {
                 match channel.recv() {
-                    Ok(rich_mail) => {
-                        println!("What a joy");
-                        self::egress(rich_mail);
+                    Ok(mut rich_mail) => {
+                        let mail: Mail = rich_mail.mail_out();
+                        let inouts = Mail::split(mail);
+                        if let Some((ins, outs)) = inouts {
+                            if !ins.is_empty() {
+                                rich_mail.replace_mail(ins);
+                                self::egress(rich_mail);
+                            }
+                            if !outs.is_empty() {
+                                Messenger::mail(Mail::Bulk(outs));
+                            }
+                        }
                     }
                     Err(err) => eprintln!("{}", err),
                 }
@@ -63,7 +73,7 @@ impl Context {
             handle: Some(handle),
             dispatcher,
         });
-        wip.store(false, Ordering::Release);
+        ctx_init.store(false, Ordering::Release);
         ctx
     }
 

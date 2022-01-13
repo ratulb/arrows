@@ -56,7 +56,13 @@ impl Actor for ExampleActor {
         match incoming {
             Mail::Trade(mut msg) => {
                 println!("Actor received msg = {:?}", msg);
-                msg.uturn_with_text("Actor reply");
+                if msg.get_recipient_port() == 7171 {
+                    msg.set_recipient_port(8181);
+                } else {
+                    msg.set_recipient_port(7171);
+                }
+
+                //msg.uturn_with_text("Actor reply");
                 Some(msg.into())
             }
             _ => None,

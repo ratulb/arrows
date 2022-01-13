@@ -37,6 +37,11 @@ impl RichMail {
         std::mem::replace(mail, Mail::Blank)
     }
 
+    pub(crate) fn replace_mail(&mut self, msgs: Vec<Msg>) {
+        let Content(mail, _, _, _, _) = self;
+        *mail = Mail::Bulk(msgs);
+    }
+
     pub(crate) fn to(&self) -> Option<&Addr> {
         let Content(_, _, _, _, to) = self;
         to.as_ref()

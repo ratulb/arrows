@@ -215,6 +215,13 @@ impl Msg {
         }
     }
 
+    pub fn get_recipient_port(&self) -> u16 {
+        if let Some(addr) = &self.to {
+            return addr.get_port().expect("port");
+        }
+        return 0;
+    }
+
     pub fn uturn_with_reply(&mut self, reply: Option<Vec<u8>>) {
         swap(&mut self.from, &mut self.to);
         let _ignore = replace(&mut self.content, reply.map(Binary));
