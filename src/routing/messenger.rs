@@ -12,18 +12,16 @@ impl Messenger {
                 msg.set_recipient_addr(addr);
                 msg
             });
-            match addr.get_socket_addr() {
-                Some(host_addr) => match Client::connect(host_addr) {
+            if let Some(host_addr) = addr.get_socket_addr() {
+                match Client::connect(host_addr) {
                     Ok(mut client) => {
                         client.send(msgs);
                         println!("Messenger sent to {}", host_addr);
                     }
                     Err(err) => eprintln!("{}", err),
-                },
-                None => (),
+                }
             }
         });
-
         Ok(())
     }
 
