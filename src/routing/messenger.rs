@@ -38,7 +38,7 @@ impl Messenger {
                         Ok(())
                     }
                 };
-                println!("Messenger Sent to {}", host_addr);
+                println!("Messages sent to {}", host_addr);
             });
         Ok(())
     }

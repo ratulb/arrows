@@ -74,7 +74,7 @@ impl Mail {
             Trade(_) => unreachable!(),
             Bulk(msgs) => match msgs.into_iter().partition::<Vec<Msg>, _>(Msg::inbound) {
                 (v1, v2) if v1.is_empty() & v2.is_empty() => None,
-                others @ (_, _) => Some(others),
+                or_else @ (_, _) => Some(or_else),
             },
         }
     }
@@ -93,7 +93,7 @@ impl Mail {
             .partition::<Vec<Msg>, _>(Msg::inbound)
         {
             (v1, v2) if v1.is_empty() & v2.is_empty() => None,
-            others @ (_, _) => Some(others),
+            or_else @ (_, _) => Some(or_else),
         }
     }
 }
