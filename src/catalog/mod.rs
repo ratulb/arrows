@@ -8,9 +8,13 @@ use crate::{Addr, RichMail};
 use lazy_static::lazy_static;
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 use std::cell::RefCell;
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    mpsc::{channel, Receiver, Sender},
+    Arc,
+};
 use std::thread::JoinHandle;
+use std::time::Duration;
 
 lazy_static! {
     pub(crate) static ref CTX: Arc<ReentrantMutex<RefCell<Context>>> =
@@ -33,22 +37,34 @@ impl Context {
         let actors = Actors::new();
         let mut store = Store::new();
         store.setup();
-
+        let wip = Arc::new(AtomicBool::new(true));
+        let cloned = Arc::clone(&wip);
         let (dispatcher, channel) = channel();
-        let handle = std::thread::spawn(move || loop {
-            match channel.recv() {
-                Ok(_rich_msg) => {
-                    println!("What a joy");
+        let handle = std::thread::spawn(move || {
+            while cloned.load(Ordering::Acquire) {
+                println!("Never leave a possibility of accessing Context halfway through!");
+            }
+            //Improbable - but still take no chance
+            std::thread::sleep(Duration::from_millis(100));
+
+            loop {
+                match channel.recv() {
+                    Ok(_rich_msg) => {
+                        Context::handle();
+                        println!("What a joy");
+                    }
+                    Err(err) => eprintln!("{}", err),
                 }
-                Err(err) => eprintln!("{}", err),
             }
         });
-        RefCell::new(Self {
+        let cell = RefCell::new(Self {
             actors,
             store,
             handle: Some(handle),
             dispatcher,
-        })
+        });
+        wip.store(false, Ordering::Release);
+        cell
     }
 
     //cargo run --example - TODO this need to be changed to support remoting - only messages
@@ -154,7 +170,6 @@ impl Context {
                 );
                 return;
             }
-            //let _actor_id = addr_inner.get_id().to_string();
             let actor = self.actors.get_mut(addr_inner);
             if let Some(actor) = actor {
                 CachedActor::receive(actor, rich_mail);
