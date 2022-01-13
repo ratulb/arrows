@@ -119,6 +119,11 @@ impl Store {
     }
 
     pub(crate) fn egress_messages(store: &mut Store, mut mail: RichMail) -> Result<()> {
+        println!("Entered egress_messages");
+          match store.conn.inner.execute_batch(TX_COMMIT) {
+            Ok(_any_tx) => (),
+            Err(err) => println!("{}", err),
+        }
         store.conn.inner.execute_batch(TX_BEGIN)?;
         let stmt = Self::message_insert_stmt(&mut store.message_insert_stmt);
         let mut stmt = store.conn.inner.prepare_cached(stmt).ok();
