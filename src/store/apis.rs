@@ -120,7 +120,7 @@ impl Store {
 
     pub(crate) fn egress_messages(store: &mut Store, mut mail: RichMail) -> Result<()> {
         println!("Entered egress_messages");
-          match store.conn.inner.execute_batch(TX_COMMIT) {
+        match store.conn.inner.execute_batch(TX_COMMIT) {
             Ok(_any_tx) => (),
             Err(err) => println!("{}", err),
         }
