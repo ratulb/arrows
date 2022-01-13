@@ -42,9 +42,7 @@ impl Context {
         let init_watch = Arc::clone(&ctx_init);
         let (dispatcher, channel): (Sender<RichMail>, Receiver<_>) = channel();
         let handle = std::thread::spawn(move || {
-            while init_watch.load(Ordering::Acquire) {
-                println!("Never leave a possibility of accessing Context halfway through!");
-            }
+            while init_watch.load(Ordering::Acquire) {}
             //Let there be Context
             std::thread::sleep(Duration::from_millis(10));
 
