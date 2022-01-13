@@ -219,7 +219,7 @@ impl Msg {
         if let Some(addr) = &self.to {
             return addr.get_port().expect("port");
         }
-        return 0;
+        0
     }
 
     pub fn uturn_with_reply(&mut self, reply: Option<Vec<u8>>) {

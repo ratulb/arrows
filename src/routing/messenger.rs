@@ -30,13 +30,16 @@ impl Messenger {
             .into_iter()
             .for_each(|(host_addr, msgs)| {
                 match Client::connect(host_addr) {
-                    Ok(mut client) => client.send(msgs),
-                    Err(err) => {
-                        eprintln!("{}", err);
+                    Ok(mut client) => {
+                        client.send(msgs);
+                        println!("Messages sent to {}", host_addr);
                         Ok(())
                     }
+                    Err(err) => {
+                        eprintln!("{}", err);
+                        Err(err)
+                    }
                 };
-                println!("Messages sent to {}", host_addr);
             });
         Ok(())
     }
