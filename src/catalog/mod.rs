@@ -1,5 +1,6 @@
 mod actors;
 use crate::apis::Store;
+use crate::catalog::actors::{Actors, CachedActor};
 use crate::common::{actor::Producer, mail::Mail};
 use crate::events::DBEvent;
 use crate::Error::{self, RegistrationError, RestorationError};
@@ -9,8 +10,7 @@ use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 use std::cell::RefCell;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
-
-use crate::catalog::actors::{Actors, CachedActor};
+use std::thread::JoinHandle;
 
 lazy_static! {
     pub(crate) static ref CTX: Arc<ReentrantMutex<RefCell<Context>>> =
@@ -21,23 +21,32 @@ lazy_static! {
 pub struct Context {
     actors: Actors,
     store: Store,
-    channel: InputChannel,
+    handle: Option<JoinHandle<()>>,
     dispatcher: Dispatcher,
 }
 
-type InputChannel = Option<Receiver<Vec<Option<Mail>>>>;
-type Dispatcher = Sender<Vec<Option<Mail>>>;
+type InputChannel = Option<Receiver<RichMail>>;
+type Dispatcher = Sender<RichMail>;
 
 impl Context {
     pub fn init() -> RefCell<Self> {
         let actors = Actors::new();
         let mut store = Store::new();
         store.setup();
+
         let (dispatcher, channel) = channel();
+        let handle = std::thread::spawn(move || loop {
+            match channel.recv() {
+                Ok(_rich_msg) => {
+                    println!("What a joy");
+                }
+                Err(err) => eprintln!("{}", err),
+            }
+        });
         RefCell::new(Self {
             actors,
             store,
-            channel: Some(channel),
+            handle: Some(handle),
             dispatcher,
         })
     }
@@ -86,7 +95,7 @@ impl Context {
         producer: impl Producer,
     ) -> Result<Option<CachedActor>, Error> {
         let text = serde_json::to_string(&producer as &dyn Producer)?;
-        match CachedActor::new(&text, Some(self.dispatcher.clone())) {
+        match CachedActor::new(&text, addr.clone(), Some(self.dispatcher.clone())) {
             Some(mut actor) => {
                 let previous = Actors::get(&self.actors, &addr);
                 if let Some(previous) = previous {
@@ -109,7 +118,7 @@ impl Context {
             Some(definition) => {
                 let text = definition.1;
                 let msg_seq = definition.2;
-                match CachedActor::new(&text, Some(self.dispatcher.clone())) {
+                match CachedActor::new(&text, addr.clone(), Some(self.dispatcher.clone())) {
                     Some(mut actor) => {
                         CachedActor::set_sequence(
                             CachedActor::get_sequence_mut(&mut actor),

@@ -52,6 +52,20 @@ impl Mail {
         }
     }
 
+    pub fn fold(mails: Vec<Option<Mail>>) -> Mail {
+        Bulk(
+            mails
+                .into_iter()
+                .map(Mail::from)
+                .flat_map(|mail| match mail {
+                    trade @ Trade(_) => vec![trade.take()],
+                    bulk @ Bulk(_) => bulk.take_all(),
+                    _ => unreachable!(),
+                })
+                .collect::<Vec<_>>(),
+        )
+    }
+
     pub fn is_blank(mail: &Mail) -> bool {
         match mail {
             Blank => true,
@@ -94,6 +108,21 @@ impl Mail {
         {
             (v1, v2) if v1.is_empty() & v2.is_empty() => None,
             or_else @ (_, _) => Some(or_else),
+        }
+    }
+
+    pub fn set_from(mail: &mut Option<Mail>, from: &Addr) {
+        match mail {
+            Some(mail) => match mail {
+                Trade(msg) => msg.set_from(from),
+                Bulk(msgs) => {
+                    for msg in msgs.iter_mut() {
+                        msg.set_from(from);
+                    }
+                }
+                Blank => (),
+            },
+            None => (),
         }
     }
 }
@@ -235,6 +264,10 @@ impl Msg {
             Some(ref addr) => addr.is_local(),
             None => false,
         }
+    }
+
+    pub fn set_from(&mut self, from: &Addr) {
+        std::mem::replace(&mut self.from, Some(from.clone()));
     }
 }
 

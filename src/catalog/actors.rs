@@ -11,7 +11,7 @@ pub(super) struct Actors {
 unsafe impl Send for Actors {}
 unsafe impl Sync for Actors {}
 
-type OutputChannel = Option<Sender<Vec<Option<Mail>>>>;
+type OutputChannel = Option<Sender<RichMail>>;
 
 impl Actors {
     pub(super) fn new() -> Self {
@@ -65,10 +65,11 @@ pub struct CachedActor {
     sequence: i64,
     outputs: Vec<Option<Mail>>,
     channel: OutputChannel,
+    addr: Addr,
 }
 
 impl CachedActor {
-    pub(crate) fn new(text: &str, channel: OutputChannel) -> Option<Self> {
+    pub(crate) fn new(text: &str, addr: Addr, channel: OutputChannel) -> Option<Self> {
         let producer = ProducerDeserializer::default().from_string(text.to_string());
         match producer {
             Ok(mut producer) => {
@@ -77,6 +78,7 @@ impl CachedActor {
                     exe: Some(actor),
                     sequence: 0,
                     outputs: Vec::new(),
+                    addr,
                     channel,
                 })
             }
@@ -89,6 +91,10 @@ impl CachedActor {
 
     pub(crate) fn should_handle_message(actor: &CachedActor, mail: &RichMail) -> bool {
         actor.sequence <= mail.seq()
+    }
+
+    pub(crate) fn get_addr(actor: &CachedActor) -> &Addr {
+        &actor.addr
     }
 
     pub(crate) fn get_sequence(actor: &CachedActor) -> i64 {
@@ -112,11 +118,12 @@ impl CachedActor {
     }
 
     pub(crate) fn re_define_self(&mut self, text: &str) -> bool {
-        let re_incarnate = Self::new(text, None);
+        let re_incarnate = Self::new(text, Addr::default(), None);
         match re_incarnate {
             Some(mut re_incarnate) => {
                 re_incarnate.outputs = std::mem::take(&mut self.outputs);
                 re_incarnate.sequence = self.sequence;
+                re_incarnate.addr = self.addr.clone();
                 re_incarnate.channel = self.channel.take();
                 *self = re_incarnate;
                 true
@@ -128,6 +135,7 @@ impl CachedActor {
     pub(crate) fn take_over_from(this: &mut CachedActor, other: &CachedActor) {
         this.sequence = other.sequence;
         this.outputs = other.outputs.clone();
+        this.addr = other.addr.clone();
         this.channel = other.channel.clone();
     }
 
@@ -137,7 +145,8 @@ impl CachedActor {
         }
         match CachedActor::actor_exe(actor) {
             Some(ref mut executable) => {
-                let outcome = executable.receive(mail.mail_out());
+                let mut outcome = executable.receive(mail.mail_out());
+                Mail::set_from(&mut outcome, CachedActor::get_addr(actor));
                 CachedActor::push_outcome(CachedActor::output_buffer(actor), outcome);
                 CachedActor::increment_sequence(CachedActor::get_sequence_mut(actor));
                 println!(
@@ -145,12 +154,17 @@ impl CachedActor {
                     CachedActor::get_sequence_mut(actor)
                 );
                 if CachedActor::should_flush(CachedActor::buffer_size(actor)) {
-                    //Do flush here
                     let buffered = std::mem::take(CachedActor::output_buffer(actor));
-                    //TODO egress
-                    //ingress(Mail::Bulk(buffered));
                     if let Some(ref channel) = actor.channel {
-                        channel.send(buffered).expect("Published output");
+                        channel
+                            .send(RichMail::Content(
+                                Mail::fold(buffered),
+                                false,
+                                CachedActor::get_sequence(actor),
+                                Some(CachedActor::get_addr(actor).clone()),
+                                None,
+                            ))
+                            .expect("Published output");
                     }
                 }
             }
