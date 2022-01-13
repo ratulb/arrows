@@ -44,27 +44,27 @@ impl Context {
             while cloned.load(Ordering::Acquire) {
                 println!("Never leave a possibility of accessing Context halfway through!");
             }
-            //Improbable - but still take no chance
-            std::thread::sleep(Duration::from_millis(100));
+            //Let there be Context
+            std::thread::sleep(Duration::from_millis(10));
 
             loop {
                 match channel.recv() {
-                    Ok(_rich_msg) => {
-                        Context::handle();
+                    Ok(rich_mail) => {
                         println!("What a joy");
+                        self::egress(rich_mail);
                     }
                     Err(err) => eprintln!("{}", err),
                 }
             }
         });
-        let cell = RefCell::new(Self {
+        let ctx = RefCell::new(Self {
             actors,
             store,
             handle: Some(handle),
             dispatcher,
         });
         wip.store(false, Ordering::Release);
-        cell
+        ctx
     }
 
     //cargo run --example - TODO this need to be changed to support remoting - only messages
@@ -73,6 +73,12 @@ impl Context {
         let rs = self.store.persist(payload);
         println!("catalog ingress {:?}", rs);
     }
+
+    pub(crate) fn egress(&mut self, mail: RichMail) {
+        let rs = self.store.egress(mail);
+        println!("catalog egress {:?}", rs);
+    }
+
     //Numeric identity of the actor
     pub(crate) fn remove_actor_permanent(&mut self, identity: &str) -> Result<(), Error> {
         self.store
@@ -229,6 +235,10 @@ pub fn define_actor(
 //address(Addr) of each message
 pub fn ingress(mail: Mail) {
     Context::handle().borrow_mut().ingress(mail);
+}
+
+pub(crate) fn egress(mail: RichMail) {
+    Context::handle().borrow_mut().egress(mail);
 }
 
 pub fn restore(addr: Addr) -> Result<Option<CachedActor>, Error> {

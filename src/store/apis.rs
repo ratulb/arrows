@@ -106,13 +106,25 @@ impl Store {
         self.conn.inner.execute_batch(TX_COMMIT)?;
         Ok(())
     }
-    pub(crate) fn egress(&mut self) -> Result<()> {
-        self.conn.inner.execute_batch(TX_BEGIN)?;
-        let stmt = Self::message_insert_stmt(&mut self.message_insert_stmt);
-        let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
+
+    //UPDATE_ACTOR_EVENT_SEQ
+    pub(crate) fn update_actor_event_seq(
+        store: &mut Store,
+        msg_seq: i64,
+        actor_id: &str,
+    ) -> Result<()> {
+        let mut stmt = store.conn.inner.prepare_cached(UPDATE_ACTOR_EVENT_SEQ)?;
+        stmt.execute(params![msg_seq, actor_id])?;
+        Ok(())
+    }
+
+    pub(crate) fn egress_messages(store: &mut Store, mut mail: RichMail) -> Result<()> {
+        store.conn.inner.execute_batch(TX_BEGIN)?;
+        let stmt = Self::message_insert_stmt(&mut store.message_insert_stmt);
+        let mut stmt = store.conn.inner.prepare_cached(stmt).ok();
         match stmt {
             Some(ref mut s) => {
-                for msg in self.buffer.drain(..) {
+                for msg in mail.mail_out().take_all().drain(..) {
                     let actor_id = msg.get_to_id().to_string();
                     let bytes = msg.as_bytes();
                     let _status = s.execute(named_params! {":actor_id": &actor_id as &dyn ToSql, ":msg_id": &msg.id_as_string() as &dyn ToSql,":actor_id": &actor_id as &dyn ToSql, ":msg": &bytes as &dyn ToSql })?;
@@ -120,10 +132,16 @@ impl Store {
             }
             None => panic!(),
         }
-        self.conn.inner.execute_batch(TX_COMMIT)?;
+        store.conn.inner.execute_batch(TX_COMMIT)?;
         Ok(())
     }
-
+    pub(crate) fn egress(&mut self, mail: RichMail) -> Result<()> {
+        let from = &mail.from().expect("address").get_id().to_string();
+        let msg_seq = mail.seq();
+        Self::egress_messages(self, mail)?;
+        Self::update_actor_event_seq(self, msg_seq, from)?;
+        Ok(())
+    }
     pub(crate) fn setup(&mut self) -> Result<()> {
         self.conn.inner.execute(MESSAGES, [])?;
         self.conn.inner.execute(ACTORS, [])?;
