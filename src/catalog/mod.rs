@@ -7,7 +7,7 @@ use crate::{Addr, RichMail};
 use lazy_static::lazy_static;
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 use std::cell::RefCell;
-
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 
 use crate::catalog::actors::{Actors, CachedActor};
@@ -21,14 +21,25 @@ lazy_static! {
 pub struct Context {
     actors: Actors,
     store: Store,
+    channel: InputChannel,
+    dispatcher: Dispatcher,
 }
+
+type InputChannel = Option<Receiver<Vec<Option<Mail>>>>;
+type Dispatcher = Sender<Vec<Option<Mail>>>;
 
 impl Context {
     pub fn init() -> RefCell<Self> {
         let actors = Actors::new();
         let mut store = Store::new();
         store.setup();
-        RefCell::new(Self { actors, store })
+        let (dispatcher, channel) = channel();
+        RefCell::new(Self {
+            actors,
+            store,
+            channel: Some(channel),
+            dispatcher,
+        })
     }
 
     //cargo run --example - TODO this need to be changed to support remoting - only messages
@@ -75,7 +86,7 @@ impl Context {
         producer: impl Producer,
     ) -> Result<Option<CachedActor>, Error> {
         let text = serde_json::to_string(&producer as &dyn Producer)?;
-        match CachedActor::new(&text) {
+        match CachedActor::new(&text, Some(self.dispatcher.clone())) {
             Some(mut actor) => {
                 let previous = Actors::get(&self.actors, &addr);
                 if let Some(previous) = previous {
@@ -98,7 +109,7 @@ impl Context {
             Some(definition) => {
                 let text = definition.1;
                 let msg_seq = definition.2;
-                match CachedActor::new(&text) {
+                match CachedActor::new(&text, Some(self.dispatcher.clone())) {
                     Some(mut actor) => {
                         CachedActor::set_sequence(
                             CachedActor::get_sequence_mut(&mut actor),

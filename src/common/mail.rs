@@ -45,6 +45,13 @@ impl Mail {
         }
     }
 
+    pub fn take_all(self) -> Vec<Msg> {
+        match self {
+            Bulk(msgs) => msgs,
+            _ => panic!(),
+        }
+    }
+
     pub fn is_blank(mail: &Mail) -> bool {
         match mail {
             Blank => true,
@@ -161,7 +168,7 @@ impl Msg {
         self.content = Some(Binary(new_content));
     }
 
-    pub fn set_recipient_add(&mut self, addr: &Addr) {
+    pub fn set_recipient_addr(&mut self, addr: &Addr) {
         self.to = Some(addr.clone());
     }
 
@@ -319,7 +326,7 @@ mod tests {
     }
     #[test]
     fn test_mail_partition() {
-        let mut mails = Vec::new();
+        let mut mails = vec![];
         mails.push(Some(Mail::Blank));
         mails.push(Some(Mail::Blank));
         mails.push(None);
@@ -327,12 +334,12 @@ mod tests {
         let mut m1 = Msg::new_with_text("mail", "from1", "to1");
         let mut addr1 = Addr::new("add1");
         addr1.with_port(9999);
-        m1.set_recipient_add(&addr1);
+        m1.set_recipient_addr(&addr1);
         mails.push(Some(Trade(m1)));
         let mut addr2 = addr1.clone();
         addr2.with_port(1111);
         let mut m2 = Msg::new_with_text("mail", "from2", "to2");
-        m2.set_recipient_add(&addr2);
+        m2.set_recipient_addr(&addr2);
         mails.push(Some(Bulk(vec![m2])));
 
         let mut m3 = Msg::new_with_text("mail", "from3", "to3");

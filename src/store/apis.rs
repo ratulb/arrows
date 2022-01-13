@@ -242,7 +242,8 @@ impl Store {
     }
 
     #[inline(always)]
-    fn message_insert_stmt<'a>(stmt: &'a mut Option<String>) -> &'a str {
+    //fn message_insert_stmt<'a>(stmt: &'a mut Option<String>) -> &'a str {
+    fn message_insert_stmt(stmt: &mut Option<String>) -> &str {
         match stmt {
             Some(ref s) => s,
             None => {

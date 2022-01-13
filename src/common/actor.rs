@@ -38,7 +38,7 @@ pub trait Producer {
         Ok(builder)
     }
 }
-//ProducerDeserializer is used to rebuild actor builders from their serialized state.
+//ProducerDeserializer is used to create actor producers from their serialized state.
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct ProducerDeserializer;
@@ -52,8 +52,15 @@ impl Producer for ProducerDeserializer {
 //Sample actor and actor producer
 pub struct ExampleActor;
 impl Actor for ExampleActor {
-    fn receive(&mut self, _incoming: Mail) -> std::option::Option<Mail> {
-        Some(Msg::new_with_text("Reply from ExampleActor", "from", "to").into())
+    fn receive(&mut self, incoming: Mail) -> std::option::Option<Mail> {
+        match incoming {
+            Mail::Trade(mut msg) => {
+                println!("Actor received msg = {:?}", msg);
+                msg.uturn_with_text("Actor reply");
+                Some(msg.into())
+            }
+            _ => None,
+        }
     }
 }
 #[derive(Debug, Serialize, Deserialize, Default)]

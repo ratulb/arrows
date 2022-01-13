@@ -80,7 +80,7 @@ impl Server {
     }
 }
 use arrows::define_actor;
-use arrows::Addr;
+
 use arrows::ExampleActorProducer;
 
 fn define_example_actors() {
