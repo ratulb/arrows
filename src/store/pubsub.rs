@@ -27,9 +27,10 @@ impl Publisher {
                 let tbl_of_interest = tbl.starts_with(TABLE_MESSAGES);
                 if action == Action::SQLITE_INSERT && tbl_of_interest {
                     let event = DBEvent(row_id);
-                    publisher
-                        .send(Events::DbUpdate(event))
-                        .expect("Event published");
+                    match publisher.send(Events::DbUpdate(event)) {
+                        Ok(_) => (),
+                        Err(err) => eprintln!("Error publishing event {}", err),
+                    }
                 }
             }));
         let receiver = self.receiver.take();

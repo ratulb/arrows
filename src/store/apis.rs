@@ -630,8 +630,7 @@ mod tests {
         let _ = store.setup();
         let addr = Addr::new("1001");
         let identity = "1001";
-        let insert =
-            store.save_producer(identity, addr, &r#"{"new_actor_builder":null}"#.to_string());
+        let insert = store.save_producer(identity, addr, r#"{"new_actor_builder":null}"#);
         assert!(insert.is_ok());
         Ok(())
     }

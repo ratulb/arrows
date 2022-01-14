@@ -186,7 +186,8 @@ impl Context {
             }
             let actor = self.actors.get_mut(addr_inner);
             if let Some(actor) = actor {
-                CachedActor::receive(actor, rich_mail);
+                let rs = CachedActor::receive(actor, rich_mail);
+                println!("In handle_invocation: {:?}", rs);
             }
         }
     }

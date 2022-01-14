@@ -18,7 +18,7 @@ impl Messenger {
                         client.send(msgs);
                         println!("Messenger sent to {}", host_addr);
                     }
-                    Err(err) => eprintln!("{}", err),
+                    Err(err) => eprintln!("Host: {} {}", host_addr, err),
                 }
             }
         });
@@ -36,7 +36,7 @@ impl Messenger {
                         Ok(())
                     }
                     Err(err) => {
-                        eprintln!("{}", err);
+                        eprintln!("Host: {} {}", host_addr, err);
                         Err(err)
                     }
                 };

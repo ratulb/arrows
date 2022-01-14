@@ -1,7 +1,9 @@
 use crate::constants::ACTOR_BUFFER_SIZE;
 use crate::Error::{self, RegistrationError, RestorationError};
 use crate::{Actor, Addr, Mail, Producer, ProducerDeserializer, RichMail};
+use std::any::Any;
 use std::collections::HashMap;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::mpsc::Sender;
 
 #[derive(Debug)]
@@ -59,9 +61,11 @@ impl Actors {
         Self::play_registration_acts(actors, addr, actor).map_err(|_| RestorationError)
     }
 }
+type Binary = Box<dyn Actor>;
+
 #[derive(Debug)]
 pub struct CachedActor {
-    exe: Option<Box<dyn Actor>>,
+    binary: Option<Binary>,
     sequence: i64,
     outputs: Vec<Option<Mail>>,
     channel: OutputChannel,
@@ -73,9 +77,9 @@ impl CachedActor {
         let producer = ProducerDeserializer::default().from_string(text.to_string());
         match producer {
             Ok(mut producer) => {
-                let actor: Box<dyn Actor> = producer.build();
+                let actor: Binary = producer.build();
                 Some(Self {
-                    exe: Some(actor),
+                    binary: Some(actor),
                     sequence: 0,
                     outputs: Vec::new(),
                     addr,
@@ -114,7 +118,7 @@ impl CachedActor {
     }
 
     pub(crate) fn is_loaded(actor: &CachedActor) -> bool {
-        actor.exe.is_some()
+        actor.binary.is_some()
     }
 
     pub(crate) fn re_define_self(&mut self, text: &str) -> bool {
@@ -139,36 +143,59 @@ impl CachedActor {
         this.channel = other.channel.clone();
     }
 
-    pub(crate) fn receive(actor: &mut CachedActor, mut mail: RichMail) {
+    pub(crate) fn receive(
+        actor: &mut CachedActor,
+        mut mail: RichMail,
+    ) -> Result<(), Box<dyn Any + Send + 'static>> {
         if !CachedActor::is_loaded(actor) || !CachedActor::should_handle_message(actor, &mail) {
-            return;
+            return Ok(());
         }
-        match CachedActor::actor_exe(actor) {
-            Some(ref mut executable) => {
-                let mut outcome = executable.receive(mail.mail_out());
-                Mail::set_from(&mut outcome, CachedActor::get_addr(actor));
-                CachedActor::push_outcome(CachedActor::output_buffer(actor), outcome);
-                CachedActor::increment_sequence(CachedActor::get_sequence_mut(actor));
-                println!(
-                    "CachedActor current message seq {:?}",
-                    CachedActor::get_sequence_mut(actor)
-                );
-                if CachedActor::should_flush(CachedActor::buffer_size(actor)) {
-                    let buffered = std::mem::take(CachedActor::output_buffer(actor));
-                    if let Some(ref channel) = actor.channel {
-                        channel
-                            .send(RichMail::Content(
-                                Mail::fold(buffered),
-                                false,
-                                CachedActor::get_sequence(actor),
-                                Some(CachedActor::get_addr(actor).clone()),
-                                None,
-                            ))
-                            .expect("Published output");
-                    }
+        if let Some(ref mut binary) = CachedActor::actor_binary(actor) {
+            let rs = Self::execute(binary, mail.mail_out());
+            match rs {
+                Ok(mut outcome) => {
+                    Mail::set_from(&mut outcome, CachedActor::get_addr(actor));
+                    CachedActor::push_outcome(CachedActor::output_buffer(actor), outcome);
+                    CachedActor::increment_sequence(CachedActor::get_sequence_mut(actor));
+                    println!(
+                        "CachedActor current message seq {:?}",
+                        CachedActor::get_sequence_mut(actor)
+                    );
+                    Self::flush_buffer(actor);
                 }
+                Err(err) => return Err(err),
             }
-            None => {}
+        }
+        Ok(())
+    }
+
+    fn flush_buffer(actor: &mut CachedActor) {
+        if CachedActor::should_flush(CachedActor::buffer_size(actor)) {
+            let buffered = std::mem::take(CachedActor::output_buffer(actor));
+            if let Some(ref channel) = actor.channel {
+                channel
+                    .send(RichMail::Content(
+                        Mail::fold(buffered),
+                        false,
+                        CachedActor::get_sequence(actor),
+                        Some(CachedActor::get_addr(actor).clone()),
+                        None,
+                    ))
+                    .expect("Published output");
+            }
+        }
+    }
+
+    fn execute(
+        binary: &mut Binary,
+        mail: Mail,
+    ) -> Result<Option<Mail>, Box<dyn Any + Send + 'static>> {
+        match catch_unwind(AssertUnwindSafe(|| binary.receive(mail))) {
+            Ok(outcome) => Ok(outcome),
+            Err(err) => {
+                eprintln!("{:?}", err);
+                Err(err)
+            }
         }
     }
 
@@ -178,8 +205,8 @@ impl CachedActor {
         }
     }
 
-    pub(crate) fn actor_exe(actor: &mut CachedActor) -> &mut Option<Box<dyn Actor>> {
-        &mut actor.exe
+    pub(crate) fn actor_binary(actor: &mut CachedActor) -> &mut Option<Binary> {
+        &mut actor.binary
     }
 
     pub(crate) fn should_flush(buffer_size: usize) -> bool {

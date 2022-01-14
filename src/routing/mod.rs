@@ -1,5 +1,4 @@
 pub(crate) mod messenger;
-
 use crate::catalog::{self};
 use crate::RichMail;
 use parking_lot::Mutex;
@@ -32,7 +31,7 @@ impl Delegate {
                     catalog::handle_invocation(rich_mail);
                 }
                 Err(err) => {
-                    eprintln!("Error receiving msg {:?}", err);
+                    eprintln!("Error receiving msg {}", err);
                     continue;
                 }
             }
@@ -52,7 +51,7 @@ impl Router {
         let mut delegates = Vec::with_capacity(count);
         let receiver = Arc::new(Mutex::new(receiver));
         for i in 0..count {
-            println!("Delegate started = {:?}", i);
+            println!("Delegate started = {}", i);
             delegates.push(Delegate::new(Arc::clone(&receiver)).start());
         }
         Self { sender, delegates }
@@ -60,7 +59,12 @@ impl Router {
 
     pub(crate) fn route(&mut self, msgs: Vec<RichMail>) {
         for msg in msgs {
-            self.sender.send(msg).expect("Routing messages");
+            match self.sender.send(msg) {
+                Ok(_) => (),
+                Err(err) => {
+                    eprintln!("Router: error routing message {}", err);
+                }
+            }
         }
     }
 }
