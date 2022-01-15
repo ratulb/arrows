@@ -1,4 +1,5 @@
 mod actors;
+mod panics;
 use crate::apis::Store;
 use crate::catalog::actors::PANICS;
 use crate::catalog::actors::{Actors, CachedActor};
