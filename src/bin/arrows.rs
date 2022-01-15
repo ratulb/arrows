@@ -74,7 +74,7 @@ impl Server {
         let payload = from_bytes::<'_, Mail>(&payload)?;
         match payload {
             m @ Mail::Trade(_) | m @ Mail::Bulk(_) | m @ Mail::Blank => ingress(m),
-            _ => eprintln!("Engulfed by blackhole!"),
+            _ => eprintln!("Sunk to blackhole!"),
         }
         Ok(())
     }
