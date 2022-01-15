@@ -331,15 +331,15 @@ impl std::fmt::Display for Mail {
                 write!(f, "Trade({})", msg)
             }
             Bulk(ref msgs) => {
-                write!(f, "Bulk({})\n", msgs.len())?;
-                if msgs.len() > 0 {
+                writeln!(f, "Bulk({})", msgs.len())?;
+                if !msgs.is_empty() {
                     for i in 0..msgs.len() - 1 {
                         write!(f, "{}", msgs[i]);
-                        write!(f, "\n");
+                        writeln!(f);
                     }
                     write!(f, "{}", msgs[msgs.len() - 1])
                 } else {
-                    write!(f, "{}", " Empty")
+                    write!(f, " Empty")
                 }
             }
             Blank => write!(f, "Blank"),

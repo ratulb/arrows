@@ -77,8 +77,6 @@ impl Context {
         ctx
     }
 
-    //cargo run --example - TODO this need to be changed to support remoting - only messages
-    //destined to local system should be looped back
     pub fn ingress(&mut self, payload: Mail) {
         let _rs = self.store.persist(payload);
     }
@@ -179,7 +177,7 @@ impl Context {
             let defined = self.is_actor_defined(addr_inner);
             if !defined {
                 eprintln!(
-                    "Actor definition not found in the system for :{:?}!",
+                    "Actor definition not found in the system for :{}!",
                     addr_inner
                 );
                 return;
@@ -191,7 +189,7 @@ impl Context {
             {
                 let actor = self.actors.get_mut(addr_inner);
                 if let Some(actor) = actor {
-                    if let Err(err) = CachedActor::receive(actor, rich_mail) {
+                    if let Err(_err) = CachedActor::receive(actor, rich_mail) {
                         panicked = PanicWatch::has_exceeded_tolerance(actor_id);
                         actor_addr = CachedActor::get_addr(actor).clone();
                     }
