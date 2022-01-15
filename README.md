@@ -14,4 +14,5 @@ Arrows - a fast, lightweight, resilient & intuitive actor framework in rust. Cur
 11) Macro for sending message(s) to actor(s) - (`send!`)
 12) Panicking Actor ejection.
 13) Parralel processing of received messages 
+14) Post start and clean up signals
 
