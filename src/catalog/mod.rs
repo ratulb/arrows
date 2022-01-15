@@ -212,16 +212,12 @@ impl Context {
                 }
             }
             if panicked {
-                Self::remove_actor(self, &actor_addr);
+                Actors::remove(&mut self.actors, &actor_addr);
                 let lock = PANICS.lock();
                 let mut panics = lock.borrow_mut();
                 panics.remove(&actor_addr.get_id());
             }
         }
-    }
-
-    fn remove_actor(ctx: &mut Self, addr: &Addr) {
-        Actors::remove(&mut ctx.actors, addr);
     }
 
     //Exclusive mutable handle to Context - sigleton lock. Discretionary usage advisable
