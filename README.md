@@ -3,7 +3,7 @@
 
 ##### Current supported functionalities:
 
-* Message durability is intrinsic(Can not be opted out). Based on fast sqlite embedded instance.
+* Message durability is intrinsic(Can not be opted out). Based on fast sqlite embedded instance. (https://github.com/rusqlite/rusqlite)
 * Remoting(No peer awareness - other systems should be up or remote delivery fails and gets retried at system start up) - as of now.
 * Binany(serde + bincode) or Text messages
 * Actor panic toleration.
