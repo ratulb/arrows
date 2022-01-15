@@ -31,7 +31,7 @@ pub struct Context {
     handle: Option<JoinHandle<()>>,
     dispatcher: Dispatcher,
 }
-
+static ACTOR_PANIC_LIMIT: u8 = 3;
 type InputChannel = Option<Receiver<RichMail>>;
 type Dispatcher = Sender<RichMail>;
 
@@ -199,9 +199,11 @@ impl Context {
                         let lock = PANICS.lock();
                         let panics = lock.borrow();
                         if let Some(ref count) = panics.get(&actor_id) {
-                            eprintln!("Actor panic count: {}", count);
-                            if **count >= 1 {
-                                println!("Panicking actor exceeded panic limit. Ejecting.");
+                            if **count >= ACTOR_PANIC_LIMIT {
+                                println!(
+                                    "Actor panic count {}. Reached panic limit({}). Would eject.",
+                                    count, ACTOR_PANIC_LIMIT
+                                );
                                 panicked = true;
                                 actor_addr = CachedActor::get_addr(actor).clone();
                             }

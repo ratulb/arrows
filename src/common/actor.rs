@@ -61,7 +61,7 @@ impl Actor for ExampleActor {
                 } else {
                     msg.set_recipient_port(7171);
                 }
-
+                panic!("Crashed");
                 //msg.uturn_with_text("Actor reply");
                 Some(msg.into())
             }
