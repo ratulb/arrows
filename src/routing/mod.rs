@@ -23,11 +23,6 @@ impl Delegate {
             let receiver = receiver.lock();
             match receiver.recv() {
                 Ok(rich_mail) => {
-                    /***println!(
-                        "Received a mail msg = {:?} {:?}",
-                        std::thread::current().id(),
-                        rich_mail.to()
-                    );***/
                     catalog::handle_invocation(rich_mail);
                 }
                 Err(err) => {
