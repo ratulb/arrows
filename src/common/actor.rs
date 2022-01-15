@@ -55,7 +55,7 @@ impl Actor for ExampleActor {
     fn receive(&mut self, incoming: Mail) -> std::option::Option<Mail> {
         match incoming {
             Mail::Trade(mut msg) => {
-                println!("Actor received msg = {:?}", msg);
+                println!("Actor msg = {}", msg);
                 if msg.get_recipient_port() == 7171 {
                     msg.set_recipient_port(8181);
                 } else {

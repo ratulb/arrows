@@ -13,7 +13,7 @@ pub(crate) const SELECT_ACTORS: &str = "SELECT actor_id FROM actors";
 //pub(self) const DOES_TABLE_EXIST: &str =
 //  "SELECT count(1) FROM sqlite_master WHERE type='table' AND name=?";
 pub(crate) const MESSAGES: &str =
-"CREATE TABLE IF NOT EXISTS messages (actor_id TEXT, msg_id TEXT, msg_seq INTEGER,inbound INTEGER DEFAULT 1, msg BLOB, PRIMARY KEY (actor_id, msg_id, msg_seq))";
+"CREATE TABLE IF NOT EXISTS messages (actor_id TEXT, msg_id TEXT, msg_seq INTEGER,inbound INTEGER DEFAULT 1, msg BLOB, PRIMARY KEY (actor_id, msg_id))";
 
 pub(crate) const ACTORS: &str =
     "CREATE TABLE IF NOT EXISTS actors (actor_id TEXT PRIMARY KEY, addr BLOB DEFAULT NULL, actor_def TEXT, state BLOB DEFAULT NULL, msg_seq INTEGER DEFAULT 0)";

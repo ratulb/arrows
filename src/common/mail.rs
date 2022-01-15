@@ -24,6 +24,7 @@ pub enum Mail {
     Blank,
 }
 use Mail::*;
+
 impl Mail {
     pub fn message(&self) -> &Msg {
         match self {
@@ -323,6 +324,29 @@ impl std::fmt::Display for Content {
     }
 }
 
+impl std::fmt::Display for Mail {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Trade(msg) => {
+                write!(f, "Trade({})", msg)
+            }
+            Bulk(ref msgs) => {
+                write!(f, "Bulk({})\n", msgs.len())?;
+                if msgs.len() > 0 {
+                    for i in 0..msgs.len() - 1 {
+                        write!(f, "{}", msgs[i]);
+                        write!(f, "\n");
+                    }
+                    write!(f, "{}", msgs[msgs.len() - 1])
+                } else {
+                    write!(f, "{}", " Empty")
+                }
+            }
+            Blank => write!(f, "Blank"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -434,5 +458,31 @@ mod tests {
                 }
             });
         }
+    }
+
+    #[test]
+    fn mail_print_test() {
+        let m = Msg::new_with_text("mail", "from", "to");
+        let mail = Mail::Trade(m);
+        println!("{}", mail);
+
+        let m1 = Msg::new_with_text("mail", "from", "to");
+        let m2 = Msg::new_with_text("mail", "from", "to");
+        let m3 = Msg::new_with_text("mail", "from", "to");
+        let bulk_mail = Mail::Bulk(vec![]);
+        println!("{}", bulk_mail);
+
+        let bulk_mail = Mail::Bulk(Vec::new());
+        println!("{}", bulk_mail);
+
+        let bulk_mail = Mail::Bulk(vec![m1, m2, m3]);
+        println!("Bulk {}", bulk_mail);
+
+        let m1 = Msg::new_with_text("mail", "from", "to");
+        let bulk_mail = Mail::Bulk(vec![m1]);
+        println!("Bulk {}", bulk_mail);
+
+        println!("Bulk {}", Mail::Blank);
+
     }
 }

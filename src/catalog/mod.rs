@@ -81,7 +81,6 @@ impl Context {
     //destined to local system should be looped back
     pub fn ingress(&mut self, payload: Mail) {
         let _rs = self.store.persist(payload);
-        
     }
 
     pub(crate) fn egress(&mut self, mail: RichMail) {
@@ -193,7 +192,6 @@ impl Context {
                 let actor = self.actors.get_mut(addr_inner);
                 if let Some(actor) = actor {
                     if let Err(err) = CachedActor::receive(actor, rich_mail) {
-                        eprintln!("{:?}", err);
                         panicked = PanicWatch::has_exceeded_tolerance(actor_id);
                         actor_addr = CachedActor::get_addr(actor).clone();
                     }
