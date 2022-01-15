@@ -1,5 +1,5 @@
 # arrows
-##### Arrows - a fast, lightweight, resilient & intuitive actor framework in rust. 
+##### Arrows - a fast, lightweight, resilient actor framework in rust. 
 
 ##### Current supported functionalities:
 
