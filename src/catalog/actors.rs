@@ -1,10 +1,23 @@
 use crate::constants::ACTOR_BUFFER_SIZE;
 use crate::Error::{self, RegistrationError, RestorationError};
+use crate::ADDRESS;
 use crate::{Actor, Addr, Mail, Producer, ProducerDeserializer, RichMail};
+use lazy_static::lazy_static;
+use parking_lot::ReentrantMutex;
 use std::any::Any;
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::panic;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::mpsc::Sender;
+use std::sync::Arc;
+use std::thread;
+
+//This lock will not contended in happy path - only when an actor panics!
+lazy_static! {
+    pub(crate) static ref PANICS: Arc<ReentrantMutex<RefCell<HashMap<u64, u8>>>> =
+        Arc::new(ReentrantMutex::new(RefCell::new(HashMap::new())));
+}
 
 #[derive(Debug)]
 pub(super) struct Actors {
@@ -12,11 +25,28 @@ pub(super) struct Actors {
 }
 unsafe impl Send for Actors {}
 unsafe impl Sync for Actors {}
-
 type OutputChannel = Option<Sender<RichMail>>;
 
 impl Actors {
     pub(super) fn new() -> Self {
+        //Set panic handler for for the actors. We don't want to eject actors on the very
+        //first very first instance that it panics. Panics may be due corrupt messages.
+        //Hence we maintain a tolerable count limit.
+        panic::set_hook(Box::new(|_panic_info| {
+            if thread::panicking() {
+                ADDRESS.with(|id| {
+                    let lock = PANICS.lock();
+                    let mut panics = lock.borrow_mut();
+                    match panics.get_mut(&id.borrow()) {
+                        Some(count) => *count += 1,
+                        None => {
+                            panics.insert(*id.borrow(), 1);
+                        }
+                    }
+                });
+            }
+        }));
+
         Self {
             actor_cache: HashMap::new(),
         }
@@ -34,9 +64,13 @@ impl Actors {
         self.actor_cache.insert(addr, actor)
     }
 
-    pub(super) fn remove(&mut self, addr: &Addr) -> Option<CachedActor> {
-        self.actor_cache.remove(addr)
+    pub(super) fn remove(actors: &mut Self, addr: &Addr) -> Option<CachedActor> {
+        actors.actor_cache.remove(addr).and_then(pre_shutdown)
     }
+
+    /***pub(super) fn remove(&mut self, addr: &Addr) -> Option<CachedActor> {
+        self.actor_cache.remove(addr)
+    }***/
 
     pub(super) fn play_registration_acts(
         actors: &mut Self,
@@ -70,6 +104,7 @@ pub struct CachedActor {
     outputs: Vec<Option<Mail>>,
     channel: OutputChannel,
     addr: Addr,
+    //panics: u8,
 }
 
 impl CachedActor {
@@ -82,8 +117,9 @@ impl CachedActor {
                     binary: Some(actor),
                     sequence: 0,
                     outputs: Vec::new(),
-                    addr,
                     channel,
+                    addr,
+                    //panics: 0,
                 })
             }
             Err(err) => {
@@ -100,6 +136,12 @@ impl CachedActor {
     pub(crate) fn get_addr(actor: &CachedActor) -> &Addr {
         &actor.addr
     }
+    /*** pub(crate) fn get_panics(actor: &CachedActor) -> u8 {
+        actor.panics
+    }
+    pub(crate) fn increment_panics(actor: &mut CachedActor) {
+        actor.panics += 1;
+    }***/
 
     pub(crate) fn get_sequence(actor: &CachedActor) -> i64 {
         actor.sequence
@@ -228,6 +270,7 @@ fn pre_shutdown(mut actor: CachedActor) -> Option<CachedActor> {
         &mut actor,
         RichMail::Content(Mail::Blank, true, 0, None, None),
     );
+    println!("Pre shutdown hook fired for actor");
     Some(actor)
 }
 //Post startup message
@@ -236,5 +279,6 @@ fn post_start(mut actor: CachedActor) -> Option<CachedActor> {
         &mut actor,
         RichMail::Content(Mail::Blank, true, 0, None, None),
     );
+    println!("Post start hook fired for actor");
     Some(actor)
 }

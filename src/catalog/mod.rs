@@ -1,10 +1,12 @@
 mod actors;
 use crate::apis::Store;
+use crate::catalog::actors::PANICS;
 use crate::catalog::actors::{Actors, CachedActor};
 use crate::common::{actor::Producer, mail::Mail};
 use crate::events::DBEvent;
 use crate::routing::messenger::Messenger;
 use crate::Error::{self, RegistrationError, RestorationError};
+use crate::ADDRESS;
 use crate::{Addr, RichMail};
 use lazy_static::lazy_static;
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
@@ -184,12 +186,40 @@ impl Context {
                 );
                 return;
             }
-            let actor = self.actors.get_mut(addr_inner);
-            if let Some(actor) = actor {
-                let rs = CachedActor::receive(actor, rich_mail);
-                println!("In handle_invocation: {:?}", rs);
+            let mut actor_addr = Addr::default();
+            let mut panicked = false;
+            {
+                let actor = self.actors.get_mut(addr_inner);
+                if let Some(actor) = actor {
+                    if let Err(_err) = CachedActor::receive(actor, rich_mail) {
+                        let actor_id = CachedActor::get_addr(actor).get_id();
+                        ADDRESS.with(|id| {
+                            *id.borrow_mut() = actor_id;
+                        });
+                        let lock = PANICS.lock();
+                        let panics = lock.borrow();
+                        if let Some(ref count) = panics.get(&actor_id) {
+                            eprintln!("Actor panic count: {}", count);
+                            if **count >= 1 {
+                                println!("Panicking actor exceeded panic limit. Ejecting.");
+                                panicked = true;
+                                actor_addr = CachedActor::get_addr(actor).clone();
+                            }
+                        }
+                    }
+                }
+            }
+            if panicked {
+                Self::remove_actor(self, &actor_addr);
+                let lock = PANICS.lock();
+                let mut panics = lock.borrow_mut();
+                panics.remove(&actor_addr.get_id());
             }
         }
+    }
+
+    fn remove_actor(ctx: &mut Self, addr: &Addr) {
+        Actors::remove(&mut ctx.actors, addr);
     }
 
     //Exclusive mutable handle to Context - sigleton lock. Discretionary usage advisable
