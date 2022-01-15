@@ -17,10 +17,10 @@ thread_local! {
    static  ACTOR_ID: RefCell<u64> = RefCell::new(0);
 }
 
-pub(super) struct PanicWatch {}
+pub(super) struct PanicWatch;
 
 impl PanicWatch {
-    pub(super) fn new() {
+    pub(super) fn new() -> Self {
         //Set panic handler for for the actors. We don't want to eject actors on the very
         //first instance that it panics. Panics may be due corrupt messages.
         //Hence we maintain a tolerable count limit.
@@ -38,15 +38,26 @@ impl PanicWatch {
                 });
             }
         }));
+        Self
     }
 
-    pub(super) fn set_watch(&mut self, actor_id: u64) {
+    pub(super) fn tolerance() -> u8 {
+        PANIC_TOLERANCE
+    }
+
+    pub(super) fn set_watch(actor_id: u64) {
         ACTOR_ID.with(|id| {
             *id.borrow_mut() = actor_id;
         });
     }
 
-    pub(super) fn has_exceeded_tolerance(&self, actor_id: u64) -> bool {
+    pub(super) fn remove_watch(actor_id: &u64) {
+        let lock = PANICS.lock();
+        let mut panics = lock.borrow_mut();
+        panics.remove(actor_id);
+    }
+
+    pub(super) fn has_exceeded_tolerance(actor_id: u64) -> bool {
         let lock = PANICS.lock();
         let panics = lock.borrow();
         match panics.get(&actor_id) {
@@ -54,7 +65,7 @@ impl PanicWatch {
             None => false,
         }
     }
-    pub(super) fn count(&self, actor_id: u64) -> u8 {
+    pub(super) fn count(actor_id: u64) -> u8 {
         let lock = PANICS.lock();
         let panics = lock.borrow();
         match panics.get(&actor_id) {

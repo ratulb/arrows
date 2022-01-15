@@ -62,8 +62,3 @@ impl RichMail {
         *seq
     }
 }
-
-use std::cell::RefCell;
-thread_local! {
-    pub(crate) static ADDRESS: RefCell<u64> = RefCell::new(0);
-}

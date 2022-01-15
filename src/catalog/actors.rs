@@ -1,28 +1,15 @@
+use crate::catalog::PanicWatch;
 use crate::constants::ACTOR_BUFFER_SIZE;
-
 use crate::Error::{self, RegistrationError, RestorationError};
-use crate::ADDRESS;
 use crate::{Actor, Addr, Mail, Producer, ProducerDeserializer, RichMail};
-use lazy_static::lazy_static;
-use parking_lot::ReentrantMutex;
 use std::any::Any;
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::panic;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::mpsc::Sender;
-use std::sync::Arc;
-use std::thread;
-
-//This lock will not contended in happy path - only when an actor panics!
-lazy_static! {
-    pub(crate) static ref PANICS: Arc<ReentrantMutex<RefCell<HashMap<u64, u8>>>> =
-        Arc::new(ReentrantMutex::new(RefCell::new(HashMap::new())));
-}
 
 #[derive(Debug)]
 pub(super) struct Actors {
-    pub(crate) actor_cache: HashMap<Addr, CachedActor>,
+    actor_cache: HashMap<Addr, CachedActor>,
 }
 unsafe impl Send for Actors {}
 unsafe impl Sync for Actors {}
@@ -33,21 +20,8 @@ impl Actors {
         //Set panic handler for for the actors. We don't want to eject actors on the very
         //first instance that it panics. Panics may be due corrupt messages.
         //Hence we maintain a tolerable count limit.
-        panic::set_hook(Box::new(|_panic_info| {
-            if thread::panicking() {
-                ADDRESS.with(|id| {
-                    let lock = PANICS.lock();
-                    let mut panics = lock.borrow_mut();
-                    match panics.get_mut(&id.borrow()) {
-                        Some(count) => *count += 1,
-                        None => {
-                            panics.insert(*id.borrow(), 1);
-                        }
-                    }
-                });
-            }
-        }));
-
+        //Just initialize it once for setting the actor panic hook
+        let _panic_watch = PanicWatch::new();
         Self {
             actor_cache: HashMap::new(),
         }
@@ -137,12 +111,6 @@ impl CachedActor {
     pub(crate) fn get_addr(actor: &CachedActor) -> &Addr {
         &actor.addr
     }
-    /*** pub(crate) fn get_panics(actor: &CachedActor) -> u8 {
-        actor.panics
-    }
-    pub(crate) fn increment_panics(actor: &mut CachedActor) {
-        actor.panics += 1;
-    }***/
 
     pub(crate) fn get_sequence(actor: &CachedActor) -> i64 {
         actor.sequence

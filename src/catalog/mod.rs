@@ -1,13 +1,12 @@
 mod actors;
 mod panics;
 use crate::apis::Store;
-use crate::catalog::actors::PANICS;
 use crate::catalog::actors::{Actors, CachedActor};
+use crate::catalog::panics::PanicWatch;
 use crate::common::{actor::Producer, mail::Mail};
 use crate::events::DBEvent;
 use crate::routing::messenger::Messenger;
 use crate::Error::{self, RegistrationError, RestorationError};
-use crate::ADDRESS;
 use crate::{Addr, RichMail};
 use lazy_static::lazy_static;
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
@@ -188,35 +187,27 @@ impl Context {
                 return;
             }
             let mut actor_addr = Addr::default();
+            let actor_id = addr_inner.get_id();
+            PanicWatch::set_watch(actor_id);
             let mut panicked = false;
             {
                 let actor = self.actors.get_mut(addr_inner);
                 if let Some(actor) = actor {
-                    if let Err(_err) = CachedActor::receive(actor, rich_mail) {
-                        let actor_id = CachedActor::get_addr(actor).get_id();
-                        ADDRESS.with(|id| {
-                            *id.borrow_mut() = actor_id;
-                        });
-                        let lock = PANICS.lock();
-                        let panics = lock.borrow();
-                        if let Some(ref count) = panics.get(&actor_id) {
-                            if **count >= ACTOR_PANIC_LIMIT {
-                                println!(
-                                    "Actor panic count {}. Reached panic limit({}). Would eject.",
-                                    count, ACTOR_PANIC_LIMIT
-                                );
-                                panicked = true;
-                                actor_addr = CachedActor::get_addr(actor).clone();
-                            }
-                        }
+                    if let Err(err) = CachedActor::receive(actor, rich_mail) {
+                        eprintln!("{:?}", err);
+                        panicked = PanicWatch::has_exceeded_tolerance(actor_id);
+                        actor_addr = CachedActor::get_addr(actor).clone();
                     }
                 }
             }
             if panicked {
+                println!(
+                    "Actor panic count {}. Has exceeded tolerance ({:?}). Removing.",
+                    PanicWatch::count(actor_id),
+                    PanicWatch::tolerance()
+                );
                 Actors::remove(&mut self.actors, &actor_addr);
-                let lock = PANICS.lock();
-                let mut panics = lock.borrow_mut();
-                panics.remove(&actor_addr.get_id());
+                PanicWatch::remove_watch(&actor_id);
             }
         }
     }
