@@ -39,11 +39,11 @@ impl Server {
             match stream {
                 Ok(inner_stream) => {
                     if let Err(serving_error) = self.serve(inner_stream) {
-                        eprintln!("Error serving client {:?}", serving_error);
+                        eprintln!("Error serving client {}", serving_error);
                     }
                 }
                 Err(e) => {
-                    eprintln!("Error handling connection {:?}", e);
+                    eprintln!("Error handling connection {}", e);
                 }
             }
             println!("Server served stream!");
@@ -74,7 +74,7 @@ impl Server {
         let payload = from_bytes::<'_, Mail>(&payload)?;
         match payload {
             m @ Mail::Trade(_) | m @ Mail::Bulk(_) | m @ Mail::Blank => ingress(m),
-            _ => eprintln!("Engulfed by blackhole!"),
+            _ => eprintln!("Sunk to blackhole!"),
         }
         Ok(())
     }
