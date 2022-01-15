@@ -80,13 +80,12 @@ impl Context {
     //cargo run --example - TODO this need to be changed to support remoting - only messages
     //destined to local system should be looped back
     pub fn ingress(&mut self, payload: Mail) {
-        let rs = self.store.persist(payload);
-        println!("catalog ingress {:?}", rs);
+        let _rs = self.store.persist(payload);
+        
     }
 
     pub(crate) fn egress(&mut self, mail: RichMail) {
-        let rs = self.store.egress(mail);
-        println!("catalog egress {:?}", rs);
+        let _rs = self.store.egress(mail);
     }
 
     //Numeric identity of the actor
