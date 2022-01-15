@@ -30,7 +30,7 @@ type OutputChannel = Option<Sender<RichMail>>;
 impl Actors {
     pub(super) fn new() -> Self {
         //Set panic handler for for the actors. We don't want to eject actors on the very
-        //first very first instance that it panics. Panics may be due corrupt messages.
+        //first instance that it panics. Panics may be due corrupt messages.
         //Hence we maintain a tolerable count limit.
         panic::set_hook(Box::new(|_panic_info| {
             if thread::panicking() {
