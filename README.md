@@ -5,9 +5,9 @@
 
 * Message durability is intrinsic(Can not be opted out). Based on fast sqlite embedded instance. (https://github.com/rusqlite/rusqlite)
 * Remoting(No peer awareness - other systems should be up or remote delivery fails and gets retried at system start up) - as of now.
-* Binany(serde + bincode) or Text messages
+* Binany(serde https://github.com/serde-rs/serde + bincode https://github.com/bincode-org/bincode) or Text payload
 * Actor panic toleration.
-* Actor behaviour can be swapped out at runtime with another actor definition(Actor binaries has to be available in system - no runtime injection of binaries)
+* Runtime swapping of actor behaviour with another actor definition(Actor binaries has to be available in system - no runtime injection of binaries)
 * No out of sequence delivery of messages 
 * Swapped in actor resumes from where the swapped out instance left off.
 * Actor loading/Unloading is based on typetag(https://github.com/dtolnay/typetag). A huge thanks to the ingenuity of its author https://github.com/dtolnay
