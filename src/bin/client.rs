@@ -41,6 +41,19 @@ enum Command {
         addr: SocketAddr,
     },
 }
+/// A command line client of a remote Arrow instance.
+///
+/// `Client` communicates with a Arrow instance  over TCP at the default port 7171, with the
+/// option to change port with `port=8181` for example
+///A remote instance can be connected in the format `IP:PORT` - for example [0.0.0.0:8181]
+/// One or more messages can be sent to an actor from the CLI
+/// # Examples
+/// Send text messages m1,m2 to arrow actor(`example_actor1`) instance running 
+/// at localhost:7171
+/// 
+/// cargo run --bin client send example_actor1 'm1,m2' --addr 127.0.0.1:7171
+///
+
 
 fn main() {
     let opt = Opt::from_args();
