@@ -108,6 +108,16 @@ impl Addr {
     }
 }
 
+impl std::fmt::Display for Addr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Address")
+            .field("name", &self.name)
+            .field("host", self.host.as_ref().unwrap_or(&"not set".to_string()))
+            .field("port", &self.port)
+            .finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -148,5 +158,6 @@ mod tests {
         assert_eq!(addr.get_id(), id);
         addr.with_ip("10.160.0.2");
         assert!(addr.is_local());
+        println!("{}", addr);
     }
 }

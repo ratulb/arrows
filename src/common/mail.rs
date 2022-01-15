@@ -290,6 +290,39 @@ impl From<Msg> for Mail {
     }
 }
 
+impl std::fmt::Display for Msg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        {
+            write!(f, "Msg({}), ", &self.id)?;
+            match self.from {
+                Some(ref from) => write!(f, "from: {}, ", from),
+                None => write!(f, "from: None, "),
+            };
+            match self.to {
+                Some(ref to) => write!(f, "to: {}, ", to),
+                None => write!(f, "to: None, "),
+            };
+            match self.content {
+                Some(ref content) => write!(f, "content: {}", content),
+                None => write!(f, "content: None"),
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for Content {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Text(text) => {
+                write!(f, "Text({})", text)
+            }
+            Binary(binary) => {
+                write!(f, "Binary(..) -> length {}", binary.len())
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -303,12 +336,14 @@ mod tests {
             Some("Content")
         );
         assert_eq!(msg.get_to(), &Some(Addr::new("addr_to")));
+        println!("{}", msg);
     }
 
     #[test]
     fn create_trade_msg_test_from() {
         let msg = Msg::new(option_of_bytes(&"Content"), "addr_from", "addr_to");
         assert_eq!(msg.get_from(), &Some(Addr::new("addr_from")));
+        println!("{}", msg);
     }
 
     #[test]
