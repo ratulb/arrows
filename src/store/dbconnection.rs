@@ -18,7 +18,7 @@ impl DBConnection {
                 Self { inner }
             }
             Err(err) => {
-                panic!("Failed to obtain db connection: {:?}", err);
+                panic!("Failed to obtain db connection: {}", err);
             }
         }
     }
