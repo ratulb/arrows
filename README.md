@@ -18,3 +18,32 @@
 * Parralel processing of received messages 
 * Post start and clean up signals
 
+```rust
+ use crate::{define_actor, send};
+ use serde::{Deserialize, Serialize};
+ 
+ //Sample actor and actor producer
+pub struct ExampleActor;
+impl Actor for ExampleActor {
+    fn receive(&mut self, incoming: Mail) -> Option<Mail> {
+        println!("Actor received {}", incoming.message());
+        None
+    }
+}
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct ExampleActorProducer;
+#[typetag::serde(name = "example_actor_producer")]
+impl Producer for ExampleActorProducer {
+    fn produce(&mut self) -> Box<dyn Actor> {
+        Box::new(ExampleActor)
+    }
+}
+fn main() {
+  let producer = ExampleActorProducer;
+  //Define an actor
+  let _rs = define_actor!("example_actor1", producer);
+  let m = Msg::default();
+  //Send out messages
+  send!("example_actor1", m);
+}
+ ```
