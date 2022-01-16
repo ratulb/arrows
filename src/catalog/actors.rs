@@ -18,7 +18,7 @@ type OutputChannel = Option<Sender<RichMail>>;
 impl Actors {
     pub(super) fn new() -> Self {
         //Set panic handler for for the actors. We don't want to eject actors on the very
-        //first instance that it panics. Panics may be due corrupt messages.
+        //first instance that it panics. Panics may be due to corrupt messages.
         //Hence we maintain a tolerable count limit.
         //Just initialize it once for setting the actor panic hook
         let _panic_watch = PanicWatch::new();
@@ -42,10 +42,6 @@ impl Actors {
     pub(super) fn remove(actors: &mut Self, addr: &Addr) -> Option<CachedActor> {
         actors.actor_cache.remove(addr).and_then(pre_shutdown)
     }
-
-    /***pub(super) fn remove(&mut self, addr: &Addr) -> Option<CachedActor> {
-        self.actor_cache.remove(addr)
-    }***/
 
     pub(super) fn play_registration_acts(
         actors: &mut Self,
@@ -79,7 +75,6 @@ pub struct CachedActor {
     outputs: Vec<Option<Mail>>,
     channel: OutputChannel,
     addr: Addr,
-    //panics: u8,
 }
 
 impl CachedActor {
@@ -94,7 +89,6 @@ impl CachedActor {
                     outputs: Vec::new(),
                     channel,
                     addr,
-                    //panics: 0,
                 })
             }
             Err(err) => {
