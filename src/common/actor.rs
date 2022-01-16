@@ -2,19 +2,56 @@ use crate::{Mail, Msg};
 use serde::{Deserialize, Serialize};
 use std::any::{self, Any};
 use std::fmt::{self, Debug, Formatter};
-
 pub trait Actor: Any + Send + Sync {
+    //! # Actor
+    //!
+    //!`Actor` - the trait for an actor implementation in the system. The only required method
+    //!to implement is `receive` - which keeps receiving messages(`Mail`) and optionally
+    //!supposed to return an outgoing message(s) which may be addressed to any local or remote
+    //!actor(s). Outgoing `Mail` can contain multiple messages directed to different actors.
+    //!Messages directed to an actor will always be delivered in the order that they were
+    //!ingested into the actor system. Out of sequence messages will not be delivered until
+    //!all previous messages have been consumed by the actor. Message might get delivered more
+    //!than once because of actor failing to process message.
+    //!
+    //!Upon restart - actor would start receiving messages - where it left off from.
+
+    /**
+     * The required method that needs to be implemented as part of `Actor` implementation.
+     * Called to handle incoming messages. The incoming message should not be returned as it
+     * is - doing so would lead to re-delivery of the message back again. The 'to' `Addr`
+     * of the recipient should be set in the outgoing payload.
+     *
+     * Incoming mail will have only a single message `Trade(Msg)` variant of `Mail` enum.
+     **/
+
     fn receive(&mut self, _mail: Mail) -> Option<Mail> {
         Some(Mail::Blank)
     }
+    /**
+     * Name of the type implementing the `Actor` trait
+     **/
     fn type_name(&self) -> &'static str {
         any::type_name::<Self>()
     }
+    /**
+     * The startup signal that the actor receives upon definition - when actor is defined via
+     * `define_actor!` macro or on restoration from the backing store.
+     **/
+
     fn post_start(&mut self, _mail: Mail) -> Option<Mail> {
-        Some(Msg::new_with_text("Actor loading", self.type_name(), "system").into())
+        Some(Msg::new_with_text("Starting up", "from_this_actor", "to_another_actor").into())
     }
+
+    /**
+     * Pre-shutdown signal that the actor will receive due to normal shutdown or  actor
+     * eviction due to actor panicking while processing message. An actor is allowed to
+     * panic a set number of times(currently 3) before eviction. Actor might panic due to
+     * internal(faulty logic, index bounds exception) or external reasons like message
+     * getting corrupted in transit.
+     **/
     fn pre_shutdown(&mut self, _mail: Mail) -> Option<Mail> {
-        Some(Msg::new_with_text("Actor unloading", self.type_name(), "system").into())
+        Some(Msg::new_with_text("Shutdown", "from_this_actor", "to_another_actor").into())
     }
 }
 
@@ -27,15 +64,33 @@ impl Debug for dyn Actor {
 
 #[typetag::serde]
 pub trait Producer {
-    //This method must be implemented to register an actor implementation. There is a one-to-one
-    //corresponds between an 'Actor implementation' and its builder('Producer'). Producers are
-    //persisted so that actors can be resurrected after a failure or restart. Actor builders are
-    //identified by their #[typetag::serde(name = "an_actor_builder")] name. These names should not
-    //collide in a running system.
-    fn build(&mut self) -> Box<dyn Actor>;
+    //! # Producer
+    //!Implementation of an `Actor` trait involves two steps. First, implementation of the
+    //!`Actor` trait itself. Once trait implentation is done - first step is complete. Making
+    //!Actor instances available to system is job of the `Producer`. A `Producer` trait
+    //!implemenation(each `Producer` implementation with an unique `typetag` name) is
+    //!responsible for creating `Actor` instances at runtime. The `Producer` trait has the
+    //!`produce` method - which gets invoked to hand out `Actor` instances during actor
+    //!registration and restoration. So, the second step of `Actor` implemenation is to
+    //!implement the `Producer` trait. While registering an `Actor` to the system - the
+    //!`define_actor!` macro takes a serde serializable(<https://github.com/serde-rs/serde>)
+    //!`Producer` instance and a name for the actor(string - which could be anything - a
+    //!name for the actor). The `Producer` implemenation gets serialized and stored in the
+    //!backing store.
+
+    /** The only method to be implemented to create `Actor` instances`. The implementing type
+     *should be tagged with a non-collinding `typetag`(https://github.com/dtolnay/typetag)
+     *name in the format `#[typetag::serde(name = "an_actor_producer")]`
+     **/
+
+    fn produce(&mut self) -> Box<dyn Actor>;
+
+    /**
+     * A method to rebuild a `Producer` implementation.
+     **/
     fn from_string(&self, content: String) -> std::io::Result<Box<dyn Producer>> {
-        let builder: Box<dyn Producer> = serde_json::from_str(&content)?;
-        Ok(builder)
+        let producer: Box<dyn Producer> = serde_json::from_str(&content)?;
+        Ok(producer)
     }
 }
 //ProducerDeserializer is used to create actor producers from their serialized state.
@@ -43,9 +98,9 @@ pub trait Producer {
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct ProducerDeserializer;
 
-#[typetag::serde(name = "builder_deserializer")]
+#[typetag::serde(name = "producer_deserializer")]
 impl Producer for ProducerDeserializer {
-    fn build(&mut self) -> Box<dyn Actor> {
+    fn produce(&mut self) -> Box<dyn Actor> {
         panic!("Should not be called on ProducerDeserializer");
     }
 }
@@ -61,8 +116,7 @@ impl Actor for ExampleActor {
                 } else {
                     msg.set_recipient_port(7171);
                 }
-                panic!("Crashed");
-                //msg.uturn_with_text("Actor reply");
+                //panic!("Crashed");
                 Some(msg.into())
             }
             _ => None,
@@ -73,7 +127,7 @@ impl Actor for ExampleActor {
 pub struct ExampleActorProducer;
 #[typetag::serde(name = "example_actor_producer")]
 impl Producer for ExampleActorProducer {
-    fn build(&mut self) -> Box<dyn Actor> {
+    fn produce(&mut self) -> Box<dyn Actor> {
         Box::new(ExampleActor)
     }
 }
@@ -122,7 +176,7 @@ mod tests {
     }
 
     #[test]
-    fn actor_builder_test_1() {
+    fn actor_producer_test_1() {
         struct MyActor;
 
         impl Actor for MyActor {}
@@ -130,20 +184,19 @@ mod tests {
         #[derive(Clone, Debug, Serialize, Deserialize, Default)]
         struct MyProducer;
 
-        //Tag the impl with distinguishable name - actor builder's name should not collide in
-        //each specific running system
-        #[typetag::serde(name = "my_actor_builder")]
+        //Tag the impl with distinguishable name - actor producer's name should not
+        //collide in the running system
+        #[typetag::serde(name = "my_actor_producer")]
         impl Producer for MyProducer {
-            fn build(&mut self) -> Box<dyn Actor> {
+            fn produce(&mut self) -> Box<dyn Actor> {
                 Box::new(MyActor)
             }
         }
 
-        let mut builder = MyProducer::default();
-        let mut built_actor = builder.build();
-        println!("The type name is = {:?}", built_actor.type_name());
+        let mut producer = MyProducer::default();
+        let mut produced_actor = producer.produce();
         //Send a blank message and get a response back
-        let actor_response = built_actor.receive(Mail::Blank);
+        let actor_response = produced_actor.receive(Mail::Blank);
         assert!(actor_response.is_some());
     }
 }
