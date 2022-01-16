@@ -87,7 +87,7 @@ impl CachedActor {
         let producer = ProducerDeserializer::default().from_string(text.to_string());
         match producer {
             Ok(mut producer) => {
-                let actor: Binary = producer.build();
+                let actor: Binary = producer.produce();
                 Some(Self {
                     binary: Some(actor),
                     sequence: 0,

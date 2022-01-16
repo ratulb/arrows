@@ -16,9 +16,9 @@ impl Actor for NewActor {
 #[derive(Debug, Serialize, Deserialize, Default)]
 struct NewProducer;
 
-#[typetag::serde(name = "new_actor_builder")]
+#[typetag::serde(name = "a_new_actor_producer")]
 impl Producer for NewProducer {
-    fn build(&mut self) -> Box<dyn Actor> {
+    fn produce(&mut self) -> Box<dyn Actor> {
         Box::new(NewActor)
     }
 }

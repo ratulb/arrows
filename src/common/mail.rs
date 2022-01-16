@@ -483,6 +483,5 @@ mod tests {
         println!("Bulk {}", bulk_mail);
 
         println!("Bulk {}", Mail::Blank);
-
     }
 }

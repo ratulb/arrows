@@ -17,6 +17,9 @@ lazy_static! {
     );
 }
 
+///`Addr` - An actor address with name, node ip and port
+///
+
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize, Hash, Default)]
 pub struct Addr {
     id: u64,

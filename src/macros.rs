@@ -74,9 +74,9 @@ mod tests {
     #[derive(Debug, Serialize, Deserialize, Default)]
     struct NewProducer;
 
-    #[typetag::serde(name = "new_actor_builder")]
+    #[typetag::serde(name = "actor_producer_new")]
     impl Producer for NewProducer {
-        fn build(&mut self) -> Box<dyn Actor> {
+        fn produce(&mut self) -> Box<dyn Actor> {
             Box::new(NewActor)
         }
     }

@@ -31,7 +31,6 @@ pub struct Context {
     handle: Option<JoinHandle<()>>,
     dispatcher: Dispatcher,
 }
-static ACTOR_PANIC_LIMIT: u8 = 3;
 type InputChannel = Option<Receiver<RichMail>>;
 type Dispatcher = Sender<RichMail>;
 
