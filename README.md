@@ -25,7 +25,7 @@
  //Sample actor and actor producer
 pub struct ExampleActor;
 impl Actor for ExampleActor {
-    fn receive(&mut self, incoming: Mail) -> std::option::Option<Mail> {
+    fn receive(&mut self, incoming: Mail) -> Option<Mail> {
         println!("Actor received {}", incoming.message());
         None
     }
