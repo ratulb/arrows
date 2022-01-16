@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use std::{panic, thread};
 
-//This lock will not contended in happy path - only when an actor panics!
+//This lock will not be contended in happy path - only when an actor panics!
 lazy_static! {
     static ref PANICS: Arc<ReentrantMutex<RefCell<HashMap<u64, u8>>>> =
         Arc::new(ReentrantMutex::new(RefCell::new(HashMap::new())));
@@ -22,8 +22,8 @@ pub(super) struct PanicWatch;
 impl PanicWatch {
     pub(super) fn new() -> Self {
         //Set panic handler for for the actors. We don't want to eject actors on the very
-        //first instance that it panics. Panics may be due corrupt messages.
-        //Hence we maintain a tolerable count limit.
+        //first instance that it panics. Panics may be due to corrupt messages.
+        //Hence we maintain a tolerance limit.
         panic::set_hook(Box::new(|_panic_info| {
             if thread::panicking() {
                 ACTOR_ID.with(|id| {
