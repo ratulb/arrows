@@ -1,91 +1,76 @@
-use arrows::ingress;
-use arrows::{from_bytes, Mail};
-use byte_marks::Marked;
-use std::io::{BufReader, BufWriter, Result, Write};
-use std::net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs};
+use arrows::common::config::Config;
+use arrows::routing::listener::MessageListener;
+use std::net::{IpAddr, SocketAddr};
+use std::path::Path;
 use structopt::StructOpt;
 
-const DEFAULT_LISTENING_ADDRESS: &str = "0.0.0.0:7171";
-
 #[derive(StructOpt, Debug)]
-#[structopt(name = "server")]
+#[structopt(name = "arrows")]
 struct Opt {
     #[structopt(
         long,
-        help="Set the listening address",
-        value_name="IP:PORT",
-        default_value =DEFAULT_LISTENING_ADDRESS,
+        short = "i",
+        name = "hostport",
+        help = "Flag to overide default listen address",
+        parse(try_from_str)
+    )]
+    hostport: Option<String>,
+
+    #[structopt(
+        long,
+        short = "d",
+        name = "db",
+        help = "Specify backing store path",
+        parse(try_from_str)
+    )]
+    db: Option<String>,
+
+    #[structopt(
+        long,
+        help = "Set the listening address",
+        value_name = "IP:PORT",
         parse(try_from_str),
-        )]
-    addr: SocketAddr,
+        required_if("hostport", "user")
+    )]
+    addr: Option<SocketAddr>,
 }
+//cargo run --bin arrows -- -i user --addr 127.0.0.1:8181
+//cargo run --bin arrows -- -i user --addr 127.0.0.1:8181 -d /tmp
+//cargo run --bin arrows -- -i user --addr 127.99.1.1:8182 -d /tmp
 
-fn main() -> Result<()> {
-    let opt = Opt::from_args();
-    println!("Server listening on {}", opt.addr);
-    define_example_actors();
-    let server = Server::default();
-    server.run(opt.addr);
-    Ok(())
-}
-
-#[derive(Default)]
-pub struct Server;
-
-impl Server {
-    pub fn run<A: ToSocketAddrs>(mut self, addr: A) -> Result<()> {
-        let listener = TcpListener::bind(addr)?;
-        for stream in listener.incoming() {
-            match stream {
-                Ok(inner_stream) => {
-                    if let Err(serving_error) = self.serve(inner_stream) {
-                        eprintln!("Error serving client {}", serving_error);
+fn main() {
+    let opts = Opt::from_args();
+    let mut config = Config::from_env();
+    match opts.hostport {
+        None => MessageListener::start(),
+        Some(ref hostport) if hostport == "user" => match opts.addr {
+            Some(ref sa) => {
+                config.set_listen_addr(&sa.to_string());
+                match sa.ip() {
+                    IpAddr::V4(inner) => {
+                        let host = inner.to_string();
+                        config.set_host(&host);
                     }
+                    _ => eprintln!("Ipv6Addr address not supported currently! "),
                 }
-                Err(e) => {
-                    eprintln!("Error handling connection {}", e);
-                }
+                let port = sa.port();
+                config.set_port(port);
             }
-            println!("Server served stream!");
-        }
-        Ok(())
-    }
-
-    fn serve(&mut self, tcp: TcpStream) -> Result<()> {
-        let _peer_addr = tcp.peer_addr()?;
-        let cloned = tcp.try_clone()?;
-        let mut reader = BufReader::new(cloned);
-        let mut writer = BufWriter::new(tcp);
-        let marked = Marked::with_defaults(&mut reader);
-
-        for mail in marked {
-            println!("Received mail length = {}", mail.len());
-            let rs = self.ingress(mail);
-            if let Err(err) = rs {
-                eprintln!("Error ingressing mail {:?}", err);
+            None => panic!("IP:PORT expected!"),
+        },
+        _ => eprintln!("Wrong options!"),
+    };
+    match opts.db {
+        Some(dbpath) => {
+            if !Path::new(&dbpath).exists() {
+                panic!("Db path does not exits {}!", dbpath);
+            } else {
+                config.set_db_path(&dbpath);
             }
         }
-        writer.write_all("Server received request".as_bytes())?;
-        writer.flush()?;
-        Ok(())
+        None => (),
     }
-
-    fn ingress(&self, payload: Vec<u8>) -> Result<()> {
-        let payload = from_bytes::<'_, Mail>(&payload)?;
-        match payload {
-            m @ Mail::Trade(_) | m @ Mail::Bulk(_) | m @ Mail::Blank => ingress(m),
-            _ => eprintln!("Sunk to blackhole!"),
-        }
-        Ok(())
-    }
-}
-use arrows::define_actor;
-
-use arrows::ExampleActorProducer;
-
-fn define_example_actors() {
-    let producer = ExampleActorProducer;
-    let _rs = define_actor!("example_actor1", producer);
-    let _rs = define_actor!("from", ExampleActorProducer);
-    println!("Defined example actors");
+    Config::re_init(config);
+    println!("New def Config {:?}", Config::get_shared());
+    MessageListener::start();
 }
