@@ -18,7 +18,10 @@ impl Messenger {
                         client.send(msgs);
                         println!("Messenger sent to {}", host_addr);
                     }
-                    Err(err) => eprintln!("Host: {} {}", host_addr, err),
+                    Err(err) => {
+                        eprintln!("Host: {} {}", host_addr, err);
+                        try_restart_listener(msgs, host_addr, err);
+                    }
                 }
             }
         });
@@ -37,7 +40,7 @@ impl Messenger {
                     }
                     Err(err) => {
                         eprintln!("Host: {} {}", host_addr, err);
-                        Err(err)
+                        try_restart_listener(msgs, host_addr, err)
                     }
                 };
             });
@@ -103,4 +106,12 @@ pub(super) mod client {
             }
         }
     }
+}
+
+fn try_restart_listener(
+    msgs: Vec<Msg>,
+    socket_addr: SocketAddr,
+    err: std::io::Error,
+) -> Result<()> {
+    Ok(())
 }
