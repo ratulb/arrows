@@ -1,8 +1,10 @@
 use crate::routing::messenger::client::Client;
+use crate::Error;
 use crate::{Addr, Mail, Msg, Result};
 use std::collections::HashMap;
+use std::io::ErrorKind::ConnectionRefused;
 use std::net::SocketAddr;
-
+use std::process::Command;
 pub(crate) struct Messenger;
 
 impl Messenger {
@@ -15,6 +17,12 @@ impl Messenger {
             if let Some(host_addr) = addr.get_socket_addr() {
                 match Client::connect(host_addr) {
                     Ok(mut client) => {
+                        println!("Messenger sent to *****{:?}", msgs);
+                        println!("Messenger sent to *****{:?}", msgs);
+                        println!("Messenger sent to *****{:?}", msgs);
+                        println!("Messenger sent to *****{:?}", msgs);
+                        println!("Messenger sent to *****{:?}", msgs);
+                        println!("Messenger sent to *****{:?}", msgs);
                         client.send(msgs);
                         println!("Messenger sent to {}", host_addr);
                     }
@@ -109,9 +117,68 @@ pub(super) mod client {
 }
 
 fn try_restart_listener(
-    msgs: Vec<Msg>,
+    _msgs: Vec<Msg>,
     socket_addr: SocketAddr,
     err: std::io::Error,
 ) -> Result<()> {
+    
+    let should_start =  std::env::var("SHOULD_START").unwrap_or_else(|_| "".to_string());
+    if should_start == "".to_string() {
+      println!("Should start should be empty and not starting: {}", should_start);
+      println!("Should start should be empty and not starting: {}", should_start);
+      println!("Should start should be empty and not starting: {}", should_start);
+      println!("Should start should be empty and not starting: {}", should_start);
+      return Ok(());
+    }
+    else {
+
+      println!("Should start should not be empty and starting: {}", should_start);
+      println!("Should start should not be empty and starting: {}", should_start);
+      println!("Should start should not be empty and starting: {}", should_start);
+      println!("Should start should not be empty and starting: {}", should_start);
+    }
+
+    if socket_addr.ip().is_loopback() {
+        match err.kind() {
+            ConnectionRefused => {
+                println!("The error kind: {:?}", err.kind());
+                /*** Command::new("sh")
+                .spawn()
+                .expect("sh command failed to start");***/
+                println!("Current dir: {:?}", std::env::current_dir());
+                let mut listener_path = std::env::current_dir().unwrap();
+                //let listener_path = listener_path.push("/target/debug/arrows");
+                listener_path.push("target/debug/arrows");
+                println!("After push = {:?}", listener_path);
+                let path = listener_path.as_path().to_str();
+                match path {
+                    Some(path) => {
+                        println!("Path = {:?}", path);
+                        Command::new(path)
+                            .spawn()
+                            .expect("sh command failed to start");
+                        println!("Did it");
+                        println!("Did it");
+                        println!("Did it");
+                        println!("Did it");
+                        println!("Did it");
+                        return Ok(());
+                    }
+                    None => return Err(Error::Registration(err)),
+                }
+                //Current dir: Ok("/home/rbsomeg101/github/arrows")
+                //What = Command { cmd: "/home/rbsomeg101/github/arrows/target/debug/arrows", stdin: None, timeout: None }
+                /***let cmd = Command::cargo_bin("arrows");
+                match cmd {
+                  Ok(what) => {
+                      println!("What = {:?}", what);
+                      println!("Here again: {:?}",err.kind());},
+                  Err(err) => eprintln!("{}", err),
+                }***/
+            }
+            _ => (),
+        }
+    }
+
     Ok(())
 }

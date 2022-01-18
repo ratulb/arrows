@@ -102,8 +102,8 @@ impl CachedActor {
         actor.sequence <= mail.seq()
     }
 
-    pub(crate) fn get_addr(actor: &CachedActor) -> &Addr {
-        &actor.addr
+    pub(crate) fn get_addr(&self) -> &Addr {
+        &self.addr
     }
 
     pub(crate) fn get_sequence(actor: &CachedActor) -> i64 {
@@ -233,7 +233,7 @@ fn pre_shutdown(mut actor: CachedActor) -> Option<CachedActor> {
         &mut actor,
         RichMail::Content(Mail::Blank, true, 0, None, None),
     );
-    println!("Pre shutdown hook fired for actor");
+    println!("Pre shutdown hook fired for actor ({})", actor.get_addr());
     Some(actor)
 }
 //Post startup message
@@ -242,6 +242,6 @@ fn post_start(mut actor: CachedActor) -> Option<CachedActor> {
         &mut actor,
         RichMail::Content(Mail::Blank, true, 0, None, None),
     );
-    println!("Post start hook fired for actor");
+    println!("Post start hook fired for actor ({})", actor.get_addr());
     Some(actor)
 }

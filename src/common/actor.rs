@@ -99,7 +99,11 @@ pub trait Producer {
 pub struct ExampleActor;
 impl Actor for ExampleActor {
     fn receive(&mut self, incoming: Mail) -> std::option::Option<Mail> {
-        println!("Actor received {}", incoming.message());
+        if !Mail::is_blank(&incoming) {
+            println!("Actor received {}", incoming.message());
+            let reply = Msg::new_with_text("Some text", "from_me", "to_sender");
+            return Some(reply.into());
+        }
         None
     }
 }
@@ -157,7 +161,7 @@ mod tests {
                 }
             }
         }
-        //A demo actor implementation which responds by blank replies. 
+        //A demo actor implementation which responds by blank replies.
         //message(_msg)
         impl Actor for MyActor {
             fn receive(&mut self, _msg: Mail) -> Option<Mail> {
@@ -172,7 +176,12 @@ mod tests {
     fn actor_producer_test_1() {
         struct MyActor;
 
-        impl Actor for MyActor {}
+        impl Actor for MyActor {
+            fn receive(&mut self, incoming: Mail) -> std::option::Option<Mail> {
+                println!("My Actor received {}", incoming.message());
+                None
+            }
+        }
 
         #[derive(Clone, Debug, Serialize, Deserialize, Default)]
         struct MyProducer;

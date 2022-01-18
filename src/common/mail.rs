@@ -13,6 +13,7 @@ use uuid::Uuid;
 pub enum Content {
     Text(String),
     Binary(Vec<u8>),
+    Command(String),
 }
 
 use Content::*;
@@ -27,6 +28,12 @@ use Mail::*;
 
 impl Mail {
     pub fn message(&self) -> &Msg {
+        println!("What are you ? {}", self);
+        println!("What are you ? {}", self);
+        println!("What are you ? {}", self);
+        println!("What are you ? {}", self);
+        println!("What are you ? {}", self);
+        println!("What are you ? {}", self);
         match self {
             Trade(ref msg) => msg,
             _ => panic!("message is supported only on Trade variant"),
@@ -50,6 +57,36 @@ impl Mail {
         match self {
             Bulk(msgs) => msgs,
             _ => panic!(),
+        }
+    }
+    pub fn command_is_same(&self, cmd: &str) -> bool {
+        match self {
+            trade @ Trade(_) => trade.is_command() && self.message().command_is_same(cmd),
+            bulk @ Bulk(ref msgs) => {
+                bulk.is_command()
+                    && bulk.messages().len() == 1
+                    && bulk.messages()[0].command_is_same(cmd)
+            }
+            _ => false,
+        }
+        //self.is_command() && self.message().command_is_same(cmd)
+    }
+
+    fn command_from(cmd: &str) -> Mail {
+        Trade(Msg::command_from(cmd))
+    }
+
+    pub fn is_command(&self) -> bool {
+        println!("The self is {}", self);
+        println!("The self is {}", self);
+        println!("The self is {}", self);
+        println!("The self is {}", self);
+        println!("The self is {}", self);
+        println!("The self is {}", self);
+        match self {
+            trade @ Trade(_) => trade.is_command(),
+            Bulk(ref msgs) if msgs.len() == 1 && msgs[0].is_command() => true,
+            _ => false,
         }
     }
 
@@ -166,6 +203,15 @@ impl Msg {
         }
     }
 
+    pub fn command_from(cmd: &str) -> Self {
+        let mut cmd_msg = Msg::default();
+        std::mem::replace(
+            &mut cmd_msg.content,
+            Some(Content::Command(cmd.to_string())),
+        );
+        cmd_msg
+    }
+
     pub fn content_as_text(&self) -> Option<&str> {
         match self.content {
             Some(Binary(ref bytes)) => {
@@ -173,9 +219,22 @@ impl Msg {
                 text.ok()
             }
             Some(Text(ref s)) => Some(s),
+            Some(Command(ref c)) => Some(c),
             None => None,
         }
     }
+
+    pub fn is_command(&self) -> bool {
+        match self.content {
+            Some(Command(_)) => true,
+            _ => false,
+        }
+    }
+
+    pub fn command_is_same(&self, cmd: &str) -> bool {
+        self.is_command() && self.content_as_text().map_or(false, |txt| cmd == txt)
+    }
+
     pub fn as_bytes(&self) -> Vec<u8> {
         option_of_bytes(self).unwrap_or_default()
     }
@@ -319,6 +378,9 @@ impl std::fmt::Display for Content {
             }
             Binary(binary) => {
                 write!(f, "Binary(..) -> length {}", binary.len())
+            }
+            Command(c) => {
+                write!(f, "Command({})", c)
             }
         }
     }

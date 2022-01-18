@@ -6,14 +6,14 @@ pub use common::addr::Addr;
 pub use common::errs::{Error, Result};
 pub use common::mail::{Mail, Msg};
 pub use common::utils::*;
-
+pub use routing::listener::MessageListener;
 pub(crate) use store::*;
 
 pub mod catalog;
 pub mod common;
 pub mod macros;
 
-mod routing;
+pub mod routing;
 mod store;
 
 use std::collections::HashMap;
@@ -63,3 +63,25 @@ impl RichMail {
         *seq
     }
 }
+/***
+ * Issues to be resolved and things to be done
+ * 1. Documentation - absolute priority
+ * 2. Test mode/Dev mode - routing
+ * 3. Config
+ * 4. Read documentation doc
+ * 5. All examples should run
+ * 6. Check first message panic
+ * 7. Find logo and make it public
+ ***/
+
+/***use std::sync::Once;
+use std::thread;
+
+static INIT: Once = Once::new();
+
+assert_eq!(INIT.is_completed(), false);
+let handle = thread::spawn(|| {
+    INIT.call_once(|| panic!());
+});
+assert!(handle.join().is_err());
+assert_eq!(INIT.is_completed(), false);***/

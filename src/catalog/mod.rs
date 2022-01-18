@@ -46,7 +46,6 @@ impl Context {
             while init_watch.load(Ordering::Acquire) {}
             //Let there be Context
             std::thread::sleep(Duration::from_millis(10));
-
             loop {
                 match channel.recv() {
                     Ok(mut rich_mail) => {
@@ -76,8 +75,9 @@ impl Context {
         ctx
     }
 
-    pub fn ingress(&mut self, payload: Mail) {
+    pub fn ingress(&mut self, payload: Mail) -> std::io::Result<Option<Mail>> {
         let _rs = self.store.persist(payload);
+        Ok(None)
     }
 
     pub(crate) fn egress(&mut self, mail: RichMail) {
@@ -256,8 +256,8 @@ pub fn define_actor(
 //Send off a payload of messages which could be directed to different actors in local or
 //remote systems. Where messages would be delivered is decided on the host field to of the to
 //address(Addr) of each message
-pub fn ingress(mail: Mail) {
-    Context::handle().borrow_mut().ingress(mail);
+pub fn ingress(mail: Mail) -> std::io::Result<Option<Mail>> {
+    Context::handle().borrow_mut().ingress(mail)
 }
 
 pub(crate) fn egress(mail: RichMail) {

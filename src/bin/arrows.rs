@@ -71,6 +71,15 @@ fn main() {
         None => (),
     }
     Config::re_init(config);
-    println!("New def Config {:?}", Config::get_shared());
+    println!("New {:?}", Config::get_shared());
     MessageListener::start();
 }
+
+/***use arrows::define_actor;
+use arrows::ExampleActorProducer;
+fn define_example_actors() {
+    let producer = ExampleActorProducer;
+    let _rs = define_actor!("example_actor1", producer);
+    let _rs = define_actor!("from", ExampleActorProducer);
+    println!("Defined example actors");
+}***/

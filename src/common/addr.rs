@@ -1,24 +1,11 @@
+use crate::common::config::Config;
 use crate::{compute_hash, option_of_bytes};
-use lazy_static::lazy_static;
 use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
-use std::env;
 use std::hash::Hash;
 use std::net::{IpAddr, SocketAddr};
 
-lazy_static! {
-    pub static ref PORT: u16 = env::var("port").unwrap_or_else(|_| "7171".to_string())[..]
-        .parse()
-        .unwrap();
-    pub static ref ADDR: &'static str = Box::leak(
-        env::var("ip_addr")
-            .unwrap_or_else(|_| "127.0.0.1".to_string())
-            .into_boxed_str()
-    );
-}
-
 ///`Addr` - An actor address with name, node ip and port
-///
 
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize, Hash, Default)]
 pub struct Addr {
@@ -37,8 +24,8 @@ impl Addr {
             name: name.to_string(),
             class: Some("default".to_string()),
             ns: Some("system".to_string()),
-            host: Some((&ADDR).to_string()),
-            port: Some(*PORT),
+            host: Some(Config::get_shared().host().to_string()),
+            port: Some(Config::get_shared().port()),
         };
         Self::addr_hash(&mut addr);
         addr
@@ -91,7 +78,7 @@ impl Addr {
 
     pub fn is_local_port(&self) -> bool {
         match self.get_port() {
-            Some(port) => port == *PORT,
+            Some(port) => port == Config::get_shared().port(),
             None => false,
         }
     }

@@ -1,4 +1,5 @@
-pub(crate) mod messenger;
+pub mod listener;
+pub mod messenger;
 use crate::catalog::{self};
 use crate::RichMail;
 use parking_lot::Mutex;

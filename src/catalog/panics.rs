@@ -24,8 +24,9 @@ impl PanicWatch {
         //Set panic handler for for the actors. We don't want to eject actors on the very
         //first instance that it panics. Panics may be due to corrupt messages.
         //Hence we maintain a tolerance limit.
-        panic::set_hook(Box::new(|_panic_info| {
+        panic::set_hook(Box::new(|panic_info| {
             if thread::panicking() {
+                eprintln!("{:?} {:?}", backtrace::Backtrace::new(), panic_info);
                 ACTOR_ID.with(|id| {
                     let lock = PANICS.lock();
                     let mut panics = lock.borrow_mut();

@@ -1,4 +1,5 @@
-use crate::constants::{ARROWS_DB_PATH, DATABASE};
+use crate::common::config::Config;
+use crate::constants::DATABASE;
 use rusqlite::Connection;
 use std::path::PathBuf;
 
@@ -7,8 +8,8 @@ pub(crate) struct DBConnection {
 }
 impl DBConnection {
     pub(crate) fn new() -> Self {
-        let path = std::env::var(ARROWS_DB_PATH)
-            .expect("Please set ARROWS_DB_PATH pointing to an existing directory!");
+        let path = Config::get_shared().db_path().to_string();
+        println!("Using db path {}", path);
         let mut path = PathBuf::from(path);
         path.push(DATABASE);
         let result = Connection::open(path);
