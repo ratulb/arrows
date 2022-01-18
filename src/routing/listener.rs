@@ -63,7 +63,7 @@ impl MessageListener {
                     }
                     mail @ Bulk(_) if mail.command_equals(Action::Echo("".to_string())) => {
                         response.clear();
-                        match mail.messages()[0].content_as_text() {
+                        match mail.messages()[0].as_text() {
                             Some(text) => response.push_str(text),
                             None => (),
                         };

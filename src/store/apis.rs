@@ -506,7 +506,7 @@ mod tests {
         let msgs = store.from_messages(rowids).unwrap();
         let count = msgs
             .iter()
-            .filter(|msg| msg.mail().message().content_as_text() == Some(&message))
+            .filter(|msg| msg.mail().message().as_text() == Some(&message))
             .count();
         assert!(count == BUFFER_MAX_SIZE);
         Ok(())
@@ -521,7 +521,7 @@ mod tests {
         let last = rowids.pop().unwrap();
         let msgs = store.messages_from(&actor_id, last).unwrap();
 
-        assert!(msgs[0].content_as_text() == Some(&message));
+        assert!(msgs[0].as_text() == Some(&message));
     }
 
     #[test]

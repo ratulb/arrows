@@ -192,7 +192,7 @@ impl Action {
     fn inner(&self) -> &str {
         match self {
             Self::Shutdown => "",
-            Self::Echo(s) => &s,
+            Self::Echo(s) => s,
         }
     }
 }
@@ -216,7 +216,18 @@ impl Msg {
             dispatched: None,
         }
     }
+    pub fn with_binary_content(content: Option<Vec<u8>>) -> Self {
+        Self {
+            id: compute_hash(&Uuid::new_v4()),
+            from: None,
+            to: None,
+            content: content.map(Binary),
+            dispatched: None,
+        }
+    }
+
     ///Create a msg with content as text to an actor(`example_actor1`) in the local system
+    ///
     ///
     /// # Example
     ///
@@ -228,6 +239,15 @@ impl Msg {
     ///let rs = send!("example_actor1", m);
     ///
     ///
+    pub fn with_text(content: &str) -> Self {
+        Self {
+            id: compute_hash(&Uuid::new_v4()),
+            from: None,
+            to: None,
+            content: Some(Text(content.to_string())),
+            dispatched: Some(SystemTime::now()),
+        }
+    }
 
     pub fn from_text(content: &str, from: &str, to: &str) -> Self {
         Self {
@@ -240,7 +260,7 @@ impl Msg {
     }
     /// Get the content of msg as text. In case - binary content being actually binary
     /// this would not be helpful.
-    pub fn content_as_text(&self) -> Option<&str> {
+    pub fn as_text(&self) -> Option<&str> {
         match self.content {
             Some(Binary(ref bytes)) => {
                 let text: Result<&str> = from_bytes(bytes);
@@ -316,19 +336,19 @@ impl Msg {
         0
     }
 
-    pub fn reply_with_binary_content(&mut self, reply: Option<Vec<u8>>) {
+    pub fn binary_reply(&mut self, reply: Option<Vec<u8>>) {
         swap(&mut self.from, &mut self.to);
         let _ignore = replace(&mut self.content, reply.map(Binary));
     }
 
-    pub fn get_content(&self) -> Option<Vec<u8>> {
+    pub fn binary_content(&self) -> Option<Vec<u8>> {
         match &self.content {
             Some(Binary(data)) => Some(data.to_vec()),
             _ => None,
         }
     }
     //Would take content out (if binary)- leaving message content to a None
-    pub fn get_content_out(&mut self) -> Option<Vec<u8>> {
+    pub fn binary_content_out(&mut self) -> Option<Vec<u8>> {
         match self.content.take() {
             Some(Binary(data)) => Some(data),
             content @ Some(_) => {
@@ -466,7 +486,7 @@ mod tests {
     fn create_trade_msg_test_content_and_to() {
         let mut msg = Msg::new(option_of_bytes(&"Content"), "addr_from", "addr_to");
         assert_eq!(
-            from_bytes(&msg.get_content_out().unwrap()).ok(),
+            from_bytes(&msg.binary_content_out().unwrap()).ok(),
             Some("Content")
         );
         assert_eq!(msg.get_to(), &Some(Addr::new("addr_to")));
@@ -483,10 +503,10 @@ mod tests {
     #[test]
     fn create_trade_msg_test_alter_content_and_to() {
         let mut msg = Msg::new(option_of_bytes(&"Content"), "addr_from", "addr_to");
-        assert_eq!(msg.get_content(), option_of_bytes(&"Content"));
+        assert_eq!(msg.binary_content(), option_of_bytes(&"Content"));
         assert_eq!(msg.get_to(), &Some(Addr::new("addr_to")));
         msg.with_content_and_to(option_of_bytes(&"New content").unwrap(), "New_to");
-        assert_eq!(msg.get_content(), option_of_bytes(&"New content"));
+        assert_eq!(msg.binary_content(), option_of_bytes(&"New content"));
         assert_eq!(msg.get_to(), &Some(Addr::new("New_to")));
     }
 
@@ -499,31 +519,31 @@ mod tests {
     }
 
     #[test]
-    fn reply_with_binary_content_test_1() {
+    fn binary_reply_test_1() {
         let mut msg = Msg::new(option_of_bytes(&"Content"), "addr_from", "addr_to");
-        msg.reply_with_binary_content(option_of_bytes(&"Reply"));
+        msg.binary_reply(option_of_bytes(&"Reply"));
         assert_eq!(msg.get_to(), &Some(Addr::new("addr_from")));
         assert_eq!(msg.get_from(), &Some(Addr::new("addr_to")));
-        assert_eq!(msg.get_content(), option_of_bytes(&"Reply"));
+        assert_eq!(msg.binary_content(), option_of_bytes(&"Reply"));
     }
     #[test]
     fn text_reply_test_1() {
         let mut msg = Msg::new(option_of_bytes(&"Content"), "addr_from", "addr_to");
-        assert_eq!(msg.get_content(), option_of_bytes(&"Content"));
+        assert_eq!(msg.binary_content(), option_of_bytes(&"Content"));
         msg.text_reply("Reply");
         assert_eq!(msg.get_to(), &Some(Addr::new("addr_from")));
         assert_eq!(msg.get_from(), &Some(Addr::new("addr_to")));
-        assert_eq!(msg.get_content(), option_of_bytes(&"Reply"));
+        assert_eq!(msg.binary_content(), option_of_bytes(&"Reply"));
     }
     #[test]
-    fn content_as_text_test_1() {
+    fn as_text_test_1() {
         let mut msg = Msg::new(option_of_bytes(&"Content"), "addr_from", "addr_to");
-        assert_eq!(msg.get_content(), option_of_bytes(&"Content"));
-        assert_eq!(msg.content_as_text(), Some("Content"));
+        assert_eq!(msg.binary_content(), option_of_bytes(&"Content"));
+        assert_eq!(msg.as_text(), Some("Content"));
 
         msg.update_text_content("Updated content");
-        assert_eq!(msg.get_content(), option_of_bytes(&"Updated content"));
-        assert_eq!(msg.content_as_text(), Some("Updated content"));
+        assert_eq!(msg.binary_content(), option_of_bytes(&"Updated content"));
+        assert_eq!(msg.as_text(), Some("Updated content"));
     }
     #[test]
     fn outbound_mgs_test_1() {
