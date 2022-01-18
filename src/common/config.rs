@@ -6,12 +6,17 @@ use std::hash::Hash;
 lazy_static! {
     pub static ref CONFIG: RwLock<Config> = RwLock::new(Config::from_env());
 }
+
+static WINDOWS: &str = "target\\debug\\arrows.exe";
+static LINUX: &str = "target/debug/arrows";
+
 #[derive(PartialEq, Eq, Clone, Debug, Hash)]
 pub struct Config {
     host: String,
     port: u16,
     db_path: String,
     listen_addr: String,
+    resident_listener: String,
 }
 
 impl Config {
@@ -25,11 +30,19 @@ impl Config {
         let host = env::var("ip_addr").unwrap_or_else(|_| "127.0.0.1".to_string());
         let db_path = env::var("DB_PATH").unwrap_or_else(|_| "/tmp".to_string());
         let listen_addr = env::var("LISTEN_ADDR").unwrap_or_else(|_| "0.0.0.0:7171".to_string());
+        let resident_listener = env::var("resident_listener").unwrap_or_else(|_| {
+            if cfg!(target_os = "windows") {
+                WINDOWS.to_string()
+            } else {
+                LINUX.to_string()
+            }
+        });
         Self {
             host,
             port,
             db_path,
             listen_addr,
+            resident_listener,
         }
     }
 
@@ -54,6 +67,10 @@ impl Config {
         &self.listen_addr
     }
 
+    pub fn resident_listener(&self) -> &str {
+        &self.resident_listener
+    }
+
     pub fn set_host(&mut self, host: &str) {
         self.host = host.to_string();
     }
@@ -68,6 +85,10 @@ impl Config {
 
     pub fn set_listen_addr(&mut self, listen_addr: &str) {
         self.listen_addr = listen_addr.to_string();
+    }
+
+    pub fn set_resident_listener(&mut self, resident_listener: &str) {
+        self.resident_listener = resident_listener.to_string();
     }
 }
 

@@ -13,7 +13,15 @@ use uuid::Uuid;
 pub enum Content {
     Text(String),
     Binary(Vec<u8>),
-    Command(String),
+    Command(Action),
+}
+impl std::fmt::Display for Action {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            action @ Self::Shutdown => write!(f, "{}", action.as_text()),
+            Self::Echo(s) => write!(f, "Echo({})", s),
+        }
+    }
 }
 
 use Content::*;
@@ -28,12 +36,7 @@ use Mail::*;
 
 impl Mail {
     pub fn message(&self) -> &Msg {
-        println!("What are you ? {}", self);
-        println!("What are you ? {}", self);
-        println!("What are you ? {}", self);
-        println!("What are you ? {}", self);
-        println!("What are you ? {}", self);
-        println!("What are you ? {}", self);
+        println!("Inside mail message - printing self {}", self);
         match self {
             Trade(ref msg) => msg,
             _ => panic!("message is supported only on Trade variant"),
@@ -59,33 +62,25 @@ impl Mail {
             _ => panic!(),
         }
     }
-    pub fn command_is_same(&self, cmd: &str) -> bool {
+    pub(crate) fn command_equals(&self, other: &Msg) -> bool {
+        if !self.is_command() {
+            return false;
+        }
         match self {
-            trade @ Trade(_) => trade.is_command() && self.message().command_is_same(cmd),
-            bulk @ Bulk(ref msgs) => {
-                bulk.is_command()
-                    && bulk.messages().len() == 1
-                    && bulk.messages()[0].command_is_same(cmd)
-            }
+            Trade(_) => self.message().command_equals(other),
+            bulk @ Bulk(_) => bulk.messages()[0].command_equals(other),
             _ => false,
         }
-        //self.is_command() && self.message().command_is_same(cmd)
     }
 
-    fn command_from(cmd: &str) -> Mail {
-        Trade(Msg::command_from(cmd))
-    }
-
-    pub fn is_command(&self) -> bool {
-        println!("The self is {}", self);
-        println!("The self is {}", self);
-        println!("The self is {}", self);
-        println!("The self is {}", self);
-        println!("The self is {}", self);
-        println!("The self is {}", self);
+    pub(crate) fn is_command(&self) -> bool {
         match self {
-            trade @ Trade(_) => trade.is_command(),
-            Bulk(ref msgs) if msgs.len() == 1 && msgs[0].is_command() => true,
+            trade @ Trade(_) => trade.message().is_command(),
+            bulk @ Bulk(ref _msgs)
+                if bulk.messages().len() == 1 && bulk.messages()[0].is_command() =>
+            {
+                true
+            }
             _ => false,
         }
     }
@@ -174,6 +169,27 @@ impl From<Option<Mail>> for Mail {
     }
 }
 
+impl From<Vec<Msg>> for Mail {
+    fn from(msgs: Vec<Msg>) -> Self {
+        Bulk(msgs)
+    }
+}
+
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum Action {
+    Shutdown,
+    Echo(String),
+}
+impl Action {
+    fn as_text(&self) -> &str {
+        match self {
+            Self::Shutdown => "Shutdown",
+            Self::Echo(_) => "Echo",
+        }
+    }
+}
+
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Msg {
     id: u64,
@@ -193,7 +209,20 @@ impl Msg {
             dispatched: None,
         }
     }
-    pub fn new_with_text(content: &str, from: &str, to: &str) -> Self {
+    ///Create a msg with content as text to an actor(`example_actor1`) in the local system
+    ///
+    /// # Example
+    ///
+    ///```
+    ///use arrows::send;
+    ///use arrows::Msg;
+    ///
+    ///let m = Msg::from_text("mail", "from", "example_actor1");
+    ///let rs = send!("example_actor1", m);
+    ///
+    ///
+
+    pub fn from_text(content: &str, from: &str, to: &str) -> Self {
         Self {
             id: compute_hash(&Uuid::new_v4()),
             from: Some(Addr::new(from)),
@@ -202,16 +231,8 @@ impl Msg {
             dispatched: Some(SystemTime::now()),
         }
     }
-
-    pub fn command_from(cmd: &str) -> Self {
-        let mut cmd_msg = Msg::default();
-        std::mem::replace(
-            &mut cmd_msg.content,
-            Some(Content::Command(cmd.to_string())),
-        );
-        cmd_msg
-    }
-
+    /// Get the content of msg as text. In case - binary content being actually binary
+    /// this would not be helpful.
     pub fn content_as_text(&self) -> Option<&str> {
         match self.content {
             Some(Binary(ref bytes)) => {
@@ -219,7 +240,7 @@ impl Msg {
                 text.ok()
             }
             Some(Text(ref s)) => Some(s),
-            Some(Command(ref c)) => Some(c),
+            Some(Command(ref cmd)) => Some(cmd.as_text()),
             None => None,
         }
     }
@@ -231,15 +252,15 @@ impl Msg {
         }
     }
 
-    pub fn command_is_same(&self, cmd: &str) -> bool {
-        self.is_command() && self.content_as_text().map_or(false, |txt| cmd == txt)
+    pub fn command_equals(&self, other: &Msg) -> bool {
+        self.is_command() && self.content == other.content
     }
 
     pub fn as_bytes(&self) -> Vec<u8> {
         option_of_bytes(self).unwrap_or_default()
     }
 
-    pub fn uturn_with_text(&mut self, reply: &str) {
+    pub fn text_reply(&mut self, reply: &str) {
         swap(&mut self.from, &mut self.to);
         let _ignore = replace(&mut self.content, Some(Text(reply.to_string())));
     }
@@ -282,7 +303,7 @@ impl Msg {
         0
     }
 
-    pub fn uturn_with_reply(&mut self, reply: Option<Vec<u8>>) {
+    pub fn reply_with_binary_content(&mut self, reply: Option<Vec<u8>>) {
         swap(&mut self.from, &mut self.to);
         let _ignore = replace(&mut self.content, reply.map(Binary));
     }
@@ -335,6 +356,20 @@ impl Msg {
 
     pub fn set_from(&mut self, from: &Addr) {
         std::mem::replace(&mut self.from, Some(from.clone()));
+    }
+    pub fn shutdown() -> Self {
+        let mut cmd = Msg::default();
+        std::mem::replace(&mut cmd.content, Some(Content::Command(Action::Shutdown)));
+        cmd
+    }
+
+    pub fn echo(s: &str) -> Self {
+        let mut cmd = Msg::default();
+        std::mem::replace(
+            &mut cmd.content,
+            Some(Content::Command(Action::Echo(s.to_string()))),
+        );
+        cmd
     }
 }
 
@@ -451,18 +486,18 @@ mod tests {
     }
 
     #[test]
-    fn uturn_with_reply_test_1() {
+    fn reply_with_binary_content_test_1() {
         let mut msg = Msg::new(option_of_bytes(&"Content"), "addr_from", "addr_to");
-        msg.uturn_with_reply(option_of_bytes(&"Reply"));
+        msg.reply_with_binary_content(option_of_bytes(&"Reply"));
         assert_eq!(msg.get_to(), &Some(Addr::new("addr_from")));
         assert_eq!(msg.get_from(), &Some(Addr::new("addr_to")));
         assert_eq!(msg.get_content(), option_of_bytes(&"Reply"));
     }
     #[test]
-    fn uturn_with_text_reply_test_1() {
+    fn text_reply_test_1() {
         let mut msg = Msg::new(option_of_bytes(&"Content"), "addr_from", "addr_to");
         assert_eq!(msg.get_content(), option_of_bytes(&"Content"));
-        msg.uturn_with_text("Reply");
+        msg.text_reply("Reply");
         assert_eq!(msg.get_to(), &Some(Addr::new("addr_from")));
         assert_eq!(msg.get_from(), &Some(Addr::new("addr_to")));
         assert_eq!(msg.get_content(), option_of_bytes(&"Reply"));
@@ -491,19 +526,19 @@ mod tests {
         mails.push(Some(Mail::Blank));
         mails.push(Some(Mail::Blank));
         mails.push(None);
-        mails.push(Some(Trade(Msg::new_with_text("mail", "from", "to"))));
-        let mut m1 = Msg::new_with_text("mail", "from1", "to1");
+        mails.push(Some(Trade(Msg::from_text("mail", "from", "to"))));
+        let mut m1 = Msg::from_text("mail", "from1", "to1");
         let mut addr1 = Addr::new("add1");
         addr1.with_port(9999);
         m1.set_recipient_addr(&addr1);
         mails.push(Some(Trade(m1)));
         let mut addr2 = addr1.clone();
         addr2.with_port(1111);
-        let mut m2 = Msg::new_with_text("mail", "from2", "to2");
+        let mut m2 = Msg::from_text("mail", "from2", "to2");
         m2.set_recipient_addr(&addr2);
         mails.push(Some(Bulk(vec![m2])));
 
-        let mut m3 = Msg::new_with_text("mail", "from3", "to3");
+        let mut m3 = Msg::from_text("mail", "from3", "to3");
         m3.set_recipient_ip("89.89.89.89");
         mails.push(Some(Bulk(vec![m3])));
 
@@ -524,13 +559,13 @@ mod tests {
 
     #[test]
     fn mail_print_test() {
-        let m = Msg::new_with_text("mail", "from", "to");
+        let m = Msg::from_text("mail", "from", "to");
         let mail = Mail::Trade(m);
         println!("{}", mail);
 
-        let m1 = Msg::new_with_text("mail", "from", "to");
-        let m2 = Msg::new_with_text("mail", "from", "to");
-        let m3 = Msg::new_with_text("mail", "from", "to");
+        let m1 = Msg::from_text("mail", "from", "to");
+        let m2 = Msg::from_text("mail", "from", "to");
+        let m3 = Msg::from_text("mail", "from", "to");
         let bulk_mail = Mail::Bulk(vec![]);
         println!("{}", bulk_mail);
 
@@ -540,10 +575,19 @@ mod tests {
         let bulk_mail = Mail::Bulk(vec![m1, m2, m3]);
         println!("Bulk {}", bulk_mail);
 
-        let m1 = Msg::new_with_text("mail", "from", "to");
+        let m1 = Msg::from_text("mail", "from", "to");
         let bulk_mail = Mail::Bulk(vec![m1]);
         println!("Bulk {}", bulk_mail);
 
         println!("Bulk {}", Mail::Blank);
+    }
+
+    #[test]
+    fn mail_is_command_test_1() {
+        let trade_mail: Mail = Msg::from_text("Some text", "from", "to").into();
+        assert!(!trade_mail.is_command());
+
+        let bulk = Mail::Bulk(vec![Msg::from_text("Some text", "from", "to")]);
+        assert!(!bulk.is_command());
     }
 }

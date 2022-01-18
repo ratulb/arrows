@@ -60,16 +60,15 @@ fn main() {
         },
         _ => eprintln!("Wrong options!"),
     };
-    match opts.db {
-        Some(dbpath) => {
-            if !Path::new(&dbpath).exists() {
-                panic!("Db path does not exits {}!", dbpath);
-            } else {
-                config.set_db_path(&dbpath);
-            }
+
+    if let Some(dbpath) = opts.db {
+        if !Path::new(&dbpath).exists() {
+            panic!("Db path does not exits {}!", dbpath);
+        } else {
+            config.set_db_path(&dbpath);
         }
-        None => (),
     }
+
     Config::re_init(config);
     println!("New {:?}", Config::get_shared());
     MessageListener::start();

@@ -93,7 +93,7 @@ impl Client<'_> {
     pub fn send(&mut self, actor: &str, msgs: &str) -> Result<()> {
         let msgs: Vec<_> = msgs
             .split(',')
-            .map(|msg| Msg::new_with_text(msg, "cli", actor))
+            .map(|msg| Msg::from_text(msg, "cli", actor))
             .collect();
 
         let bulk = Mail::Bulk(msgs);

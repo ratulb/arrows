@@ -67,7 +67,7 @@ mod tests {
 
     impl Actor for NewActor {
         fn receive(&mut self, _incoming: Mail) -> std::option::Option<Mail> {
-            Some(Msg::new_with_text("Reply from new actor", "from", "to").into())
+            Some(Msg::from_text("Reply from new actor", "from", "to").into())
         }
     }
 

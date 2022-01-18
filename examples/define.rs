@@ -7,7 +7,7 @@ pub struct NewActor;
 
 impl Actor for NewActor {
     fn receive(&mut self, _incoming: Mail) -> std::option::Option<Mail> {
-        Some(Msg::new_with_text("Reply from new actor", "from", "to").into())
+        Some(Msg::from_text("Reply from new actor", "from", "to").into())
     }
 }
 
@@ -35,6 +35,6 @@ fn main() {
 
     send!(Addr::new("new_actor"), Msg::default());
 
-    let msg_to_unregisterd = Msg::new_with_text("Mis-directed message", "from", "to");
+    let msg_to_unregisterd = Msg::from_text("Mis-directed message", "from", "to");
     send!("Unknown actor", msg_to_unregisterd);
 }

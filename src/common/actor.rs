@@ -41,7 +41,7 @@ pub trait Actor: Any + Send + Sync {
      **/
 
     fn post_start(&mut self, _mail: Mail) -> Option<Mail> {
-        Some(Msg::new_with_text("Starting up", "from_this_actor", "to_another_actor").into())
+        Some(Msg::from_text("Starting up", "from_this_actor", "to_another_actor").into())
     }
 
     /**
@@ -52,7 +52,7 @@ pub trait Actor: Any + Send + Sync {
      * getting corrupted in transit.
      **/
     fn pre_shutdown(&mut self, _mail: Mail) -> Option<Mail> {
-        Some(Msg::new_with_text("Shutdown", "from_this_actor", "to_another_actor").into())
+        Some(Msg::from_text("Shutdown", "from_this_actor", "to_another_actor").into())
     }
 }
 
@@ -101,7 +101,7 @@ impl Actor for ExampleActor {
     fn receive(&mut self, incoming: Mail) -> std::option::Option<Mail> {
         if !Mail::is_blank(&incoming) {
             println!("Actor received {}", incoming.message());
-            let reply = Msg::new_with_text("Some text", "from_me", "to_sender");
+            let reply = Msg::from_text("Some text", "from_me", "to_sender");
             return Some(reply.into());
         }
         None
