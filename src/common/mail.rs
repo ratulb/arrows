@@ -62,13 +62,13 @@ impl Mail {
             _ => panic!(),
         }
     }
-    pub(crate) fn command_equals(&self, other: &Msg) -> bool {
+    pub(crate) fn command_equals(&self, action: Action) -> bool {
         if !self.is_command() {
             return false;
         }
         match self {
-            Trade(_) => self.message().command_equals(other),
-            bulk @ Bulk(_) => bulk.messages()[0].command_equals(other),
+            Trade(_) => self.message().command_equals(action),
+            bulk @ Bulk(_) => bulk.messages()[0].command_equals(action),
             _ => false,
         }
     }
@@ -188,6 +188,13 @@ impl Action {
             Self::Echo(_) => "Echo",
         }
     }
+
+    fn inner(&self) -> &str {
+        match self {
+            Self::Shutdown => "",
+            Self::Echo(s) => &s,
+        }
+    }
 }
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Default)]
@@ -240,7 +247,7 @@ impl Msg {
                 text.ok()
             }
             Some(Text(ref s)) => Some(s),
-            Some(Command(ref cmd)) => Some(cmd.as_text()),
+            Some(Command(ref action)) => Some(action.inner()),
             None => None,
         }
     }
@@ -252,8 +259,14 @@ impl Msg {
         }
     }
 
-    pub fn command_equals(&self, other: &Msg) -> bool {
-        self.is_command() && self.content == other.content
+    pub fn command_equals(&self, action: Action) -> bool {
+        if !self.is_command() {
+            return false;
+        }
+        if let Some(Content::Command(ref own_action)) = self.content {
+            return own_action.as_text() == action.as_text();
+        }
+        false
     }
 
     pub fn as_bytes(&self) -> Vec<u8> {

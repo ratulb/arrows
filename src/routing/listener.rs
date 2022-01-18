@@ -1,7 +1,7 @@
 use crate::catalog::ingress;
 use crate::common::config::Config;
 use crate::type_of;
-use crate::{from_bytes, Addr, Mail, Msg};
+use crate::{from_bytes, Action, Addr, Mail, Mail::Bulk};
 use byte_marks::Marked;
 use std::io::{BufReader, BufWriter, Result, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
@@ -9,14 +9,10 @@ use std::process::Command;
 
 pub struct MessageListener {
     addr: SocketAddr,
-    shutdown: Msg,
 }
 impl MessageListener {
     pub(crate) fn new(addr: SocketAddr) -> Self {
-        Self {
-            addr,
-            shutdown: Msg::shutdown(),
-        }
+        Self { addr }
     }
     pub fn start() {
         let listener_addr = Addr::new("listener");
@@ -35,11 +31,11 @@ impl MessageListener {
                     Err(serving_error) => eprintln!("Error serving client {}", serving_error),
                     Ok(None) => continue,
                     Ok(cmd) => match cmd {
-                        Some(cmd) if cmd.is_command() && cmd.command_equals(&self.shutdown) => {
+                        Some(_) => {
                             println!("Stopping on request");
                             break;
                         }
-                        _ => continue,
+                        None => continue,
                     },
                 },
                 Err(e) => {
@@ -57,33 +53,37 @@ impl MessageListener {
         let mut reader = BufReader::new(cloned);
         let mut writer = BufWriter::new(tcp);
         let marked = Marked::with_defaults(&mut reader);
-
+        let mut response = String::from("MessageListener received request");
         for mail in marked {
             println!("for mail in marked");
             match self.ingress(mail) {
-                Ok(cmd) if cmd.is_some() => {
-                    println!("return Ok(cmd) post ingress");
-                    return Ok(cmd);
-                }
-                Ok(what) => {
-                    println!("continue {:?}", what);
-                    continue;
-                }
+                Ok(Some(mail)) => match mail {
+                    mail @ Bulk(_) if mail.command_equals(Action::Shutdown) => {
+                        return Ok(Some(mail))
+                    }
+                    mail @ Bulk(_) if mail.command_equals(Action::Echo("".to_string())) => {
+                        response.clear();
+                        match mail.messages()[0].content_as_text() {
+                            Some(text) => response.push_str(text),
+                            None => (),
+                        };
+                        break;
+                    }
+                    _ => continue,
+                },
+                Ok(None) => continue,
                 Err(err) => eprintln!("Error ingressing mail {}", err),
             }
         }
-        writer.write_all("MessageListener received request".as_bytes())?;
+        writer.write_all(response.as_bytes())?;
         writer.flush()?;
         Ok(None)
     }
     fn process_cmd(mail: Mail) -> Result<Option<Mail>> {
-        println!("Entered process_cmd - telling to shutdown {}!", mail);
-        let telling_what = Ok(Some(mail));
-        println!(
-            "Returning from process_cmd - telling to shutdown {:?}!",
-            telling_what
-        );
-        telling_what
+        println!("Entered process_cmd  {}!", mail);
+        let what = Ok(Some(mail));
+        println!("Returning from process_cmd - telling to {:?}!", what);
+        what
     }
 
     fn ingress(&self, payload: Vec<u8>) -> Result<Option<Mail>> {
@@ -91,11 +91,11 @@ impl MessageListener {
         println!("The type of check in listener self ingress");
         type_of(&payload);
         match payload {
-            m @ Mail::Bulk(_) if m.is_command() && m.command_equals(&self.shutdown) => {
-                println!("The match payload coming after shutdown success - to go to process_cmd");
+            m @ Mail::Bulk(_) if m.is_command() => {
+                println!("The match payload going go to process_cmd");
                 return Self::process_cmd(m);
             }
-            m @ Mail::Trade(_) | m @ Mail::Bulk(_)=> {
+            m @ Mail::Trade(_) | m @ Mail::Bulk(_) => {
                 println!("The match payload going to ingress in to db");
                 ingress(m)
             }
