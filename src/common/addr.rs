@@ -3,7 +3,9 @@ use crate::{compute_hash, option_of_bytes};
 use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
-use std::net::{IpAddr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+static WILDCARD_IP: IpAddr = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
 
 ///`Addr` - An actor address with name, node ip and port
 
@@ -55,24 +57,35 @@ impl Addr {
     }
     pub fn get_socket_addr(&self) -> Option<SocketAddr> {
         if let Some(h) = &self.host {
-            return Some(SocketAddr::new(
-                h[..].parse().ok().unwrap(),
-                self.port.unwrap(),
-            ));
+            return Some(SocketAddr::new(h[..].parse().ok()?, self.port?));
         }
         None
     }
+
+    pub fn get_host_ip(&self) -> IpAddr {
+        match self.get_host() {
+            Some(host) => match host.parse::<Ipv4Addr>() {
+                Ok(ip) => IpAddr::V4(ip),
+                Err(err) => panic!("{}", err),
+            },
+            None => panic!(),
+        }
+    }
+
+    pub fn is_ip_local(ip: IpAddr) -> bool {
+        Config::get_shared()
+            .host()
+            .to_string()
+            .parse()
+            .map_or(false, |parsed: IpAddr| parsed == ip)
+    }
+
     pub fn is_local_ip(&self) -> bool {
-        match self.get_socket_addr() {
-            None => false,
-            Some(sa) => {
-                if sa.ip().is_loopback() {
-                    true
-                } else {
-                    let local_ip = local_ip();
-                    local_ip.is_ok() && sa.ip() == local_ip.unwrap()
-                }
-            }
+        let host_ip = self.get_host_ip();
+        if host_ip.is_loopback() || host_ip == WILDCARD_IP {
+            true
+        } else {
+            local_ip().map_or(false, |local_ip| local_ip == host_ip)
         }
     }
 
@@ -100,7 +113,7 @@ impl Addr {
 
 impl std::fmt::Display for Addr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Address")
+        f.debug_struct("Addr")
             .field("name", &self.name)
             .field("host", self.host.as_ref().unwrap_or(&"not set".to_string()))
             .field("port", &self.port)
@@ -120,7 +133,7 @@ mod tests {
     #[test]
     fn create_addr_test2() {
         let addr1 = Addr::new("add1");
-        assert!(addr1.get_socket_addr().unwrap().ip().is_loopback());
+        assert!(addr1.is_local_ip());
     }
     #[test]
     fn create_addr_test3() {
@@ -130,20 +143,21 @@ mod tests {
     #[test]
     fn create_addr_change_port_test_1() {
         use std::env;
-        env::set_var("port", "7171");
+        env::set_var("PORT", "6161");
         let mut addr = Addr::new("addr");
         let id = addr.get_id();
         assert!(addr.is_local());
         addr.with_port(7171);
-        assert_eq!(addr.get_id(), id);
-        addr.with_port(7172);
         assert_ne!(addr.get_id(), id);
+        addr.with_port(6161);
+        assert_eq!(addr.get_id(), id);
     }
     #[test]
     fn create_addr_change_ip_test1() {
         let mut addr = Addr::new("add");
         assert!(addr.is_local());
         let id = addr.get_id();
+        //Set an invalid ip - that should not alter anything
         addr.with_ip("300.300.300.300");
         assert_eq!(addr.get_id(), id);
         addr.with_ip("10.160.0.2");

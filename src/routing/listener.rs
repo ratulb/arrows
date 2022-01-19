@@ -6,7 +6,6 @@ use byte_marks::Marked;
 use std::io::{BufReader, BufWriter, Result, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 
-
 pub struct MessageListener {
     addr: SocketAddr,
 }
@@ -80,9 +79,8 @@ impl MessageListener {
         Ok(None)
     }
     fn process_cmd(mail: Mail) -> Result<Option<Mail>> {
-        println!("Entered process_cmd  {}!", mail);
         let what = Ok(Some(mail));
-        println!("Returning from process_cmd - telling to {:?}!", what);
+        println!("Returned process_cmd - {:?}!", what);
         what
     }
 
@@ -96,7 +94,7 @@ impl MessageListener {
                 return Self::process_cmd(m);
             }
             m @ Mail::Trade(_) | m @ Mail::Bulk(_) => {
-                println!("The match payload going to ingress in to db");
+                println!("The match payload going to ingress in to db {}", m);
                 ingress(m)
             }
             _ => {
@@ -106,26 +104,4 @@ impl MessageListener {
         };
         Ok(None)
     }
-
-   /*** pub fn bootup() -> Result<()> {
-        let mut resident_listener = std::env::current_dir()?;
-        resident_listener.push(Config::get_shared().resident_listener());
-        let path = resident_listener.as_path().to_str();
-        match path {
-            Some(path) => {
-                Command::new(path).spawn()?;
-            }
-            None => (),
-        }
-        Ok(())
-    }***/
 }
-//use arrows::define_actor;
-//use arrows::ExampleActorProducer;
-
-/***fn define_example_actors() {
-    let producer = ExampleActorProducer;
-    let _rs = define_actor!("example_actor1", producer);
-    let _rs = define_actor!("from", ExampleActorProducer);
-    println!("Defined example actors");
-}***/

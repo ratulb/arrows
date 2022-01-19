@@ -1,3 +1,3 @@
 [env]
-ARROWS_DB_PATH="/tmp"
-port="7171"
+DB_PATH="/tmp"
+PORT="7171"

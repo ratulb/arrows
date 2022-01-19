@@ -1,8 +1,10 @@
 use lazy_static::lazy_static;
+use local_ip_address::local_ip;
 use parking_lot::RwLock;
 use parking_lot::RwLockReadGuard;
 use std::env;
 use std::hash::Hash;
+
 lazy_static! {
     pub static ref CONFIG: RwLock<Config> = RwLock::new(Config::from_env());
 }
@@ -15,7 +17,7 @@ pub struct Config {
     host: String,
     port: u16,
     db_path: String,
-    listen_addr: String,
+    //listen_addr: String,
     resident_listener: String,
 }
 
@@ -24,12 +26,7 @@ impl Config {
         CONFIG.read()
     }
     pub fn from_env() -> Config {
-        let port: u16 = env::var("port").unwrap_or_else(|_| "7171".to_string())[..]
-            .parse()
-            .unwrap();
-        let host = env::var("ip_addr").unwrap_or_else(|_| "127.0.0.1".to_string());
         let db_path = env::var("DB_PATH").unwrap_or_else(|_| "/tmp".to_string());
-        let listen_addr = env::var("LISTEN_ADDR").unwrap_or_else(|_| "0.0.0.0:7171".to_string());
         let resident_listener = env::var("resident_listener").unwrap_or_else(|_| {
             if cfg!(target_os = "windows") {
                 WINDOWS.to_string()
@@ -37,11 +34,32 @@ impl Config {
                 LINUX.to_string()
             }
         });
+
+        let (host, port) = match env::var("LISTEN_ADDR") {
+            Ok(address) => {
+                let mut hostport = address.split(':');
+                let host = hostport.next().unwrap_or("0.0.0.0");
+                let port = hostport.next().unwrap_or("7171");
+                (host.to_string(), port.to_string())
+            }
+            Err(err) => {
+                eprintln!("{}", err);
+                let port = env::var("PORT").unwrap_or("7171".to_string());
+                match local_ip() {
+                    Ok(ip) => (ip.to_string(), port),
+                    Err(err) => {
+                        eprintln!("{}", err);
+                        ("0.0.0.0".to_string(), port)
+                    }
+                }
+            }
+        };
+
+        let port: u16 = port.parse().expect("port num");
         Self {
             host,
             port,
             db_path,
-            listen_addr,
             resident_listener,
         }
     }
@@ -63,10 +81,6 @@ impl Config {
         &self.db_path
     }
 
-    pub fn listen_addr(&self) -> &str {
-        &self.listen_addr
-    }
-
     pub fn resident_listener(&self) -> &str {
         &self.resident_listener
     }
@@ -83,30 +97,8 @@ impl Config {
         self.db_path = db_path.to_string();
     }
 
-    pub fn set_listen_addr(&mut self, listen_addr: &str) {
-        self.listen_addr = listen_addr.to_string();
-    }
-
     pub fn set_resident_listener(&mut self, resident_listener: &str) {
         self.resident_listener = resident_listener.to_string();
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn config_default_test() {
-        for _i in 0..10000 {
-            let config = Config::get_shared();
-            println!("{:?}", config);
-        }
-    }
-    #[test]
-    fn config_from_env_test() {
-        for _i in 0..10000 {
-            let config = Config::from_env();
-            println!("{:?}", config);
-        }
-    }
-}

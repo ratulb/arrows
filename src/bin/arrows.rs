@@ -45,7 +45,6 @@ fn main() {
         None => MessageListener::start(),
         Some(ref hostport) if hostport == "user" => match opts.addr {
             Some(ref sa) => {
-                config.set_listen_addr(&sa.to_string());
                 match sa.ip() {
                     IpAddr::V4(inner) => {
                         let host = inner.to_string();
@@ -70,7 +69,7 @@ fn main() {
     }
 
     Config::re_init(config);
-    println!("New {:?}", Config::get_shared());
+    println!("Listener started with config:{:?}", Config::get_shared());
     MessageListener::start();
 }
 

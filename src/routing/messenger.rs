@@ -1,10 +1,10 @@
-use crate::routing::messenger::client::Client;
-use std::process::Command;
 use crate::common::config::Config;
+use crate::routing::messenger::client::Client;
 use crate::{Addr, Mail, Msg, Result};
 use std::collections::HashMap;
 use std::io::ErrorKind::ConnectionRefused;
 use std::net::SocketAddr;
+use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
@@ -114,12 +114,8 @@ pub(super) mod client {
     }
 }
 
-fn bootup_listener(
-    msgs: Vec<Msg>,
-    socket_addr: SocketAddr,
-    err: std::io::Error,
-) -> Result<()> {
-    if socket_addr.ip().is_loopback() {
+fn bootup_listener(msgs: Vec<Msg>, socket_addr: SocketAddr, err: std::io::Error) -> Result<()> {
+    if Addr::is_ip_local(socket_addr.ip()) {
         match err.kind() {
             ConnectionRefused => {
                 if !msgs.is_empty() && msgs[0] == Msg::shutdown() {
@@ -137,15 +133,15 @@ fn bootup_listener(
     Ok(())
 }
 
- pub fn bootup() -> Result<()> {
-        let mut resident_listener = std::env::current_dir()?;
-        resident_listener.push(Config::get_shared().resident_listener());
-        let path = resident_listener.as_path().to_str();
-        match path {
-            Some(path) => {
-                Command::new(path).spawn()?;
-            }
-            None => (),
+pub fn bootup() -> Result<()> {
+    let mut resident_listener = std::env::current_dir()?;
+    resident_listener.push(Config::get_shared().resident_listener());
+    let path = resident_listener.as_path().to_str();
+    match path {
+        Some(path) => {
+            Command::new(path).spawn()?;
         }
-        Ok(())
+        None => (),
     }
+    Ok(())
+}
