@@ -101,4 +101,3 @@ impl Config {
         self.resident_listener = resident_listener.to_string();
     }
 }
-

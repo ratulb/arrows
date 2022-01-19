@@ -31,7 +31,6 @@ pub struct Context {
     handle: Option<JoinHandle<()>>,
     dispatcher: Dispatcher,
 }
-type InputChannel = Option<Receiver<RichMail>>;
 type Dispatcher = Sender<RichMail>;
 
 impl Context {

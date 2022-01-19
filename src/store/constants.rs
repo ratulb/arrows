@@ -1,5 +1,4 @@
 pub(crate) const DATABASE: &str = "arrows.db";
-pub(crate) const ARROWS_DB_PATH: &str = "ARROWS_DB_PATH";
 pub(crate) const FETCH_LIMIT: usize = 1000;
 pub(crate) const BUFFER_MAX_SIZE: usize = 1;
 pub(crate) const ACTOR_BUFFER_SIZE: usize = 1;
