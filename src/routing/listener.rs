@@ -62,10 +62,9 @@ impl MessageListener {
                     }
                     mail @ Bulk(_) if mail.command_equals(Action::Echo("".to_string())) => {
                         response.clear();
-                        match mail.messages()[0].as_text() {
-                            Some(text) => response.push_str(text),
-                            None => (),
-                        };
+                        if let Some(text) = mail.messages()[0].as_text() {
+                            response.push_str(text)
+                        }
                         break;
                     }
                     _ => continue,
