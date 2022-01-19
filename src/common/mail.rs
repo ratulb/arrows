@@ -273,10 +273,7 @@ impl Msg {
     }
 
     pub fn is_command(&self) -> bool {
-        match self.content {
-            Some(Command(_)) => true,
-            _ => false,
-        }
+        matches!(self.content, Some(Command(_)))
     }
 
     pub fn command_equals(&self, action: Action) -> bool {
@@ -555,11 +552,13 @@ mod tests {
     }
     #[test]
     fn test_mail_partition() {
-        let mut mails = vec![];
-        mails.push(Some(Mail::Blank));
-        mails.push(Some(Mail::Blank));
-        mails.push(None);
-        mails.push(Some(Trade(Msg::from_text("mail", "from", "to"))));
+        let mut mails = vec![
+            Some(Mail::Blank),
+            Some(Mail::Blank),
+            None,
+            Some(Trade(Msg::from_text("mail", "from", "to"))),
+        ];
+
         let mut m1 = Msg::from_text("mail", "from1", "to1");
         let mut addr1 = Addr::new("add1");
         addr1.with_port(9999);
