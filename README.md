@@ -17,6 +17,7 @@
 * Panicking Actor ejection.
 * Parralel processing of received messages 
 * Post start and clean up signals
+* No boot up required. Post an echo msg and the server would be ready.
 
 ```rust
  use crate::{define_actor, send};
