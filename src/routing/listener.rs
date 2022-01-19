@@ -1,11 +1,11 @@
 use crate::catalog::ingress;
-use crate::common::config::Config;
+
 use crate::type_of;
 use crate::{from_bytes, Action, Addr, Mail, Mail::Bulk};
 use byte_marks::Marked;
 use std::io::{BufReader, BufWriter, Result, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
-use std::process::Command;
+
 
 pub struct MessageListener {
     addr: SocketAddr,
@@ -107,7 +107,7 @@ impl MessageListener {
         Ok(None)
     }
 
-    pub fn bootup() -> Result<()> {
+   /*** pub fn bootup() -> Result<()> {
         let mut resident_listener = std::env::current_dir()?;
         resident_listener.push(Config::get_shared().resident_listener());
         let path = resident_listener.as_path().to_str();
@@ -118,7 +118,7 @@ impl MessageListener {
             None => (),
         }
         Ok(())
-    }
+    }***/
 }
 //use arrows::define_actor;
 //use arrows::ExampleActorProducer;

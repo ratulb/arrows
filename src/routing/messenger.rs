@@ -1,11 +1,13 @@
 use crate::routing::messenger::client::Client;
-
+use std::process::Command;
+use crate::common::config::Config;
 use crate::{Addr, Mail, Msg, Result};
 use std::collections::HashMap;
 use std::io::ErrorKind::ConnectionRefused;
 use std::net::SocketAddr;
+use std::thread;
+use std::time::Duration;
 
-use crate::MessageListener;
 pub(crate) struct Messenger;
 
 impl Messenger {
@@ -23,7 +25,7 @@ impl Messenger {
                     }
                     Err(err) => {
                         eprintln!("Host: {} {}", host_addr, err);
-                        try_restart_listener(msgs, host_addr, err);
+                        bootup_listener(msgs, host_addr, err);
                     }
                 }
             }
@@ -43,7 +45,7 @@ impl Messenger {
                     }
                     Err(err) => {
                         eprintln!("Host: {} {}", host_addr, err);
-                        try_restart_listener(msgs, host_addr, err)
+                        bootup_listener(msgs, host_addr, err)
                     }
                 };
             });
@@ -55,7 +57,8 @@ impl Messenger {
         for msg in msgs {
             let host_addr = match msg.get_to() {
                 Some(ref addr) => addr.get_socket_addr().expect("host"),
-                None => panic!(),
+                //None => panic!(),
+                None => continue,
             };
             groups.entry(host_addr).or_default().push(msg);
         }
@@ -111,7 +114,7 @@ pub(super) mod client {
     }
 }
 
-fn try_restart_listener(
+fn bootup_listener(
     msgs: Vec<Msg>,
     socket_addr: SocketAddr,
     err: std::io::Error,
@@ -122,8 +125,9 @@ fn try_restart_listener(
                 if !msgs.is_empty() && msgs[0] == Msg::shutdown() {
                     return Ok(());
                 } else {
-                    MessageListener::bootup();
+                    bootup();
                     let mail: Mail = msgs.into();
+                    thread::sleep(Duration::from_millis(100));
                     Messenger::mail(mail);
                 }
             }
@@ -132,3 +136,16 @@ fn try_restart_listener(
     }
     Ok(())
 }
+
+ pub fn bootup() -> Result<()> {
+        let mut resident_listener = std::env::current_dir()?;
+        resident_listener.push(Config::get_shared().resident_listener());
+        let path = resident_listener.as_path().to_str();
+        match path {
+            Some(path) => {
+                Command::new(path).spawn()?;
+            }
+            None => (),
+        }
+        Ok(())
+    }
