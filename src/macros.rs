@@ -1,7 +1,4 @@
-//! Macros for actor definition and invocation
-//! # Example
-//!
-//! define_actor("some_actor", ExampleActorProducer);
+//! This module defines macros for actor definition and invocation.
 //!
 
 //!This macro defines an actor in the system. It takes a literal string as actor name &

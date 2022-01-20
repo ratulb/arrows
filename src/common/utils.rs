@@ -1,4 +1,4 @@
-use crate::Result as ArrowsResult;
+use crate::Result;
 use bincode::{deserialize, serialize};
 
 use crate::Error;
@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 
 use std::hash::{Hash, Hasher};
-use std::io::Result;
+
 
 ///Get the type name from a runtime instance
 pub fn type_of<T>(_: &T) {
@@ -22,35 +22,28 @@ where
     hasher.finish()
 }
 
+///Convert a type into byte representation such as [Addr](crate::common::addr::Addr)
+///The type needs to be serde json serializable - uses bincode underneath.
+///
 pub fn option_of_bytes<T: ?Sized + std::fmt::Debug + Serialize>(t: &T) -> Option<Vec<u8>> {
     match serialize(t) {
         Ok(bytes) => Some(bytes),
         Err(err) => {
-            eprintln!("Error serializing: {:?}", err);
+            eprintln!("Error serializing: {}", err);
             None
         }
     }
 }
-
-pub fn from_bytes<'a, T: std::fmt::Debug + Deserialize<'a>>(bytes: &'a [u8]) -> ArrowsResult<T> {
+///Reconstruct a type from array of bytes such as [Msg](crate::common::mail::Mail)
+///Reconstructed type must be serde json Derserialize
+pub fn from_bytes<'a, T: std::fmt::Debug + Deserialize<'a>>(bytes: &'a [u8]) -> Result<T> {
     match deserialize(bytes) {
         Ok(t) => Ok(t),
         Err(err) => {
-            eprintln!("Error derializing: {:?}", err);
+            eprintln!("Error derializing: {}", err);
             let err = Into::<bincode::ErrorKind>::into(*err);
             let err: Error = err.into();
             Err(err)
-        }
-    }
-}
-
-pub fn from_byte_array<'a, T: std::fmt::Debug + Deserialize<'a>>(bytes: &'a [u8]) -> Result<T> {
-    use std::io::Error;
-    match deserialize(bytes) {
-        Ok(t) => Ok(t),
-        Err(err) => {
-            eprintln!("Error derializing: {:?}", err);
-            Err(Error::last_os_error())
         }
     }
 }

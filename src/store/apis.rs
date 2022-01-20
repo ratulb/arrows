@@ -1,4 +1,4 @@
-use crate::common::utils::from_byte_array;
+use crate::common::utils::from_bytes;
 use crate::constants::*;
 use crate::dbconnection::DBConnection;
 use crate::events::DBEvent;
@@ -457,7 +457,7 @@ pub(crate) fn sql_to_io(err: rusqlite::Error) -> std::io::Error {
 
 pub(crate) fn value_to_msg(v: Value) -> Msg {
     if let Value::Blob(bytes) = v {
-        return match from_byte_array::<'_, Msg>(&bytes) {
+        return match from_bytes::<'_, Msg>(&bytes) {
             Ok(msg) => msg,
             _ => Msg::default(),
         };
@@ -467,7 +467,7 @@ pub(crate) fn value_to_msg(v: Value) -> Msg {
 
 pub(crate) fn value_to_addr(v: Value) -> Addr {
     if let Value::Blob(bytes) = v {
-        return match from_byte_array::<'_, Addr>(&bytes) {
+        return match from_bytes::<'_, Addr>(&bytes) {
             Ok(addr) => addr,
             _ => Addr::default(),
         };

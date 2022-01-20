@@ -1,7 +1,7 @@
-//! `Messenger` handles sending out msgs to remote or local systems. Tries to boot up
-//! listener binary in case of local connection failre.
+//!`Messenger` sends out  messages to remote or local system. Tries to boot up
+//!listener binary in case of local connection failre.
 //!
-//! Uses a tcp client which serializes collection of messages. Each collection of messages
+//!Uses a tcp client which serializes collection of messages. Each collection of messages
 //!ends with byte marks <https://github.com/ratulb/byte_marks>. This is how the receiving
 //!end reconstruct messages back. Message serialization and deserialization is based on
 //![bincode] <https://github.com/bincode-org/bincode> library.

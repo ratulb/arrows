@@ -1,3 +1,5 @@
+
+
 use crate::Result;
 use crate::{
     common::utils::{compute_hash, from_bytes, option_of_bytes},
@@ -8,6 +10,8 @@ use serde::{Deserialize, Serialize};
 use std::mem::{replace, swap};
 use std::time::SystemTime;
 use uuid::Uuid;
+///The variants of actual message payload - Text, Binary blob or a Command adjoining an
+///Action
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Content {
@@ -25,7 +29,7 @@ impl std::fmt::Display for Action {
 }
 
 use Content::*;
-
+///The Mail enum which could be Trade(single message), Bulk(multiple messages) or Blank
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Mail {
     Trade(Msg),
@@ -35,6 +39,7 @@ pub enum Mail {
 use Mail::*;
 
 impl Mail {
+    ///Get a handle to the inner message
     pub(crate) fn message(&self) -> &Msg {
         println!("Inside mail message - printing self {}", self);
         match self {
@@ -42,27 +47,29 @@ impl Mail {
             _ => panic!("message is supported only on Trade variant"),
         }
     }
-
-    pub(crate) fn messages(&self) -> &Vec<Msg> {
+    ///Get a handle to inner messages without hollowing out the mail
+    pub fn messages(&self) -> &Vec<Msg> {
         match self {
             Bulk(ref msgs) => msgs,
             _ => panic!("messages is supported only on Bulk variant"),
         }
     }
-    pub(crate) fn take(self) -> Msg {
+    ///Take the inner message out - if its a Trade variant
+    pub fn take(self) -> Msg {
         match self {
             Trade(msg) => msg,
             _ => panic!(),
         }
     }
-
-    pub(crate) fn take_all(self) -> Vec<Msg> {
+    ///Take all the content out if its Mail enum variant is Bulk
+    pub fn take_all(self) -> Vec<Msg> {
         match self {
             Bulk(msgs) => msgs,
             _ => panic!(),
         }
     }
-    pub(crate) fn command_equals(&self, action: Action) -> bool {
+    ///If the mail is actually a command - does it match a specific command
+    pub fn command_equals(&self, action: Action) -> bool {
         if !self.is_command() {
             return false;
         }
@@ -72,8 +79,8 @@ impl Mail {
             _ => false,
         }
     }
-
-    pub(crate) fn is_command(&self) -> bool {
+    ///Is the mail is actually a containing a single command like Shutdown etc?
+    pub fn is_command(&self) -> bool {
         match self {
             trade @ Trade(_) => trade.message().is_command(),
             bulk @ Bulk(ref _msgs)
@@ -84,7 +91,8 @@ impl Mail {
             _ => false,
         }
     }
-
+    //Actors are whimsical - might not respond immediately 
+    //Convert the buffered responses into single whole mail
     pub(crate) fn fold(mails: Vec<Option<Mail>>) -> Mail {
         Bulk(
             mails
@@ -98,7 +106,7 @@ impl Mail {
                 .collect::<Vec<_>>(),
         )
     }
-
+    ///Is the mail empty - mostly to avoid transmitting
     pub fn is_blank(mail: &Mail) -> bool {
         match mail {
             Blank => true,
@@ -143,7 +151,7 @@ impl Mail {
             or_else @ (_, _) => Some(or_else),
         }
     }
-
+    ///Set from address on all the messagess inside a potential mail
     pub fn set_from(mail: &mut Option<Mail>, from: &Addr) {
         match mail {
             Some(mail) => match mail {
@@ -182,6 +190,7 @@ pub enum Action {
     Echo(String),
 }
 impl Action {
+    //Meant for type checking
     fn as_text(&self) -> &str {
         match self {
             Self::Shutdown => "Shutdown",
@@ -196,7 +205,7 @@ impl Action {
         }
     }
 }
-
+///The actual payload received by actors inside a Mail enum construct
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Msg {
     id: u64,
@@ -207,6 +216,7 @@ pub struct Msg {
 }
 
 impl Msg {
+    ///Construct a new message with binary content with from and to addresses
     pub fn new(content: Option<Vec<u8>>, from: &str, to: &str) -> Self {
         Self {
             id: compute_hash(&Uuid::new_v4()),
@@ -216,6 +226,7 @@ impl Msg {
             dispatched: None,
         }
     }
+    ///Update the message with binary content
     pub fn with_binary_content(content: Option<Vec<u8>>) -> Self {
         Self {
             id: compute_hash(&Uuid::new_v4()),
@@ -226,7 +237,7 @@ impl Msg {
         }
     }
 
-    ///Create a msg with content as text to an actor(`example_actor1`) in the local system
+    ///Create a msg with content as text to an actor(`actor1`) in the local system
     ///
     ///
     /// # Example
@@ -235,8 +246,8 @@ impl Msg {
     ///use arrows::send;
     ///use arrows::Msg;
     ///
-    ///let m = Msg::from_text("mail", "from", "example_actor1");
-    ///let rs = send!("example_actor1", m);
+    ///let m = Msg::with_text("A good will message");
+    ///send!("actor1", m);
     ///
     ///
     pub fn with_text(content: &str) -> Self {
@@ -248,7 +259,7 @@ impl Msg {
             dispatched: Some(SystemTime::now()),
         }
     }
-
+    ///Construct a text message with from and to addresses
     pub fn from_text(content: &str, from: &str, to: &str) -> Self {
         Self {
             id: compute_hash(&Uuid::new_v4()),
@@ -271,12 +282,12 @@ impl Msg {
             None => None,
         }
     }
-
-    pub(crate) fn is_command(&self) -> bool {
+    ///Is the message actually a command?
+    pub fn is_command(&self) -> bool {
         matches!(self.content, Some(Command(_)))
     }
-
-    pub(crate) fn command_equals(&self, action: Action) -> bool {
+    ///Command action equality check
+    pub fn command_equals(&self, action: Action) -> bool {
         if !self.is_command() {
             return false;
         }
@@ -285,16 +296,18 @@ impl Msg {
         }
         false
     }
-
+    ///The message as bytes - irrespective of whether content is text or
+    ///actual binary blob. Empty byte vec - if can not be serialized
     pub fn as_bytes(&self) -> Vec<u8> {
         option_of_bytes(self).unwrap_or_default()
     }
-
+    ///Construct a text reply with content as string and message direction reversed
     pub fn text_reply(&mut self, reply: &str) {
         swap(&mut self.from, &mut self.to);
         let _ignore = replace(&mut self.content, Some(Text(reply.to_string())));
     }
 
+    ///Update the content of the message - text
     pub fn update_text_content(&mut self, reply: &str) {
         let _ignore = replace(&mut self.content, Some(Text(reply.to_string())));
     }
@@ -311,40 +324,43 @@ impl Msg {
     pub fn set_recipient_addr(&mut self, addr: &Addr) {
         self.to = Some(addr.clone());
     }
-
+    ///Set the recipient identifier as string literal
     pub fn set_recipient(&mut self, new_to: &str) {
         self.to = Some(Addr::new(new_to));
     }
+    ///Set the recipient actor's IP - used in remoting
     pub fn set_recipient_ip(&mut self, new_to_ip: &str) {
         if let Some(ref mut addr) = self.to {
             addr.with_ip(new_to_ip);
         }
     }
+    ///Set the recipient port
     pub fn set_recipient_port(&mut self, new_port: u16) {
         if let Some(ref mut addr) = self.to {
             addr.with_port(new_port);
         }
     }
-
+    ///Get the port of the recipient actor - used for remote messaging
     pub fn get_recipient_port(&self) -> u16 {
         if let Some(addr) = &self.to {
             return addr.get_port().expect("port");
         }
         0
     }
-
+    ///Reverse the message direction - 'to' to 'from' or other way
     pub fn binary_reply(&mut self, reply: Option<Vec<u8>>) {
         swap(&mut self.from, &mut self.to);
         let _ignore = replace(&mut self.content, reply.map(Binary));
     }
-
+    ///Get the binary content - the message remains intact
     pub fn binary_content(&self) -> Option<Vec<u8>> {
         match &self.content {
             Some(Binary(data)) => Some(data.to_vec()),
             _ => None,
         }
     }
-    //Would take content out (if binary)- leaving message content to a None
+    ///If the message content is binary blob - get it 
+    ///Would take content out - leaving message content to a None
     pub fn binary_content_out(&mut self) -> Option<Vec<u8>> {
         match self.content.take() {
             Some(Binary(data)) => Some(data),
@@ -355,18 +371,21 @@ impl Msg {
             _ => None,
         }
     }
-
+    ///Get the address of the actor the message is directed at
     pub fn get_to(&self) -> &Option<Addr> {
         &self.to
     }
+    ///Get the id
     pub fn get_id(&self) -> &u64 {
         &self.id
     }
-
+    ///Get the id as string. Required because unique ids overflow i64 range supported by
+    ///the backing store
     pub fn id_as_string(&self) -> String {
         self.get_id().to_string()
     }
 
+    ///Get the unique id of the actor message is directed at
     pub fn get_to_id(&self) -> u64 {
         match self.to {
             Some(ref addr) => addr.get_id(),
@@ -374,25 +393,30 @@ impl Msg {
         }
     }
 
+    ///Get the from address
     pub fn get_from(&self) -> &Option<Addr> {
         &self.from
     }
+    ///Check if message is directed at any actor in the system
     pub fn inbound(&self) -> bool {
         match self.to {
             Some(ref addr) => addr.is_local(),
             None => false,
         }
     }
-
+    ///Set the from address of a message - specific usage while sending out actor message
+    ///processing outcome
     pub fn set_from(&mut self, from: &Addr) {
         let _ignore = std::mem::replace(&mut self.from, Some(from.clone()));
     }
+
+    ///Construct a Shutdown command to shutdown the system listener
     pub fn shutdown() -> Self {
         let mut cmd = Msg::default();
         let _ignore = std::mem::replace(&mut cmd.content, Some(Content::Command(Action::Shutdown)));
         cmd
     }
-
+    ///Construct a Echo command to send to the system listener to check its liveness
     pub fn echo(s: &str) -> Self {
         let mut cmd = Msg::default();
         let _ignore = std::mem::replace(
