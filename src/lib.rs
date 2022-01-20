@@ -136,16 +136,5 @@ impl RichMail {
  * 5. All examples should run
  * 6. Check first message panic
  * 7. Find logo and make it public
- ***/
-
-/***use std::sync::Once;
-use std::thread;
-
-static INIT: Once = Once::new();
-
-assert_eq!(INIT.is_completed(), false);
-let handle = thread::spawn(|| {
-    INIT.call_once(|| panic!());
-});
-assert!(handle.join().is_err());
-assert_eq!(INIT.is_completed(), false);***/
+ * 8. store/apis clean up
+ * ***/

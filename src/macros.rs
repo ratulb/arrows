@@ -23,6 +23,50 @@ macro_rules! define_actor {
     }};
 }
 ///Sends one or more messages to one or more actors defined in the system.
+///This function is responsible for gathering and dispatching messages received from the
+///macro invocation of `send!`. Multiple messages can be grouped for one more actors in
+///one `send!` macro invocation as shown below:
+///
+///Example
+///
+///```
+///use arrows::send;
+///use arrows::Msg;
+///
+///let m1 = Msg::with_text("Message to actor1");
+///let m2 = Msg::with_text("Message to actor1");
+///let m3 = Msg::with_text("Message to actor2");
+///let m4 = Msg::with_text("Message to actor1");
+///let m5 = Msg::with_text("Message to actor1");
+///send!("actor1", (m1, m2), "actor2", (m3), "actor1", (m4, m5));
+///```
+///Grouping within braces is not necessary while sending only to one actor:
+///
+///```
+///let m6 = Msg::with_text("Message to actor3")
+///let m7 = Msg::with_text("Message to actor3")
+///send!("actor3",m6,m7);
+///
+///```
+///Actors identified with string literal such as 'actor3' is assumed to be running in the
+///local system(they would be resurrected - if they are not - on message send).
+///
+///Actors running in remote systems - need to identified by the `Addr` construct:
+///
+///```
+///use arrows::Addr;
+///
+///let remote_addr1 = Addr::remote("actor1", "10.10.10.10:7171");
+///let remote_addr2 = Addr::remote("actor2", "11.11.11.11:8181");
+///
+///let m1 = Msg::with_text("Message to remote actor1");
+///let m2 = Msg::with_text("Message to remote actor1");
+///let m3 = Msg::with_text("Message to remote actor2");
+///let m4 = Msg::with_text("Message to remote actor2");
+///
+///send!(remote_addr1, (m1,m2), remote_addr2, (m3,m4));
+///
+///```
 #[macro_export]
 macro_rules! send {
     ($($actor_name:literal, ($($msg:expr),*)),*)  => {
@@ -40,7 +84,6 @@ macro_rules! send {
     ($($addr:expr, $($msg:expr),*),*) => {
         $crate::send!(@DELEGATE; $($addr, ($($msg),*)),*);
     };
-
     (@DELEGATE; $($addr:expr, ($($msg:expr),*)),*) => {{
         let mut actor_msgs = std::collections::HashMap::new();
             $(
@@ -65,6 +108,12 @@ macro_rules! send {
     (@TO_ADDR; $actor_name:literal) => {
         $crate::Addr::new($actor_name)
     };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! sub_hidden {
+    ( $msg:expr ) => {()};
 }
 
 #[cfg(test)]
