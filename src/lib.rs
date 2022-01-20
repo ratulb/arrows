@@ -69,6 +69,18 @@ use std::collections::HashMap;
 ///the system. Actor will not process out of sequence message. To prevent loss, messages
 ///are persisted into an embedded store backed by highly performant sqlite db.
 ///
+///
+///A new implementation of actor may be swapped in - replaching an actively running actor
+///in the system. Swapped in actor would take over from an outgoing actor and start
+///processing messages from where the outgoing left off. An actor would never process an
+///out of sequence message i.e. it would never increment its message sequence counter until
+///it has successfully processed the received message.
+///
+///Actors can change their behaviour while still running. They can create other actors
+///copies of themselves.
+///
+///Actors are allowed to panic a set number of times(currently 3).
+///
 pub fn recv(msgs: HashMap<&Addr, Vec<Msg>>) {
     use crate::routing::messenger::Messenger;
     Messenger::send(msgs);

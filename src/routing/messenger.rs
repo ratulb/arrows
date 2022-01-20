@@ -1,3 +1,11 @@
+//! `Messenger` handles sending out msgs to remote or local systems. Tries to boot up
+//! listener binary in case of local connection failre.
+//!
+//! Uses a tcp client which serializes collection of messages. Each collection of messages
+//!ends with byte marks <https://github.com/ratulb/byte_marks>. This is how the receiving
+//!end reconstruct messages back. Message serialization and deserialization is based on
+//![bincode] <https://github.com/bincode-org/bincode> library.
+
 use crate::common::config::Config;
 use crate::routing::messenger::client::Client;
 use crate::{Action, Addr, Error::MsgSendError, Mail, Msg, Result};
@@ -8,30 +16,27 @@ use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
+///The client face of actor system. Sends out messages with text or binary(v8) as payload.
 pub(crate) struct Messenger;
 
 impl Messenger {
     pub(crate) fn send(mut mails: HashMap<&Addr, Vec<Msg>>) -> Result<()> {
         mails.iter_mut().for_each(|(addr, msgs)| {
-            println!("The messages {:?}", msgs);
-            println!("The messages {:?}", msgs);
-            println!("The messages {:?}", msgs);
-            println!("The messages {:?}", msgs);
-            println!("The messages {:?}", msgs);
-            println!("The messages {:?}", msgs);
-            println!("The messages {:?}", msgs);
             msgs.iter_mut().for_each(|msg| {
                 msg.set_recipient_addr(addr);
             });
             if let Some(host_addr) = addr.get_socket_addr() {
                 match Client::connect(host_addr) {
                     Ok(mut client) => {
-                        client.send(msgs);
-                        println!("Messenger sent to {}", host_addr);
+                        if let Err(err) = client.send(msgs) {
+                            println!("{}", err);
+                        } else {
+                            println!("Messages sent to host {}", host_addr);
+                        }
                     }
                     Err(err) => {
                         eprintln!("Host: {} {}", host_addr, err);
-                        Self::handle_err(msgs, host_addr, err);
+                        let _rs = Self::handle_err(msgs, host_addr, err);
                     }
                 }
             }
@@ -43,7 +48,7 @@ impl Messenger {
         Self::group_by(mail.take_all())
             .into_iter()
             .for_each(|(host_addr, mut msgs)| {
-                match Client::connect(host_addr) {
+                let _rs = match Client::connect(host_addr) {
                     Ok(mut client) => match client.send(&mut msgs) {
                         Ok(ok) => {
                             println!("Messages sent to {}", host_addr);
@@ -63,11 +68,23 @@ impl Messenger {
         Ok(())
     }
 
+    fn group_by(msgs: Vec<Msg>) -> HashMap<SocketAddr, Vec<Msg>> {
+        let mut groups: HashMap<SocketAddr, Vec<Msg>> = HashMap::new();
+        for msg in msgs {
+            let host_addr = match msg.get_to() {
+                Some(ref addr) => addr.get_socket_addr().expect("host"),
+                None => continue,
+            };
+            groups.entry(host_addr).or_default().push(msg);
+        }
+        groups
+    }
+
     fn handle_err(msgs: &mut Vec<Msg>, addr: SocketAddr, err: std::io::Error) -> Result<()> {
         match err.kind() {
             ConnectionRefused => Self::try_bootup_and_resend(msgs, addr),
             _ => {
-                eprintln!("Unhandled error {}", err);
+                eprintln!("{}", err);
                 Err(MsgSendError(err))
             }
         }
@@ -80,7 +97,7 @@ impl Messenger {
             {
                 return Ok(());
             } else {
-                if let Err(err) = bootup() {
+                if let Err(err) = Self::bootup() {
                     eprintln!("Bootup error {:?}", err);
                 }
                 let mail: Mail = std::mem::take(msgs).into();
@@ -93,21 +110,23 @@ impl Messenger {
         Ok(())
     }
 
-    fn group_by(msgs: Vec<Msg>) -> HashMap<SocketAddr, Vec<Msg>> {
-        let mut groups: HashMap<SocketAddr, Vec<Msg>> = HashMap::new();
-        for msg in msgs {
-            let host_addr = match msg.get_to() {
-                Some(ref addr) => addr.get_socket_addr().expect("host"),
-                None => {
-                    println!("Filtering out none");
-                    continue;
-                }
-            };
-            groups.entry(host_addr).or_default().push(msg);
+    ///Boots up the msg listener(`MessageListener`) binary. The resident binary path is
+    ///configurable via the environment variable 'resident_listener'.
+
+    pub fn bootup() -> Result<()> {
+        let mut resident_listener = std::env::current_dir()?;
+        resident_listener.push(Config::get_shared().resident_listener());
+        let path = resident_listener.as_path().to_str();
+        match path {
+            Some(path) => {
+                Command::new(path).spawn()?;
+            }
+            None => eprintln!("Listener binary could not be found in {:?}", path),
         }
-        groups
+        Ok(())
     }
 }
+
 pub(super) mod client {
 
     use crate::{option_of_bytes, Mail, Msg};
@@ -142,7 +161,7 @@ pub(super) mod client {
                     self.writer.flush()?;
                     let mut buf = vec![0; 256];
                     let len = self.reader.read(&mut buf)?;
-                    println!("From Server = {:?}", String::from_utf8_lossy(&buf[..len]));
+                    println!("{}", String::from_utf8_lossy(&buf[..len]));
                     Ok(())
                 }
                 None => {
@@ -155,20 +174,4 @@ pub(super) mod client {
             }
         }
     }
-}
-
-///Boots up the msg listener(`MessageListener`) binary. The resident binary path is
-///configurable via the environment variable 'resident_listener'.
-
-pub fn bootup() -> Result<()> {
-    let mut resident_listener = std::env::current_dir()?;
-    resident_listener.push(Config::get_shared().resident_listener());
-    let path = resident_listener.as_path().to_str();
-    match path {
-        Some(path) => {
-            Command::new(path).spawn()?;
-        }
-        None => eprintln!("Listener binary could not be found in {:?}", path),
-    }
-    Ok(())
 }

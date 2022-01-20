@@ -35,7 +35,7 @@ pub enum Mail {
 use Mail::*;
 
 impl Mail {
-    pub fn message(&self) -> &Msg {
+    pub(crate) fn message(&self) -> &Msg {
         println!("Inside mail message - printing self {}", self);
         match self {
             Trade(ref msg) => msg,
@@ -43,20 +43,20 @@ impl Mail {
         }
     }
 
-    pub fn messages(&self) -> &Vec<Msg> {
+    pub(crate) fn messages(&self) -> &Vec<Msg> {
         match self {
             Bulk(ref msgs) => msgs,
             _ => panic!("messages is supported only on Bulk variant"),
         }
     }
-    pub fn take(self) -> Msg {
+    pub(crate) fn take(self) -> Msg {
         match self {
             Trade(msg) => msg,
             _ => panic!(),
         }
     }
 
-    pub fn take_all(self) -> Vec<Msg> {
+    pub(crate) fn take_all(self) -> Vec<Msg> {
         match self {
             Bulk(msgs) => msgs,
             _ => panic!(),
@@ -85,7 +85,7 @@ impl Mail {
         }
     }
 
-    pub fn fold(mails: Vec<Option<Mail>>) -> Mail {
+    pub(crate) fn fold(mails: Vec<Option<Mail>>) -> Mail {
         Bulk(
             mails
                 .into_iter()
@@ -106,14 +106,14 @@ impl Mail {
         }
     }
     //Checks only for the variant of Trade!
-    pub fn inbound(mail: &Mail) -> bool {
+    pub(crate) fn inbound(mail: &Mail) -> bool {
         match mail {
             Trade(ref msg) => msg.inbound(),
             _ => false,
         }
     }
     //Split into inbound and outbound(local vs remote)
-    pub fn split(mail: Mail) -> Option<(Vec<Msg>, Vec<Msg>)> {
+    pub(crate) fn split(mail: Mail) -> Option<(Vec<Msg>, Vec<Msg>)> {
         match mail {
             Blank => None,
             trade @ Trade(_) if Mail::inbound(&trade) => Some((vec![trade.take()], Vec::new())),
@@ -127,7 +127,7 @@ impl Mail {
     }
 
     //partition as inbound/outbound messages
-    pub fn partition(mails: Vec<Option<Mail>>) -> Option<(Vec<Msg>, Vec<Msg>)> {
+    pub(crate) fn partition(mails: Vec<Option<Mail>>) -> Option<(Vec<Msg>, Vec<Msg>)> {
         match mails
             .into_iter()
             .map(Mail::from)
@@ -272,11 +272,11 @@ impl Msg {
         }
     }
 
-    pub fn is_command(&self) -> bool {
+    pub(crate) fn is_command(&self) -> bool {
         matches!(self.content, Some(Command(_)))
     }
 
-    pub fn command_equals(&self, action: Action) -> bool {
+    pub(crate) fn command_equals(&self, action: Action) -> bool {
         if !self.is_command() {
             return false;
         }

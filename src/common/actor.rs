@@ -62,33 +62,33 @@ impl Debug for dyn Actor {
         write!(f, "{}", debug_msg)
     }
 }
+/// # Producer
+///Implementation of an `Actor` trait involves two steps. First, implementation of the
+///`Actor` trait itself. Once trait implentation is done - first step is complete. Making
+///Actor instances available to system is job of the `Producer`. A `Producer` trait
+///implemenation(each `Producer` implementation with an unique `typetag` name) is
+///responsible for creating `Actor` instances at runtime. The `Producer` trait has the
+///`produce` method - which gets invoked to hand out `Actor` instances during actor
+///registration and restoration. So, the second step of `Actor` implemenation is to
+///implement the `Producer` trait. While registering an `Actor` to the system - the
+///`define_actor!` macro takes a serde serializable(<https://github.com/serde-rs/serde>)
+///`Producer` instance and a name for the actor(string - which could be anything - a
+///name for the actor). The `Producer` implemenation gets serialized and stored in the
+///backing store.
 
 #[typetag::serde]
 pub trait Producer {
-    //! # Producer
-    //!Implementation of an `Actor` trait involves two steps. First, implementation of the
-    //!`Actor` trait itself. Once trait implentation is done - first step is complete. Making
-    //!Actor instances available to system is job of the `Producer`. A `Producer` trait
-    //!implemenation(each `Producer` implementation with an unique `typetag` name) is
-    //!responsible for creating `Actor` instances at runtime. The `Producer` trait has the
-    //!`produce` method - which gets invoked to hand out `Actor` instances during actor
-    //!registration and restoration. So, the second step of `Actor` implemenation is to
-    //!implement the `Producer` trait. While registering an `Actor` to the system - the
-    //!`define_actor!` macro takes a serde serializable(<https://github.com/serde-rs/serde>)
-    //!`Producer` instance and a name for the actor(string - which could be anything - a
-    //!name for the actor). The `Producer` implemenation gets serialized and stored in the
-    //!backing store.
-
-    /** The only method to be implemented to create `Actor` instances`. The implementing type
-     *should be tagged with a non-collinding `typetag`(https://github.com/dtolnay/typetag)
-     *name in the format `#[typetag::serde(name = "an_actor_producer")]`
-     **/
+    ///The method to be implemented to create `Actor` instances. The implementing type
+    ///should be tagged with a non-collinding `typetag` name in the format
+    ///#[typetag::serde(name = "an_actor_producer")]
+    ///
+    ///<https://github.com/dtolnay/typetag>
+    ///
 
     fn produce(&mut self) -> Box<dyn Actor>;
 
-    /**
-     * A method to rebuild a `Producer` implementation.
-     **/
+    ///A method to rebuild a `Producer` implementation. Used internally by the system to
+    ///generate `Producer`s on demand from the backing store.  
     fn from_string(&self, content: String) -> std::io::Result<Box<dyn Producer>> {
         let producer: Box<dyn Producer> = serde_json::from_str(&content)?;
         Ok(producer)
