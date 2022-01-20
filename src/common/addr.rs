@@ -32,6 +32,19 @@ impl Addr {
         Self::addr_hash(&mut addr);
         addr
     }
+    pub fn remote(name: &str, hostport: &str) -> Self {
+        let mut addr = Self::new(name);
+        let mut hostport = hostport.split(':');
+        let host = hostport.next().map(|host| host.to_string());
+        let port = hostport
+            .next()
+            .map(|port| port.parse::<u16>().unwrap_or(7171));
+        addr.host = host;
+        addr.port = port;
+        Self::addr_hash(&mut addr);
+        addr
+    }
+
     pub fn with_port(&mut self, port: u16) {
         self.port = Some(port);
         Self::addr_hash(self);

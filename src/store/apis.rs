@@ -37,7 +37,7 @@ pub(crate) struct Store {
 }
 impl std::fmt::Debug for Store {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Storeint")
+        f.debug_struct("Store")
             .field("message_insert_stmt", &self.message_insert_stmt)
             .field("inbox_select_stmts", &self.inbox_select_stmts)
             .field("actor_create_stmts", &self.actor_create_stmts)
@@ -188,8 +188,8 @@ impl Store {
             if value == 1 {
                 let stmt = format!("DELETE FROM inbox_{}", actor_id);
                 match self.conn.inner.execute(&stmt, []) {
-                    Ok(deleted) => println!("Rows deleted: {:?}", deleted),
-                    Err(err) => println!("Error occured: {:?}", err),
+                    Ok(deleted) => println!("Rows deleted: {}", deleted),
+                    Err(err) => println!("Error occured: {}", err),
                 }
             } else {
                 println!("Table does not exist");
@@ -198,18 +198,29 @@ impl Store {
         Ok(())
     }
 
-    pub(crate) fn delete_from_inbox(
+    pub(crate) fn delete_actor_messages(
         &mut self,
         actor_id: &str,
         msg_ids: Vec<&str>,
     ) -> std::io::Result<()> {
-        let stmt = format!("DELETE FROM inbox_{} WHERE msg_id = ?", actor_id);
-        self.conn.inner.execute_batch(TX_BEGIN).map_err(sql_to_io);
-        let mut stmt = self.conn.inner.prepare_cached(&stmt).map_err(sql_to_io)?;
-        for msg_id in msg_ids {
-            stmt.execute(params![msg_id]).map_err(sql_to_io);
-        }
-        self.conn.inner.execute_batch(TX_COMMIT).map_err(sql_to_io);
+        let msg_ids: String = msg_ids
+            .into_iter()
+            .map(|id| {
+                let mut s = String::from("'");
+                s += id;
+                s += "'";
+                s
+            })
+            .collect::<Vec<_>>()
+            .join(",");
+        let stmt = format!(
+            "DELETE FROM messages WHERE actor_id = '{}' AND msg_id in ({})",
+            actor_id, msg_ids
+        );
+        let _rs = self.conn.inner.execute_batch(TX_BEGIN).map_err(sql_to_io);
+        let mut stmt = self.conn.inner.prepare(&stmt).map_err(sql_to_io)?;
+        let _rs = stmt.execute(params![]).map_err(sql_to_io);
+        let _rs = self.conn.inner.execute_batch(TX_COMMIT).map_err(sql_to_io);
         Ok(())
     }
 
@@ -265,7 +276,6 @@ impl Store {
     }
 
     #[inline(always)]
-    //fn message_insert_stmt<'a>(stmt: &'a mut Option<String>) -> &'a str {
     fn message_insert_stmt(stmt: &mut Option<String>) -> &str {
         match stmt {
             Some(ref s) => s,

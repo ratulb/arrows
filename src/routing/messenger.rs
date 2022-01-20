@@ -1,6 +1,6 @@
 use crate::common::config::Config;
 use crate::routing::messenger::client::Client;
-use crate::{Addr, Mail, Msg, Result};
+use crate::{Action, Addr, Mail, Msg, Result};
 use std::collections::HashMap;
 use std::io::ErrorKind::ConnectionRefused;
 use std::net::SocketAddr;
@@ -11,11 +11,17 @@ use std::time::Duration;
 pub(crate) struct Messenger;
 
 impl Messenger {
-    pub(crate) fn send(mails: HashMap<&Addr, Vec<Msg>>) -> Result<()> {
-        mails.into_iter().for_each(|(addr, mut msgs)| {
-            msgs.iter_mut().map(|msg| {
+    pub(crate) fn send(mut mails: HashMap<&Addr, Vec<Msg>>) -> Result<()> {
+        mails.iter_mut().for_each(|(addr, msgs)| {
+            println!("The messages {:?}", msgs);
+            println!("The messages {:?}", msgs);
+            println!("The messages {:?}", msgs);
+            println!("The messages {:?}", msgs);
+            println!("The messages {:?}", msgs);
+            println!("The messages {:?}", msgs);
+            println!("The messages {:?}", msgs);
+            msgs.iter_mut().for_each(|msg| {
                 msg.set_recipient_addr(addr);
-                msg
             });
             if let Some(host_addr) = addr.get_socket_addr() {
                 match Client::connect(host_addr) {
@@ -36,16 +42,16 @@ impl Messenger {
     pub(crate) fn mail(mail: Mail) -> Result<()> {
         Self::group_by(mail.take_all())
             .into_iter()
-            .for_each(|(host_addr, msgs)| {
+            .for_each(|(host_addr, mut msgs)| {
                 match Client::connect(host_addr) {
                     Ok(mut client) => {
-                        client.send(msgs);
+                        client.send(&mut msgs);
                         println!("Messages sent to {}", host_addr);
                         Ok(())
                     }
                     Err(err) => {
                         eprintln!("Host: {} {}", host_addr, err);
-                        bootup_listener(msgs, host_addr, err)
+                        bootup_listener(&mut msgs, host_addr, err)
                     }
                 };
             });
@@ -57,8 +63,10 @@ impl Messenger {
         for msg in msgs {
             let host_addr = match msg.get_to() {
                 Some(ref addr) => addr.get_socket_addr().expect("host"),
-                //None => panic!(),
-                None => continue,
+                None => {
+                    println!("Filtering out none");
+                    continue;
+                }
             };
             groups.entry(host_addr).or_default().push(msg);
         }
@@ -90,8 +98,8 @@ pub(super) mod client {
             })
         }
 
-        pub fn send(&mut self, msgs: Vec<Msg>) -> Result<()> {
-            let bulk = Mail::Bulk(msgs);
+        pub fn send(&mut self, msgs: &mut Vec<Msg>) -> Result<()> {
+            let bulk = Mail::Bulk(std::mem::take(msgs));
             match option_of_bytes(&bulk) {
                 Some(ref mut bytes) => {
                     self.marker.mark_tail(bytes);
@@ -114,17 +122,28 @@ pub(super) mod client {
     }
 }
 
-fn bootup_listener(msgs: Vec<Msg>, socket_addr: SocketAddr, err: std::io::Error) -> Result<()> {
+fn bootup_listener(
+    msgs: &mut Vec<Msg>,
+    socket_addr: SocketAddr,
+    err: std::io::Error,
+) -> Result<()> {
     if Addr::is_ip_local(socket_addr.ip()) {
         match err.kind() {
             ConnectionRefused => {
-                if !msgs.is_empty() && msgs[0] == Msg::shutdown() {
+                if !msgs.is_empty()
+                    && (msgs[0].command_equals(Action::Shutdown)
+                        || msgs[0].command_equals(Action::Echo("".to_string())))
+                {
                     return Ok(());
                 } else {
-                    bootup();
-                    let mail: Mail = msgs.into();
+                    if let Err(err) = bootup() {
+                        eprintln!("Bootup error {:?}", err);
+                    }
+                    let mail: Mail = std::mem::take(msgs).into();
                     thread::sleep(Duration::from_millis(100));
-                    Messenger::mail(mail);
+                    if let Err(err) = Messenger::mail(mail) {
+                        eprintln!("Messenger mail error {:?}", err);
+                    }
                 }
             }
             _ => (),
@@ -132,6 +151,9 @@ fn bootup_listener(msgs: Vec<Msg>, socket_addr: SocketAddr, err: std::io::Error)
     }
     Ok(())
 }
+
+///Boot up Msg ingress listener binary. The resident binary path is configurable via
+///the environment variable 'resident_listener'.
 
 pub fn bootup() -> Result<()> {
     let mut resident_listener = std::env::current_dir()?;

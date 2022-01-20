@@ -17,7 +17,6 @@ pub struct Config {
     host: String,
     port: u16,
     db_path: String,
-    //listen_addr: String,
     resident_listener: String,
 }
 

@@ -309,7 +309,8 @@ impl Msg {
     }
 
     pub fn set_recipient_addr(&mut self, addr: &Addr) {
-        self.to = Some(addr.clone());
+        std::mem::replace(&mut self.to, Some(addr.clone()));
+        println!("Here : {:?}", self.to);
     }
 
     pub fn set_recipient(&mut self, new_to: &str) {
@@ -385,11 +386,11 @@ impl Msg {
     }
 
     pub fn set_from(&mut self, from: &Addr) {
-        std::mem::replace(&mut self.from, Some(from.clone()));
+        let _ignore = std::mem::replace(&mut self.from, Some(from.clone()));
     }
     pub fn shutdown() -> Self {
         let mut cmd = Msg::default();
-        std::mem::replace(&mut cmd.content, Some(Content::Command(Action::Shutdown)));
+        let _ignore = std::mem::replace(&mut cmd.content, Some(Content::Command(Action::Shutdown)));
         cmd
     }
 

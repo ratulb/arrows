@@ -1,16 +1,25 @@
+//! Macros for actor definition and invocation
+//! # Example
+//!
+//! define_actor("some_actor", ExampleActorProducer);
+//!
+
+//!This macro defines an actor in the system. It takes a literal string as actor name &
+//!an implmentation of `Producer` that is called to return an `Actor`. The actor becomes
+//!active as soon as it is defined and receives a startup message.
+//!
+
 #[macro_export]
 macro_rules! define_actor {
     ($actor_name:literal, $actor_builder:path) => {{
         let identity = $crate::Addr::new($actor_name).get_id();
         let addr = $crate::Addr::new($actor_name);
-        let res = $crate::catalog::define_actor(identity, addr, $actor_builder);
-        res
+        let _res = $crate::catalog::define_actor(identity, addr, $actor_builder);
     }};
     ($actor_addr:expr, $actor_builder:path) => {{
         let actor_addr: $crate::Addr = $actor_addr;
         let identity = actor_addr.get_id();
-        let res = $crate::catalog::define_actor(identity, actor_addr, $actor_builder);
-        res
+        let _res = $crate::catalog::define_actor(identity, actor_addr, $actor_builder);
     }};
 }
 
