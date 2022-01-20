@@ -30,8 +30,11 @@ use Content::*;
 ///The Mail enum which could be Trade(single message), Bulk(multiple messages) or Blank
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Mail {
+    ///A mail variant with a single message inside. Actor's receives this variant
     Trade(Msg),
+    ///Contains multiple messages - used for buffering, single shot transmission over the wire
     Bulk(Vec<Msg>),
+    ///An empty mail
     Blank,
 }
 use Mail::*;
@@ -106,10 +109,7 @@ impl Mail {
     }
     ///Is the mail empty - mostly to avoid transmitting
     pub fn is_blank(mail: &Mail) -> bool {
-        match mail {
-            Blank => true,
-            _ => false,
-        }
+        matches!(mail, Blank)
     }
     //Checks only for the variant of Trade!
     pub(crate) fn inbound(mail: &Mail) -> bool {
@@ -180,11 +180,13 @@ impl From<Vec<Msg>> for Mail {
         Bulk(msgs)
     }
 }
-
+///Action represents tasks corresponding to when message content type is a command
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum Action {
+    ///Shutdown the message listener
     Shutdown,
+    ///Send an echo message to the listener
     Echo(String),
 }
 impl Action {
