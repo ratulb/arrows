@@ -3,7 +3,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 pub use catalog::{ingress, restore};
 pub(crate) use common::actor::ProducerDeserializer;
-pub use common::actor::{Actor, ExampleActorProducer, Producer};
+pub use common::actor::{Actor, Producer};
 pub use common::addr::Addr;
 pub use common::errs::{Error, Result};
 pub use common::mail::{Action, Mail, Msg};

@@ -39,7 +39,7 @@ pub trait Actor: Any + Send + Sync {
     ///
 
     fn post_start(&mut self, _mail: Mail) -> Option<Mail> {
-        Some(Msg::from_text("Starting up", "from_this_actor", "to_another_actor").into())
+        Some(Msg::from_text("Start up signal received").into())
     }
 
     ///
@@ -50,7 +50,7 @@ pub trait Actor: Any + Send + Sync {
     ///getting corrupted in transit.
     ///
     fn pre_shutdown(&mut self, _mail: Mail) -> Option<Mail> {
-        Some(Msg::from_text("Shutdown", "from_this_actor", "to_another_actor").into())
+        Some(Msg::from_text("Shutdown signal received").into())
     }
 }
 
@@ -93,26 +93,6 @@ pub trait Producer {
     }
 }
 
-//Sample actor and actor producer
-pub struct ExampleActor;
-impl Actor for ExampleActor {
-    fn receive(&mut self, incoming: Mail) -> std::option::Option<Mail> {
-        if !Mail::is_blank(&incoming) {
-            println!("Actor received {}", incoming.message());
-            let reply = Msg::from_text("Some text", "from_me", "to_sender");
-            return Some(reply.into());
-        }
-        None
-    }
-}
-#[derive(Debug, Serialize, Deserialize, Default)]
-pub struct ExampleActorProducer;
-#[typetag::serde(name = "example_actor_producer")]
-impl Producer for ExampleActorProducer {
-    fn produce(&mut self) -> Box<dyn Actor> {
-        Box::new(ExampleActor)
-    }
-}
 ////////////////////////////////////////////////////////////////////////////////////////
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub(crate) struct ProducerDeserializer;
@@ -123,78 +103,5 @@ pub(crate) struct ProducerDeserializer;
 impl Producer for ProducerDeserializer {
     fn produce(&mut self) -> Box<dyn Actor> {
         panic!("Should not be called on ProducerDeserializer");
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{define_actor, send, Addr};
-    use serde::{Deserialize, Serialize};
-
-    #[test]
-    fn example_actor() {
-        let producer = ExampleActorProducer;
-        //Define an actor
-        let _rs = define_actor!("example_actor1", producer);
-        //Another actor instance with same behaviour
-        let _rs = define_actor!(Addr::new("example_actor2"), ExampleActorProducer);
-
-        let m = Msg::default();
-        //Send out messages
-        send!("example_actor1", m);
-        send!(Addr::new("example_actor2"), Msg::default());
-    }
-
-    #[test]
-    fn create_actor_test1() {
-        #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-        struct MyActor {
-            name: String,
-        }
-        impl MyActor {
-            fn new() -> Self {
-                Self {
-                    name: String::from("An actor"),
-                }
-            }
-        }
-        //A demo actor implementation which responds by blank replies.
-        //message(_msg)
-        impl Actor for MyActor {
-            fn receive(&mut self, _msg: Mail) -> Option<Mail> {
-                Some(Mail::Blank)
-            }
-        }
-        let mut my_actor = MyActor::new();
-        assert!(my_actor.receive(Mail::Blank).is_some());
-    }
-
-    #[test]
-    fn actor_producer_test_1() {
-        struct MyActor;
-
-        impl Actor for MyActor {
-            fn receive(&mut self, incoming: Mail) -> std::option::Option<Mail> {
-                println!("My Actor received {}", incoming.message());
-                None
-            }
-        }
-
-        #[derive(Clone, Debug, Serialize, Deserialize, Default)]
-        struct MyProducer;
-
-        //Tag the impl with distinguishable name - actor producer's name should not
-        //collide with existing producers' names
-        #[typetag::serde(name = "my_actor_producer")]
-        impl Producer for MyProducer {
-            fn produce(&mut self) -> Box<dyn Actor> {
-                Box::new(MyActor)
-            }
-        }
-
-        let producer = MyProducer::default();
-        let _rs = define_actor!("myactor", producer);
-        send!("myactor", Msg::default());
     }
 }

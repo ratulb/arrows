@@ -1,5 +1,3 @@
-
-
 use crate::Result;
 use crate::{
     common::utils::{compute_hash, from_bytes, option_of_bytes},
@@ -91,7 +89,7 @@ impl Mail {
             _ => false,
         }
     }
-    //Actors are whimsical - might not respond immediately 
+    //Actors are whimsical - might not respond immediately
     //Convert the buffered responses into single whole mail
     pub(crate) fn fold(mails: Vec<Option<Mail>>) -> Mail {
         Bulk(
@@ -250,7 +248,7 @@ impl Msg {
     ///send!("actor1", m);
     ///
     ///
-    pub fn with_text(content: &str) -> Self {
+    pub fn from_text(content: &str) -> Self {
         Self {
             id: compute_hash(&Uuid::new_v4()),
             from: None,
@@ -260,7 +258,7 @@ impl Msg {
         }
     }
     ///Construct a text message with from and to addresses
-    pub fn from_text(content: &str, from: &str, to: &str) -> Self {
+    pub fn with_text(content: &str, from: &str, to: &str) -> Self {
         Self {
             id: compute_hash(&Uuid::new_v4()),
             from: Some(Addr::new(from)),
@@ -359,7 +357,7 @@ impl Msg {
             _ => None,
         }
     }
-    ///If the message content is binary blob - get it 
+    ///If the message content is binary blob - get it
     ///Would take content out - leaving message content to a None
     pub fn binary_content_out(&mut self) -> Option<Vec<u8>> {
         match self.content.take() {
@@ -580,21 +578,21 @@ mod tests {
             Some(Mail::Blank),
             Some(Mail::Blank),
             None,
-            Some(Trade(Msg::from_text("mail", "from", "to"))),
+            Some(Trade(Msg::with_text("mail", "from", "to"))),
         ];
 
-        let mut m1 = Msg::from_text("mail", "from1", "to1");
+        let mut m1 = Msg::with_text("mail", "from1", "to1");
         let mut addr1 = Addr::new("add1");
         addr1.with_port(9999);
         m1.set_recipient_addr(&addr1);
         mails.push(Some(Trade(m1)));
         let mut addr2 = addr1.clone();
         addr2.with_port(1111);
-        let mut m2 = Msg::from_text("mail", "from2", "to2");
+        let mut m2 = Msg::with_text("mail", "from2", "to2");
         m2.set_recipient_addr(&addr2);
         mails.push(Some(Bulk(vec![m2])));
 
-        let mut m3 = Msg::from_text("mail", "from3", "to3");
+        let mut m3 = Msg::with_text("mail", "from3", "to3");
         m3.set_recipient_ip("89.89.89.89");
         mails.push(Some(Bulk(vec![m3])));
 
@@ -615,13 +613,13 @@ mod tests {
 
     #[test]
     fn mail_print_test() {
-        let m = Msg::from_text("mail", "from", "to");
+        let m = Msg::with_text("mail", "from", "to");
         let mail = Mail::Trade(m);
         println!("{}", mail);
 
-        let m1 = Msg::from_text("mail", "from", "to");
-        let m2 = Msg::from_text("mail", "from", "to");
-        let m3 = Msg::from_text("mail", "from", "to");
+        let m1 = Msg::with_text("mail", "from", "to");
+        let m2 = Msg::with_text("mail", "from", "to");
+        let m3 = Msg::with_text("mail", "from", "to");
         let bulk_mail = Mail::Bulk(vec![]);
         println!("{}", bulk_mail);
 
@@ -631,7 +629,7 @@ mod tests {
         let bulk_mail = Mail::Bulk(vec![m1, m2, m3]);
         println!("Bulk {}", bulk_mail);
 
-        let m1 = Msg::from_text("mail", "from", "to");
+        let m1 = Msg::with_text("mail", "from", "to");
         let bulk_mail = Mail::Bulk(vec![m1]);
         println!("Bulk {}", bulk_mail);
 
@@ -640,10 +638,10 @@ mod tests {
 
     #[test]
     fn mail_is_command_test_1() {
-        let trade_mail: Mail = Msg::from_text("Some text", "from", "to").into();
+        let trade_mail: Mail = Msg::with_text("Some text", "from", "to").into();
         assert!(!trade_mail.is_command());
 
-        let bulk = Mail::Bulk(vec![Msg::from_text("Some text", "from", "to")]);
+        let bulk = Mail::Bulk(vec![Msg::with_text("Some text", "from", "to")]);
         assert!(!bulk.is_command());
     }
 }

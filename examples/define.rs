@@ -1,20 +1,20 @@
 use arrows::define_actor;
 use arrows::send;
-use arrows::{Actor, Addr, Mail, Msg, Producer};
+use arrows::{Actor, Mail, Msg, Producer};
 use serde::{Deserialize, Serialize};
 
 pub struct NewActor;
 
 impl Actor for NewActor {
-    fn receive(&mut self, _incoming: Mail) -> std::option::Option<Mail> {
-        Some(Msg::from_text("Reply from new actor", "from", "to").into())
+    fn receive(&mut self, _incoming: Mail) -> Option<Mail> {
+        Some(Msg::from_text("Reply from new actor").into())
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 struct NewProducer;
 
-#[typetag::serde(name = "new_actor_definer")]
+#[typetag::serde(name = "new_actor_producer")]
 impl Producer for NewProducer {
     fn produce(&mut self) -> Box<dyn Actor> {
         Box::new(NewActor)
@@ -22,19 +22,19 @@ impl Producer for NewProducer {
 }
 
 fn main() {
-    let builder = NewProducer::default();
+    let actor_producer = NewProducer::default();
+    //define the actor
+    define_actor!("new_actor", actor_producer);
 
-    let rs = define_actor!("new_actor", builder);
-    println!("The registration result is = {:?}", rs);
+    let m1 = Msg::from_text("Message to new_actor");
+    let m2 = Msg::from_text("Message to new_actor");
+    let m3 = Msg::from_text("Message to new_actor");
+    //Send messages
+    send!("new_actor", (m1, m2, m3));
 
-    let builder = NewProducer;
-    define_actor!(Addr::new("new_actor"), builder);
-
-    let m = Msg::default();
-    send!("new_actor", m);
-
-    send!(Addr::new("new_actor"), Msg::default());
-
-    let msg_to_unregisterd = Msg::from_text("Mis-directed message", "from", "to");
-    send!("Unknown actor", msg_to_unregisterd);
+    let producer2 = NewProducer::default();
+    let producer3 = NewProducer::default();
+    //Multiple instances of the same actor definition
+    define_actor!("another_actor", producer2);
+    define_actor!("yet_another_actor", producer3);
 }

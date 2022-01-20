@@ -493,7 +493,7 @@ mod tests {
         //Generate as many messages as required to flush buffer
         let messages = repeat(&message).take(BUFFER_MAX_SIZE);
         let messages: Vec<_> = messages
-            .map(|msg| Msg::from_text(msg, "from", actor_name))
+            .map(|msg| Msg::with_text(msg, "from", actor_name))
             .collect();
 
         let mut store = Store::new();
@@ -592,7 +592,7 @@ mod tests {
         for _ in 0..num {
             let random_num: u64 = rng.gen();
             let msg_content = format!("The test msg-{}", random_num);
-            let msg = Msg::from_text(&msg_content, "from", "to");
+            let msg = Msg::with_text(&msg_content, "from", "to");
             messages.push(msg);
         }
         let status = store.into_inbox_batch(messages.into_iter());
@@ -608,7 +608,7 @@ mod tests {
         for _ in 0..num {
             let random_num: u64 = rng.gen();
             let msg_content = format!("The test msg-{}", random_num);
-            let msg = Msg::from_text(&msg_content, "from", "to");
+            let msg = Msg::with_text(&msg_content, "from", "to");
             let _status = store.into_inbox(msg);
         }
         Ok(())
