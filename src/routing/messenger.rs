@@ -1,6 +1,6 @@
 use crate::common::config::Config;
 use crate::routing::messenger::client::Client;
-use crate::{Action, Addr, Mail, Msg, Result};
+use crate::{Action, Addr, Error::MsgSendError, Mail, Msg, Result};
 use std::collections::HashMap;
 use std::io::ErrorKind::ConnectionRefused;
 use std::net::SocketAddr;
@@ -31,7 +31,7 @@ impl Messenger {
                     }
                     Err(err) => {
                         eprintln!("Host: {} {}", host_addr, err);
-                        bootup_listener(msgs, host_addr, err);
+                        Self::handle_err(msgs, host_addr, err);
                     }
                 }
             }
@@ -44,17 +44,52 @@ impl Messenger {
             .into_iter()
             .for_each(|(host_addr, mut msgs)| {
                 match Client::connect(host_addr) {
-                    Ok(mut client) => {
-                        client.send(&mut msgs);
-                        println!("Messages sent to {}", host_addr);
-                        Ok(())
-                    }
+                    Ok(mut client) => match client.send(&mut msgs) {
+                        Ok(ok) => {
+                            println!("Messages sent to {}", host_addr);
+                            Ok(ok)
+                        }
+                        Err(err) => {
+                            eprintln!("{}", err);
+                            Err(err.into())
+                        }
+                    },
                     Err(err) => {
                         eprintln!("Host: {} {}", host_addr, err);
-                        bootup_listener(&mut msgs, host_addr, err)
+                        Self::handle_err(&mut msgs, host_addr, err)
                     }
                 };
             });
+        Ok(())
+    }
+
+    fn handle_err(msgs: &mut Vec<Msg>, addr: SocketAddr, err: std::io::Error) -> Result<()> {
+        match err.kind() {
+            ConnectionRefused => Self::try_bootup_and_resend(msgs, addr),
+            _ => {
+                eprintln!("Unhandled error {}", err);
+                Err(MsgSendError(err))
+            }
+        }
+    }
+    fn try_bootup_and_resend(msgs: &mut Vec<Msg>, socket_addr: SocketAddr) -> Result<()> {
+        if Addr::is_ip_local(socket_addr.ip()) {
+            if !msgs.is_empty()
+                && (msgs[0].command_equals(Action::Shutdown)
+                    || msgs[0].command_equals(Action::Echo("".to_string())))
+            {
+                return Ok(());
+            } else {
+                if let Err(err) = bootup() {
+                    eprintln!("Bootup error {:?}", err);
+                }
+                let mail: Mail = std::mem::take(msgs).into();
+                thread::sleep(Duration::from_millis(100));
+                if let Err(err) = Messenger::mail(mail) {
+                    eprintln!("Messenger mail error {:?}", err);
+                }
+            }
+        }
         Ok(())
     }
 
@@ -122,38 +157,8 @@ pub(super) mod client {
     }
 }
 
-fn bootup_listener(
-    msgs: &mut Vec<Msg>,
-    socket_addr: SocketAddr,
-    err: std::io::Error,
-) -> Result<()> {
-    if Addr::is_ip_local(socket_addr.ip()) {
-        match err.kind() {
-            ConnectionRefused => {
-                if !msgs.is_empty()
-                    && (msgs[0].command_equals(Action::Shutdown)
-                        || msgs[0].command_equals(Action::Echo("".to_string())))
-                {
-                    return Ok(());
-                } else {
-                    if let Err(err) = bootup() {
-                        eprintln!("Bootup error {:?}", err);
-                    }
-                    let mail: Mail = std::mem::take(msgs).into();
-                    thread::sleep(Duration::from_millis(100));
-                    if let Err(err) = Messenger::mail(mail) {
-                        eprintln!("Messenger mail error {:?}", err);
-                    }
-                }
-            }
-            _ => (),
-        }
-    }
-    Ok(())
-}
-
-///Boot up Msg ingress listener binary. The resident binary path is configurable via
-///the environment variable 'resident_listener'.
+///Boots up the msg listener(`MessageListener`) binary. The resident binary path is
+///configurable via the environment variable 'resident_listener'.
 
 pub fn bootup() -> Result<()> {
     let mut resident_listener = std::env::current_dir()?;
@@ -163,7 +168,7 @@ pub fn bootup() -> Result<()> {
         Some(path) => {
             Command::new(path).spawn()?;
         }
-        None => (),
+        None => eprintln!("Listener binary could not be found in {:?}", path),
     }
     Ok(())
 }

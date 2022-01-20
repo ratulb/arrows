@@ -1,3 +1,9 @@
+//! This module handles method invocation on actors. Maintains a number of `Delegates`
+//! equal to the number of cpus in the running nodes.
+//!
+//!The `Router is responsible for handing out messages to the delegates which shares a
+//!`Receiver` queue.
+
 pub mod listener;
 pub mod messenger;
 use crate::catalog::{self};

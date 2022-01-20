@@ -1,6 +1,7 @@
 #[derive(Debug)]
 pub enum Error {
     Registration(std::io::Error),
+    MsgSendError(std::io::Error),
     SerdeJson(serde_json::Error),
     Other(Box<dyn std::error::Error>),
     InvalidData,
