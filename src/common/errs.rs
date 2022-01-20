@@ -16,8 +16,8 @@ pub enum Error {
     RegistrationError,
     ///Error that might happen during actor activation from the backing store
     RestorationError,
-    ///Most of the tings gets stored as binary blobs and system depends heavily depends on 
-    ///bincode - this variant errors that might arise due to bincode
+    ///Most of the tings gets stored as binary blobs and system depends heavily depends on
+    ///bincode - this variant captures errors related bincode
     Bincode(bincode::ErrorKind),
 }
 impl From<std::io::Error> for Error {

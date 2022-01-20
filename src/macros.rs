@@ -1,5 +1,9 @@
 //! This module defines macros for actor definition and invocation.
 //!
+//!
+//![define_actor!](crate::define_actor)
+//!
+//![send!](crate::send)
 
 ///This macro defines an actor in the system. It takes a literal string as actor name
 ///and an implmentation of [Producer](crate::common::actor::Producer) that is called to
@@ -184,38 +188,27 @@ mod tests {
     use crate::{Actor, Addr, Mail, Msg, Producer};
     use serde::{Deserialize, Serialize};
 
-    pub struct NewActor;
+    pub struct TestActor;
 
-    impl Actor for NewActor {
+    impl Actor for TestActor {
         fn receive(&mut self, _incoming: Mail) -> std::option::Option<Mail> {
-            Some(Msg::with_text("Reply from new actor", "from", "to").into())
+            Some(Msg::from_text("Reply from test actor").into())
         }
     }
 
     #[derive(Debug, Serialize, Deserialize, Default)]
-    struct NewProducer;
+    struct TestActorProducer;
 
-    #[typetag::serde(name = "actor_producer_new")]
-    impl Producer for NewProducer {
+    #[typetag::serde(name = "test_actor_producer")]
+    impl Producer for TestActorProducer {
         fn produce(&mut self) -> Box<dyn Actor> {
-            Box::new(NewActor)
+            Box::new(TestActor)
         }
     }
     #[test]
-    fn macro_register_actor_test1() {
-        let builder = NewProducer::default();
-        define_actor!("new_actor", builder);
-
-        let builder = NewProducer::default();
-        define_actor!(Addr::new("new_actor"), builder);
-
-        let builder = NewProducer::default();
-        let addr = Addr::new("new_actor");
-        define_actor!(addr, builder);
-
-        send!("new_actor", Msg::default());
-        send!(Addr::new("new_actor"), Msg::default());
-        let addr = Addr::new("new_actor");
-        send!(addr, Msg::default());
+    fn define_test_actor_test() {
+        let producer = TestActorProducer::default();
+        define_actor!("test_actor", producer);
+        send!("test_actor", Msg::from_text("Test message"));
     }
 }
