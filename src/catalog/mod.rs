@@ -37,7 +37,9 @@ impl Context {
     pub fn init() -> RefCell<Self> {
         let actors = Actors::new();
         let mut store = Store::new();
-        store.setup();
+        if let Err(err) = store.setup() {
+            panic!("{}", err);
+        }
         let ctx_init = Arc::new(AtomicBool::new(true));
         let init_watch = Arc::clone(&ctx_init);
         let (dispatcher, channel): (Sender<RichMail>, Receiver<_>) = channel();

@@ -83,7 +83,9 @@ use std::collections::HashMap;
 ///
 pub fn recv(msgs: HashMap<&Addr, Vec<Msg>>) {
     use crate::routing::messenger::Messenger;
-    Messenger::send(msgs);
+    if let Err(err) = Messenger::send(msgs) {
+        eprintln!("Error sending msgs {:?}", err);
+    }
 }
 
 //A mail with extra details - inbound/outbound, seq, from & destined to
