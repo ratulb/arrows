@@ -9,7 +9,6 @@ edition = "2021"
 [dependencies]
 local-ip-address = "0.4.4"
 fallible-streaming-iterator = "0.1.9"
-mktemp = "0.4.1"
 byte_marks = { git = "https://github.com/ratulb/byte_marks" }
 clap = "2.34.0"
 structopt = "0.3.25"

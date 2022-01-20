@@ -9,17 +9,29 @@
 //!active as soon as it is defined and receives a startup message.
 //!
 
+///Define an actor in the system - with a literal string identifier or
+///[Addr](crate::common::addr::Addr) for the actor and an implementation
+///of [Producer](crate::common::actor::Producer) that is able to return a specific
+///[Actor](crate::common::actor::Actor) instance on demand. The `produce` method of
+///the supplied `Producer` implementation is called at time of definition,
+///restoration/restart of the actor.
+///
+///Each Producer implementation should also be tagged with a `typetag` attribute name that
+///should not collide with any other name in the system.
+///
+///
+
 #[macro_export]
 macro_rules! define_actor {
-    ($actor_name:literal, $actor_builder:path) => {{
+    ($actor_name:literal, $actor_producer:path) => {{
         let identity = $crate::Addr::new($actor_name).get_id();
         let addr = $crate::Addr::new($actor_name);
-        let _res = $crate::catalog::define_actor(identity, addr, $actor_builder);
+        let _res = $crate::catalog::define_actor(identity, addr, $actor_producer);
     }};
-    ($actor_addr:expr, $actor_builder:path) => {{
+    ($actor_addr:expr, $actor_producer:path) => {{
         let actor_addr: $crate::Addr = $actor_addr;
         let identity = actor_addr.get_id();
-        let _res = $crate::catalog::define_actor(identity, actor_addr, $actor_builder);
+        let _res = $crate::catalog::define_actor(identity, actor_addr, $actor_producer);
     }};
 }
 ///Sends one or more messages to one or more actors defined in the system.
