@@ -298,19 +298,18 @@ impl Msg {
     pub fn update_text_content(&mut self, reply: &str) {
         let _ignore = replace(&mut self.content, Some(Text(reply.to_string())));
     }
-
+    ///Set new binary content and new local recipient actor address
     pub fn with_content_and_to(&mut self, new_content: Vec<u8>, new_to: &str) {
         self.content = Some(Binary(new_content));
         self.to = Some(Addr::new(new_to));
     }
-
+    ///Set the binary content of the message
     pub fn with_content(&mut self, new_content: Vec<u8>) {
         self.content = Some(Binary(new_content));
     }
-
+    ///Set the recipient address of the message
     pub fn set_recipient_addr(&mut self, addr: &Addr) {
-        std::mem::replace(&mut self.to, Some(addr.clone()));
-        println!("Here : {:?}", self.to);
+        self.to = Some(addr.clone());
     }
 
     pub fn set_recipient(&mut self, new_to: &str) {

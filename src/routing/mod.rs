@@ -73,7 +73,7 @@ impl Router {
 impl Drop for Router {
     fn drop(&mut self) {
         for handle in std::mem::take(&mut self.delegates) {
-            handle.join();
+            let _ignore = handle.join();
         }
     }
 }

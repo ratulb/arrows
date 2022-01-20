@@ -56,7 +56,9 @@ impl Context {
                                 self::egress(rich_mail);
                             }
                             if !outs.is_empty() {
-                                Messenger::mail(Mail::Bulk(outs));
+                                if let Err(err) = Messenger::mail(Mail::Bulk(outs)) {
+                                    eprintln!("{:?}", err);
+                                }
                             }
                         }
                     }
@@ -127,7 +129,7 @@ impl Context {
                 if let Some(previous) = previous {
                     CachedActor::take_over_from(&mut actor, previous);
                     let identity = identity.to_string();
-                    self.remove_actor_permanent(&identity);
+                    let _rs = self.remove_actor_permanent(&identity);
                 }
                 self.save_producer(&identity.to_string(), addr.clone(), &producer)?;
                 Actors::play_registration_acts(&mut self.actors, addr, actor)
