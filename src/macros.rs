@@ -22,7 +22,7 @@ macro_rules! define_actor {
         let _res = $crate::catalog::define_actor(identity, actor_addr, $actor_builder);
     }};
 }
-
+///Sends one or more messages to one or more actors defined in the system.
 #[macro_export]
 macro_rules! send {
     ($($actor_name:literal, ($($msg:expr),*)),*)  => {

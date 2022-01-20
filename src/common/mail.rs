@@ -396,7 +396,7 @@ impl Msg {
 
     pub fn echo(s: &str) -> Self {
         let mut cmd = Msg::default();
-        std::mem::replace(
+        let _ignore = std::mem::replace(
             &mut cmd.content,
             Some(Content::Command(Action::Echo(s.to_string()))),
         );
@@ -420,11 +420,11 @@ impl std::fmt::Display for Msg {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         {
             write!(f, "Msg({}), ", &self.id)?;
-            match self.from {
+            let _rs = match self.from {
                 Some(ref from) => write!(f, "from: {}, ", from),
                 None => write!(f, "from: None, "),
             };
-            match self.to {
+            let _rs = match self.to {
                 Some(ref to) => write!(f, "to: {}, ", to),
                 None => write!(f, "to: None, "),
             };
@@ -462,8 +462,8 @@ impl std::fmt::Display for Mail {
                 writeln!(f, "Bulk({})", msgs.len())?;
                 if !msgs.is_empty() {
                     for i in 0..msgs.len() - 1 {
-                        write!(f, "{}", msgs[i]);
-                        writeln!(f);
+                        let _ = write!(f, "{}", msgs[i]);
+                        let _rs = writeln!(f);
                     }
                     write!(f, "{}", msgs[msgs.len() - 1])
                 } else {

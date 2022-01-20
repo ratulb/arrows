@@ -1,3 +1,9 @@
+//!Ingress happens via the `MessegeListener` struct defined in this module
+//!The listener binary can can be manually triggered via `cargo run --bin arrows`.
+//!
+//!It would be automatically launched when a message ingress happens via the `send!`
+//!macro invocation
+//!
 use crate::catalog::ingress;
 
 use crate::{from_bytes, Action, Addr, Mail, Mail::Bulk};
