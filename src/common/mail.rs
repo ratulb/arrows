@@ -21,6 +21,7 @@ impl std::fmt::Display for Action {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             action @ Self::Shutdown => write!(f, "{}", action.as_text()),
+            cont @ Self::Continue => write!(f, "{}", cont.as_text()),
             Self::Echo(s) => write!(f, "Echo({})", s),
         }
     }
@@ -92,6 +93,20 @@ impl Mail {
             _ => false,
         }
     }
+
+    ///Get the embedded [Action](arrows::Action) out if this mail is a command
+    ///
+    pub fn get_action(&self) -> Option<Action> {
+        if !self.is_command() {
+            return None;
+        }
+        match self {
+            Trade(msg) => msg.action(),
+            bulk @ Bulk(_) => bulk.messages()[0].action(),
+            _ => None,
+        }
+    }
+
     //Actors are whimsical - might not respond immediately
     //Convert the buffered responses into single whole mail
     pub(crate) fn fold(mails: Vec<Option<Mail>>) -> Mail {
@@ -188,6 +203,8 @@ pub enum Action {
     Shutdown,
     ///Send an echo message to the listener
     Echo(String),
+    ///Good to go, carry on
+    Continue,
 }
 impl Action {
     //Meant for type checking
@@ -195,13 +212,24 @@ impl Action {
         match self {
             Self::Shutdown => "Shutdown",
             Self::Echo(_) => "Echo",
+            Self::Continue => "Continue",
         }
     }
 
-    fn inner(&self) -> &str {
+    pub fn inner(&self) -> &str {
         match self {
             Self::Shutdown => "",
+            Self::Continue => "",
             Self::Echo(s) => s,
+        }
+    }
+    //Execute the action embedded in a Mail whose content  might be a Command
+    pub fn execute(&mut self, _input: Mail) -> Option<Mail> {
+        match self {
+            Self::Echo(text) => {
+                Some(Msg::from_text(&text.chars().rev().collect::<String>()).into())
+            }
+            _ => None,
         }
     }
 }
@@ -296,6 +324,18 @@ impl Msg {
         }
         false
     }
+    ///Get the embedded [Action](arrows::Action) out if this [Msg](arrows::Msg) content
+    ///is really is Command
+    pub fn action(&self) -> Option<Action> {
+        if !self.is_command() {
+            return None;
+        }
+        match self.content {
+            Some(Command(ref action)) => Some(action.clone()),
+            _ => None,
+        }
+    }
+
     ///The message as bytes - irrespective of whether content is text or
     ///actual binary blob. Empty byte vec - if can not be serialized
     pub fn as_bytes(&self) -> Vec<u8> {

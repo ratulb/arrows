@@ -1,8 +1,8 @@
 use crate::catalog::{self};
 
-use crate::constants::{BUFFER_MAX_SIZE, EVENTS_INSERT, EVENT_MAX_AGE};
+use crate::constants::{EVENTS_INSERT, EVENT_MAX_AGE};
 use crate::routing::Router;
-
+use crate::Config;
 use rusqlite::{hooks::Action, Result, ToSql, Transaction};
 use serde::{ser::SerializeTupleStruct, Deserialize, Serialize, Serializer};
 use std::mem;
@@ -71,7 +71,7 @@ impl EventBuffer {
         }
     }
     pub(crate) fn overflown(&self) -> bool {
-        self.events.len() >= BUFFER_MAX_SIZE
+        self.events.len() >= Config::get_shared().db_buff_size()
     }
     pub fn has_matured(&self) -> bool {
         match self.earliest_event_instant {

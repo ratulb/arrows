@@ -1,7 +1,6 @@
 use crate::catalog::PanicWatch;
-use crate::constants::ACTOR_BUFFER_SIZE;
 use crate::Error::{self, RegistrationError, RestorationError};
-use crate::{Actor, Addr, Mail, Producer, ProducerDeserializer, RichMail};
+use crate::{Actor, Addr, Config, Mail, Producer, ProducerDeserializer, RichMail};
 use std::any::Any;
 use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -113,7 +112,6 @@ impl CachedActor {
     pub(crate) fn get_sequence_mut(actor: &mut CachedActor) -> &mut i64 {
         &mut actor.sequence
     }
-
     pub(crate) fn increment_sequence(actor_seq: &mut i64) {
         *actor_seq += 1;
     }
@@ -215,7 +213,7 @@ impl CachedActor {
     }
 
     pub(crate) fn should_flush(buffer_size: usize) -> bool {
-        buffer_size >= ACTOR_BUFFER_SIZE
+        buffer_size >= Config::get_shared().db_buff_size()
     }
 
     pub(crate) fn buffer_size(actor: &CachedActor) -> usize {

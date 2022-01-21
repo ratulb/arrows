@@ -42,7 +42,7 @@ fn main() {
     let opts = Opt::from_args();
     let mut config = Config::from_env();
     match opts.hostport {
-        None => MessageListener::start(),
+        None => return MessageListener::start(),
         Some(ref hostport) if hostport == "user" => match opts.addr {
             Some(ref sa) => {
                 match sa.ip() {
@@ -69,15 +69,5 @@ fn main() {
     }
 
     Config::re_init(config);
-    println!("Listener started with config:{:?}", Config::get_shared());
     MessageListener::start();
 }
-
-/***use arrows::define_actor;
-use arrows::ExampleActorProducer;
-fn define_example_actors() {
-    let producer = ExampleActorProducer;
-    let _rs = define_actor!("example_actor1", producer);
-    let _rs = define_actor!("from", ExampleActorProducer);
-    println!("Defined example actors");
-}***/

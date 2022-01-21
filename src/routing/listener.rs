@@ -6,7 +6,7 @@
 //!
 use crate::catalog::ingress;
 
-use crate::{from_bytes, Action, Addr, Mail, Mail::Bulk};
+use crate::{from_bytes, Action, Addr, Config, Mail, Mail::Bulk};
 use byte_marks::Marked;
 use std::io::{BufReader, BufWriter, Result, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
@@ -29,11 +29,13 @@ impl MessageListener {
     ///
     pub fn start() {
         let listener_addr = Addr::new("listener");
-        println!("Starting listener @{}", listener_addr);
+        println!("Starting listener with config {:?}", Config::get_shared());
         let listener =
             MessageListener::new(listener_addr.get_socket_addr().expect("Socket address"));
-        let _rs = listener.run();
-        println!("Listener exiting...");
+        match listener.run() {
+            Ok(_) => println!("Listener exiting..."),
+            Err(err) => println!("Listener failed to run: {}", err),
+        }
     }
 
     pub(crate) fn run(mut self) -> Result<()> {
@@ -66,16 +68,22 @@ impl MessageListener {
         let marked = Marked::with_defaults(&mut reader);
         let mut response = String::from("MessageListener received request");
         for mail in marked {
-            match self.ingress(mail) {
+            match self.process(mail) {
                 Ok(Some(mail)) => match mail {
                     mail @ Bulk(_) if mail.command_equals(Action::Shutdown) => {
-                        return Ok(Some(mail))
+                        return Ok(Some(mail));
                     }
                     mail @ Bulk(_) if mail.command_equals(Action::Echo("".to_string())) => {
                         response.clear();
-                        if let Some(text) = mail.messages()[0].as_text() {
+                        let _rs = match mail.get_action() {
+                            Some(mut action) => action.execute(mail),
+                            None => None,
+                        };
+
+                        /***if let Some(text) = mail.messages()[0].as_text() {
+                            println!("The echo text {}", text);
                             response.push_str(&text.chars().rev().collect::<String>())
-                        }
+                        }***/
                         break;
                     }
                     _ => continue,
@@ -89,11 +97,11 @@ impl MessageListener {
         Ok(None)
     }
 
-    fn ingress(&self, payload: Vec<u8>) -> Result<Option<Mail>> {
+    fn process(&self, payload: Vec<u8>) -> Result<Option<Mail>> {
         let payload = from_bytes::<'_, Mail>(&payload)?;
         match payload {
             m @ Mail::Bulk(_) if m.is_command() => Ok(Some(m)),
-            m @ Mail::Trade(_) | m @ Mail::Bulk(_) => ingress(m),
+            m @ Mail::Bulk(_) => ingress(m),
             _ => Ok(None),
         }
     }

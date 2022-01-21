@@ -34,7 +34,7 @@ pub struct Context {
 type Dispatcher = Sender<RichMail>;
 
 impl Context {
-    pub fn init() -> RefCell<Self> {
+    pub(crate) fn init() -> RefCell<Self> {
         let actors = Actors::new();
         let mut store = Store::new();
         if let Err(err) = store.setup() {
@@ -77,10 +77,15 @@ impl Context {
         ctx_init.store(false, Ordering::Release);
         ctx
     }
-
+    ///Ingress incoming mail to the backing store
     pub fn ingress(&mut self, payload: Mail) -> std::io::Result<Option<Mail>> {
-        let _rs = self.store.persist(payload);
-        Ok(None)
+        match self.store.persist(payload) {
+            Ok(_) => Ok(None),
+            Err(err) => {
+                eprintln!("{}", err);
+                Ok(Some(Mail::Blank))
+            }
+        }
     }
 
     pub(crate) fn egress(&mut self, mail: RichMail) {
@@ -240,7 +245,7 @@ pub(crate) fn load_messages(rowids: Vec<i64>) -> Vec<RichMail> {
 pub(crate) fn past_events() -> Vec<RichMail> {
     Context::handle().borrow_mut().past_events()
 }
-///Define an actor in the system providing the actor address(Addr) and actorproducer 
+///Define an actor in the system providing the actor address(Addr) and actorproducer
 ///implmentation of `Producer`. Existing actor with the same identity, if any, would
 ///be returned after running pre shutdown/post start up calls. Producer definition would be
 ///peristed in the backing store. On restart - actors will be restored on demand to process

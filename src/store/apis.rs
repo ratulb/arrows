@@ -5,7 +5,7 @@ use crate::events::DBEvent;
 use crate::pubsub::Publisher;
 use crate::Addr;
 use crate::RichMail;
-use crate::{Mail, Mail::*, Msg};
+use crate::{Config, Mail, Mail::*, Msg};
 use fallible_streaming_iterator::FallibleStreamingIterator;
 use rusqlite::{named_params, params, types::Value, Error::InvalidQuery, Result, ToSql};
 use std::collections::HashMap;
@@ -57,8 +57,7 @@ impl Store {
         }
     }
     fn flush_buffer(&mut self) -> Result<()> {
-        if self.buffer.len() >= BUFFER_MAX_SIZE {
-            //TODO make it configurable
+        if self.buffer.len() >= Config::get_shared().db_buff_size() {
             self.persist(Blank)
         } else {
             Ok(())
@@ -75,7 +74,6 @@ impl Store {
                 self.flush_buffer()
             }
             Bulk(msgs) => {
-                println!("Entered perist bulk");
                 self.buffer.extend(msgs);
                 self.flush_buffer()
             }
@@ -83,13 +81,11 @@ impl Store {
     }
 
     fn persist_buffer(&mut self) -> Result<()> {
-        println!("Entered perist_buffer");
         //Commit any active tx to avoid nested transaction issue
         match self.conn.inner.execute_batch(TX_COMMIT) {
             Ok(_any_tx) => (),
             Err(err) => println!("{}", err),
         }
-        println!("Entered perist_buffer 1");
         self.conn.inner.execute_batch(TX_BEGIN)?;
         let stmt = Self::message_insert_stmt(&mut self.message_insert_stmt);
         let mut stmt = self.conn.inner.prepare_cached(stmt).ok();
@@ -479,7 +475,6 @@ pub(crate) fn value_to_addr(v: Value) -> Addr {
 mod tests {
     use super::*;
     use crate::common::mail::Msg;
-    use crate::constants::BUFFER_MAX_SIZE;
     use crate::events::DBEvent;
     use crate::Addr;
     use rand::{thread_rng, Rng};
@@ -491,7 +486,7 @@ mod tests {
         let random: u64 = rng.gen();
         let message = format!("Actor message-{}", random);
         //Generate as many messages as required to flush buffer
-        let messages = repeat(&message).take(BUFFER_MAX_SIZE);
+        let messages = repeat(&message).take(Config::get_shared().db_buff_size());
         let messages: Vec<_> = messages
             .map(|msg| Msg::with_text(msg, "from", actor_name))
             .collect();
@@ -518,7 +513,7 @@ mod tests {
             .iter()
             .filter(|msg| msg.mail().message().as_text() == Some(&message))
             .count();
-        assert!(count == BUFFER_MAX_SIZE);
+        assert!(count == Config::get_shared().db_buff_size());
         Ok(())
     }
 

@@ -1,8 +1,7 @@
 //! # Addr
 //! An actor address with name, node ip and port
 //!
-use crate::common::config::Config;
-use crate::{compute_hash, option_of_bytes};
+use crate::{compute_hash, option_of_bytes, Config};
 use local_ip_address::local_ip;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;

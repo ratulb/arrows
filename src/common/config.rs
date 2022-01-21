@@ -24,6 +24,7 @@ pub struct Config {
     port: u16,
     db_path: String,
     resident_listener: String,
+    db_buff_size: usize,
 }
 
 impl Config {
@@ -64,11 +65,17 @@ impl Config {
         };
 
         let port: u16 = port.parse().expect("port num");
+        let db_buff_size: usize = env::var("db_buff_size")
+            .unwrap_or("1".to_string())
+            .parse()
+            .expect("db_buff_size");
+
         Self {
             host,
             port,
             db_path,
             resident_listener,
+            db_buff_size,
         }
     }
     ///Reinit based on user supplied config when the CLI is run
@@ -107,5 +114,19 @@ impl Config {
     ///Depends on what profile we are running under. Final location of the listener binary.
     pub fn set_resident_listener(&mut self, resident_listener: &str) {
         self.resident_listener = resident_listener.to_string();
+    }
+    ///How much buffering the backing store should instead of executing database operations
+    ///for every transaction that takes place in the system.
+    ///
+    ///Configurable via `db_buffer_size`.
+
+    pub fn db_buff_size(&self) -> usize {
+        self.db_buff_size
+    }
+    ///Set the db_buff_size. It should update all cached values. Currently its loaded at
+    ///system start time
+    ///
+    pub fn set_db_buff_size(&mut self, buff_size: usize) {
+        self.db_buff_size = buff_size;
     }
 }

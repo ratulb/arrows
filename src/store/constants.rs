@@ -1,7 +1,5 @@
 pub(crate) const DATABASE: &str = "arrows.db";
 pub(crate) const FETCH_LIMIT: usize = 1000;
-pub(crate) const BUFFER_MAX_SIZE: usize = 1;
-pub(crate) const ACTOR_BUFFER_SIZE: usize = 1;
 pub(crate) const TABLE_MESSAGES: &str = "messages";
 //In seconds
 pub(crate) const EVENT_MAX_AGE: u64 = 1;
