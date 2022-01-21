@@ -240,11 +240,12 @@ pub(crate) fn load_messages(rowids: Vec<i64>) -> Vec<RichMail> {
 pub(crate) fn past_events() -> Vec<RichMail> {
     Context::handle().borrow_mut().past_events()
 }
-///Define an actor in the system providing the actor id, actor address(Addr) and actor
-///producer implmentation of `Producer`. Existing actor with the same identity, if any, would
+///Define an actor in the system providing the actor address(Addr) and actorproducer 
+///implmentation of `Producer`. Existing actor with the same identity, if any, would
 ///be returned after running pre shutdown/post start up calls. Producer definition would be
 ///peristed in the backing store. On restart - actors will be restored on demand to process
 ///pending or incoming messages. Actors will restart from where they left off.
+
 pub fn define_actor(addr: Addr, producer: impl Producer) -> Result<Option<CachedActor>, Error> {
     Context::handle().borrow_mut().define_actor(addr, producer)
 }

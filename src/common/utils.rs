@@ -7,11 +7,7 @@ use std::collections::hash_map::DefaultHasher;
 
 use std::hash::{Hash, Hasher};
 
-///Get the type name from a runtime instance
-pub fn type_of<T>(_: &T) {
-    println!("The type is {}", std::any::type_name::<T>());
-}
-///Compute the hash for a struct like[Addr](crate::common::addr::Addr)
+///Compute the hash for a struct like [Addr](crate::common::addr::Addr)
 pub fn compute_hash<T>(value: &T) -> u64
 where
     T: Hash,

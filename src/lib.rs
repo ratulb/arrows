@@ -8,7 +8,7 @@ pub use common::addr::Addr;
 pub use common::errs::{Error, Result};
 pub use common::mail::{Action, Mail, Msg};
 pub use common::utils::*;
-pub use routing::listener::MessageListener;
+
 pub(crate) use store::*;
 
 pub mod catalog;

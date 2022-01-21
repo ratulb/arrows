@@ -9,8 +9,8 @@ use parking_lot::RwLockReadGuard;
 use std::env;
 use std::hash::Hash;
 lazy_static! {
-///The shared config - gets initialized at the system start
-    pub static ref CONFIG: RwLock<Config> = RwLock::new(Config::from_env());
+//The shared config - gets initialized at the system start
+     static ref CONFIG: RwLock<Config> = RwLock::new(Config::from_env());
 }
 //Dev binary path on windows
 static WINDOWS: &str = "target\\debug\\arrows.exe";
