@@ -120,7 +120,6 @@ impl Context {
     //Defines an actor in the system. The producer instantiates actors.
     pub(crate) fn define_actor(
         &mut self,
-        identity: u64,
         addr: Addr,
         producer: impl Producer,
     ) -> Result<Option<CachedActor>, Error> {
@@ -128,9 +127,9 @@ impl Context {
         match CachedActor::new(&text, addr.clone(), Some(self.dispatcher.clone())) {
             Some(mut actor) => {
                 let previous = Actors::get(&self.actors, &addr);
+                let identity = addr.get_id().to_string();
                 if let Some(previous) = previous {
                     CachedActor::take_over_from(&mut actor, previous);
-                    let identity = identity.to_string();
                     let _rs = self.remove_actor_permanent(&identity);
                 }
                 self.save_producer(&identity.to_string(), addr.clone(), &producer)?;
@@ -246,14 +245,8 @@ pub(crate) fn past_events() -> Vec<RichMail> {
 ///be returned after running pre shutdown/post start up calls. Producer definition would be
 ///peristed in the backing store. On restart - actors will be restored on demand to process
 ///pending or incoming messages. Actors will restart from where they left off.
-pub fn define_actor(
-    identity: u64,
-    addr: Addr,
-    producer: impl Producer,
-) -> Result<Option<CachedActor>, Error> {
-    Context::handle()
-        .borrow_mut()
-        .define_actor(identity, addr, producer)
+pub fn define_actor(addr: Addr, producer: impl Producer) -> Result<Option<CachedActor>, Error> {
+    Context::handle().borrow_mut().define_actor(addr, producer)
 }
 
 //Send off a payload of messages which could be directed to different actors in local or
@@ -262,7 +255,7 @@ pub fn define_actor(
 pub(crate) fn ingress(mail: Mail) -> std::io::Result<Option<Mail>> {
     Context::handle().borrow_mut().ingress(mail)
 }
-//Outgoing actor execution result 
+//Outgoing actor execution result
 pub(crate) fn egress(mail: RichMail) {
     Context::handle().borrow_mut().egress(mail);
 }

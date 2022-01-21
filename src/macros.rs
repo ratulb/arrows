@@ -85,14 +85,12 @@
 #[macro_export]
 macro_rules! define_actor {
     ($actor_name:literal, $actor_producer:path) => {{
-        let identity = $crate::Addr::new($actor_name).get_id();
         let addr = $crate::Addr::new($actor_name);
-        let _res = $crate::catalog::define_actor(identity, addr, $actor_producer);
+        let _res = $crate::catalog::define_actor(addr, $actor_producer);
     }};
     ($actor_addr:expr, $actor_producer:path) => {{
         let actor_addr: $crate::Addr = $actor_addr;
-        let identity = actor_addr.get_id();
-        let _res = $crate::catalog::define_actor(identity, actor_addr, $actor_producer);
+        let _res = $crate::catalog::define_actor(actor_addr, $actor_producer);
     }};
 }
 ///Sends one or more messages to one or more actors defined in the system.

@@ -12,7 +12,7 @@ lazy_static! {
 ///The shared config - gets initialized at the system start
     pub static ref CONFIG: RwLock<Config> = RwLock::new(Config::from_env());
 }
-//Dev binary path on windows 
+//Dev binary path on windows
 static WINDOWS: &str = "target\\debug\\arrows.exe";
 //Dev binary path on linux
 static LINUX: &str = "target/debug/arrows";

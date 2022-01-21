@@ -23,7 +23,6 @@ impl Producer for NewProducer {
 }
 
 fn main() {
-
     let builder = NewProducer::default();
 
     let rs = define_actor!("new_actor", builder);
