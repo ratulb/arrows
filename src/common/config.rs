@@ -104,7 +104,7 @@ impl Config {
     pub fn set_db_path(&mut self, db_path: &str) {
         self.db_path = db_path.to_string();
     }
-    ///Set as required
+    ///Depends on what profile we are running under. Final location of the listener binary.
     pub fn set_resident_listener(&mut self, resident_listener: &str) {
         self.resident_listener = resident_listener.to_string();
     }
