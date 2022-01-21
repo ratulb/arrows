@@ -185,7 +185,7 @@ macro_rules! send {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Actor, Addr, Mail, Msg, Producer};
+    use crate::{Actor, Mail, Msg, Producer};
     use serde::{Deserialize, Serialize};
 
     pub struct TestActor;

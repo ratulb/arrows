@@ -1,17 +1,23 @@
+//! # Config
+//!The centralized configuration construct - to run multiple instances of the system
+//!supply these settings at startup
+
 use lazy_static::lazy_static;
 use local_ip_address::local_ip;
 use parking_lot::RwLock;
 use parking_lot::RwLockReadGuard;
 use std::env;
 use std::hash::Hash;
-
 lazy_static! {
+///The shared config - gets initialized at the system start
     pub static ref CONFIG: RwLock<Config> = RwLock::new(Config::from_env());
 }
-
+//Dev binary path on windows 
 static WINDOWS: &str = "target\\debug\\arrows.exe";
+//Dev binary path on linux
 static LINUX: &str = "target/debug/arrows";
 
+///The config struct
 #[derive(PartialEq, Eq, Clone, Debug, Hash)]
 pub struct Config {
     host: String,
@@ -21,9 +27,12 @@ pub struct Config {
 }
 
 impl Config {
+    ///Get the read lock
     pub fn get_shared() -> RwLockReadGuard<'static, Self> {
         CONFIG.read()
     }
+
+    ///Retrieve env settings at start
     pub fn from_env() -> Config {
         let db_path = env::var("DB_PATH").unwrap_or_else(|_| "/tmp".to_string());
         let resident_listener = env::var("resident_listener").unwrap_or_else(|_| {
@@ -62,40 +71,40 @@ impl Config {
             resident_listener,
         }
     }
-
+    ///Reinit based on user supplied config when the CLI is run
     pub fn re_init(config: Config) {
         let mut current = CONFIG.write();
         *current = config;
     }
-
+    ///The host ip
     pub fn host(&self) -> &str {
         &self.host
     }
-
+    ///Port the listener start with - default is 7171
     pub fn port(&self) -> u16 {
         self.port
     }
-
+    ///Embedded sqlite db path
     pub fn db_path(&self) -> &str {
         &self.db_path
     }
-
+    ///Location of listener binary
     pub fn resident_listener(&self) -> &str {
         &self.resident_listener
     }
-
+    ///Gets reinitialzed based on user supplied IP:PORT - Addrs get created based on this
     pub fn set_host(&mut self, host: &str) {
         self.host = host.to_string();
     }
-
+    ///Alter the port - Addrs reflect this
     pub fn set_port(&mut self, port: u16) {
         self.port = port;
     }
-
+    ///Alter it if running multiple arrows instances on the same node
     pub fn set_db_path(&mut self, db_path: &str) {
         self.db_path = db_path.to_string();
     }
-
+    ///Set as required
     pub fn set_resident_listener(&mut self, resident_listener: &str) {
         self.resident_listener = resident_listener.to_string();
     }

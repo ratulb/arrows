@@ -1,7 +1,7 @@
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-pub use catalog::{ingress, restore};
+
 pub(crate) use common::actor::ProducerDeserializer;
 pub use common::actor::{Actor, Producer};
 pub use common::addr::Addr;

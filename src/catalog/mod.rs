@@ -210,7 +210,7 @@ impl Context {
     }
 
     //Exclusive mutable handle to Context - sigleton lock. Discretionary usage advisable
-    pub fn handle() -> ReentrantMutexGuard<'static, RefCell<Context>> {
+    pub(crate) fn handle() -> ReentrantMutexGuard<'static, RefCell<Context>> {
         CTX.lock()
     }
 
@@ -241,11 +241,11 @@ pub(crate) fn load_messages(rowids: Vec<i64>) -> Vec<RichMail> {
 pub(crate) fn past_events() -> Vec<RichMail> {
     Context::handle().borrow_mut().past_events()
 }
-//Define an actor in the system providing the actor id, actor address(Addr) and actor
-//producer implmentation of `Producer`. Existing actor with the same identity, if any, would
-//be returned after running pre shutdown/post start up calls. Producer definition would be
-//peristed in the backing store. On restart - actors will be restored on demand to process
-//pending or incoming messages. Actors will restart from where they left off.
+///Define an actor in the system providing the actor id, actor address(Addr) and actor
+///producer implmentation of `Producer`. Existing actor with the same identity, if any, would
+///be returned after running pre shutdown/post start up calls. Producer definition would be
+///peristed in the backing store. On restart - actors will be restored on demand to process
+///pending or incoming messages. Actors will restart from where they left off.
 pub fn define_actor(
     identity: u64,
     addr: Addr,
@@ -259,15 +259,15 @@ pub fn define_actor(
 //Send off a payload of messages which could be directed to different actors in local or
 //remote systems. Where messages would be delivered is decided on the host field to of the to
 //address(Addr) of each message
-pub fn ingress(mail: Mail) -> std::io::Result<Option<Mail>> {
+pub(crate) fn ingress(mail: Mail) -> std::io::Result<Option<Mail>> {
     Context::handle().borrow_mut().ingress(mail)
 }
-
+//Outgoing actor execution result 
 pub(crate) fn egress(mail: RichMail) {
     Context::handle().borrow_mut().egress(mail);
 }
-
-pub fn restore(addr: Addr) -> Result<Option<CachedActor>, Error> {
+//Restore an actor that might not been running
+pub(crate) fn restore(addr: Addr) -> Result<Option<CachedActor>, Error> {
     Context::handle().borrow_mut().restore(addr)
 }
 //TODO Make Receive(in routing take mail) -> Send mail

@@ -1,4 +1,3 @@
-use arrows::catalog::restore;
 use arrows::define_actor;
 use arrows::send;
 
@@ -24,9 +23,6 @@ impl Producer for NewProducer {
 }
 
 fn main() {
-    let identity = Addr::new("new_actor");
-    let rs = restore(identity);
-    println!("The rs = {:?}", rs);
 
     let builder = NewProducer::default();
 

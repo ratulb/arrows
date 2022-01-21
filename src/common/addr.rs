@@ -1,3 +1,6 @@
+//! # Addr
+//! An actor address with name, node ip and port
+//!
 use crate::common::config::Config;
 use crate::{compute_hash, option_of_bytes};
 use local_ip_address::local_ip;
@@ -5,10 +8,10 @@ use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
+///Handle the case when the system binds to all interfaces
 static WILDCARD_IP: IpAddr = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
 
-///`Addr` - An actor address with name, node ip and port
-
+///Unique actor addresses based on IP, PORT and names. Some fields are later extension points
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize, Hash, Default)]
 pub struct Addr {
     id: u64,
@@ -20,6 +23,9 @@ pub struct Addr {
 }
 
 impl Addr {
+    ///A new local actor address - bound to be unique. Actors with same name will have
+    ///different ids based on system ports even if multiple instances of the arrows systems
+    ///are running on the same node
     pub fn new(name: &str) -> Self {
         let mut addr = Self {
             id: 0,
@@ -32,6 +38,8 @@ impl Addr {
         Self::addr_hash(&mut addr);
         addr
     }
+
+    ///An actor running on a different local or remote system
     pub fn remote(name: &str, hostport: &str) -> Self {
         let mut addr = Self::new(name);
         let mut hostport = hostport.split(':');
@@ -44,11 +52,12 @@ impl Addr {
         Self::addr_hash(&mut addr);
         addr
     }
-
+    ///Alter the port - to talk to different system
     pub fn with_port(&mut self, port: u16) {
         self.port = Some(port);
         Self::addr_hash(self);
     }
+    ///Alter the IP - as requried
     pub fn with_ip(&mut self, ip: &str) {
         let parseable: Result<IpAddr, _> = ip.parse();
         if parseable.is_ok() {
@@ -62,19 +71,22 @@ impl Addr {
         addr.id = 0;
         addr.id = compute_hash(&addr);
     }
+
+    ///Human readable name of an actor
     pub fn get_name(&self) -> &String {
         &self.name
     }
+    ///Internally used by the system for unique address identification
     pub fn get_id(&self) -> u64 {
         self.id
     }
-    pub fn get_socket_addr(&self) -> Option<SocketAddr> {
+    pub(crate) fn get_socket_addr(&self) -> Option<SocketAddr> {
         if let Some(h) = &self.host {
             return Some(SocketAddr::new(h[..].parse().ok()?, self.port?));
         }
         None
     }
-
+    ///Address host ip
     pub fn get_host_ip(&self) -> IpAddr {
         match self.get_host() {
             Some(host) => match host.parse::<Ipv4Addr>() {
@@ -84,7 +96,8 @@ impl Addr {
             None => panic!(),
         }
     }
-
+    ///Needed for support remoting - used to decide if listener should be booted if not
+    ///already up if message comes in
     pub fn is_ip_local(ip: IpAddr) -> bool {
         Config::get_shared()
             .host()
@@ -92,7 +105,7 @@ impl Addr {
             .parse()
             .map_or(false, |parsed: IpAddr| parsed == ip)
     }
-
+    ///Mostly for routing decisions
     pub fn is_local_ip(&self) -> bool {
         let host_ip = self.get_host_ip();
         if host_ip.is_loopback() || host_ip == WILDCARD_IP {
@@ -101,24 +114,26 @@ impl Addr {
             local_ip().map_or(false, |local_ip| local_ip == host_ip)
         }
     }
-
+    ///Routing
     pub fn is_local_port(&self) -> bool {
         match self.get_port() {
             Some(port) => port == Config::get_shared().port(),
             None => false,
         }
     }
-
+    ///Is the local - based on port or ip or both together
     pub fn is_local(&self) -> bool {
         self.is_local_ip() && self.is_local_port()
     }
-
+    ///Handle to host
     pub fn get_host(&self) -> Option<&String> {
         self.host.as_ref()
     }
+    ///Handle to port
     pub fn get_port(&self) -> Option<u16> {
         self.port
     }
+    ///For serialization
     pub fn as_bytes(&self) -> Vec<u8> {
         option_of_bytes(self).unwrap_or_default()
     }

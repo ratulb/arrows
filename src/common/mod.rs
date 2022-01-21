@@ -1,3 +1,6 @@
+//! Common
+//! Common interface between implementation and client usage
+
 pub(crate) mod actor;
 pub(crate) mod addr;
 pub mod config;
