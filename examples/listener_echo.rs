@@ -7,5 +7,5 @@ fn main() {
     //alive
     //let m = Msg::echo("This is an echo message to the listener");
     let m = Msg::echo("renetsil eht ot egassem ohce na si sihT");
-    let rs = send!(Addr::listen_addr(), m);
+    let _rs = send!(Addr::listen_addr(), m);
 }
