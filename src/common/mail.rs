@@ -43,7 +43,6 @@ use Mail::*;
 impl Mail {
     ///Get a handle to the inner message
     pub(crate) fn message(&self) -> &Msg {
-        println!("Inside mail message - printing self {}", self);
         match self {
             Trade(ref msg) => msg,
             _ => panic!("message is supported only on Trade variant"),
@@ -96,7 +95,7 @@ impl Mail {
 
     ///Get the embedded [Action](arrows::Action) out if this mail is a command
     ///
-    pub fn get_action(&self) -> Option<Action> {
+    pub fn action(&self) -> Option<Action> {
         if !self.is_command() {
             return None;
         }
@@ -195,7 +194,8 @@ impl From<Vec<Msg>> for Mail {
         Bulk(msgs)
     }
 }
-///Action represents tasks corresponding to when message content type is a command
+///[Msg](arrows::Msg) content type can also be [Command](arrows::Content::Command). `Action`
+///represents tasks corresponding to Commands.
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum Action {
@@ -207,7 +207,7 @@ pub enum Action {
     Continue,
 }
 impl Action {
-    //Meant for type checking
+    //Meant for internal use by the system
     fn as_text(&self) -> &str {
         match self {
             Self::Shutdown => "Shutdown",
@@ -215,7 +215,7 @@ impl Action {
             Self::Continue => "Continue",
         }
     }
-
+    ///Inner content such as echo message
     pub fn inner(&self) -> &str {
         match self {
             Self::Shutdown => "",
@@ -223,12 +223,12 @@ impl Action {
             Self::Echo(s) => s,
         }
     }
-    //Execute the action embedded in a Mail whose content  might be a Command
+
+    ///Execute the action embedded in a Mail whose content  might be a Command
+    ///For echo action execute just reverses the incoming text
     pub fn execute(&mut self, _input: Mail) -> Option<Mail> {
         match self {
-            Self::Echo(text) => {
-                Some(Msg::from_text(&text.chars().rev().collect::<String>()).into())
-            }
+            Self::Echo(text) => Some(Msg::echo(&text.chars().rev().collect::<String>()).into()),
             _ => None,
         }
     }

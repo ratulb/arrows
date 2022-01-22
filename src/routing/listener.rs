@@ -6,7 +6,7 @@
 //!
 use crate::catalog::ingress;
 
-use crate::{from_bytes, Action, Addr, Config, Mail, Mail::Bulk};
+use crate::{from_bytes, Action, Action::*, Addr, Config, Mail};
 use byte_marks::Marked;
 use std::io::{BufReader, BufWriter, Result, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
@@ -44,14 +44,11 @@ impl MessageListener {
             match stream {
                 Ok(inner_stream) => match self.serve(inner_stream) {
                     Err(serving_error) => eprintln!("Error serving client {}", serving_error),
-                    Ok(None) => continue,
-                    Ok(cmd) => match cmd {
-                        Some(_) => {
-                            println!("Stopping on request");
-                            break;
-                        }
-                        None => continue,
-                    },
+                    Ok(Shutdown) => {
+                        println!("Shutdown request received!");
+                        break;
+                    }
+                    Ok(_) => continue,
                 },
                 Err(e) => {
                     eprintln!("Error handling connection {}", e);
@@ -61,48 +58,49 @@ impl MessageListener {
         Ok(())
     }
 
-    fn serve(&mut self, tcp: TcpStream) -> Result<Option<Mail>> {
+    fn serve(&mut self, tcp: TcpStream) -> Result<Action> {
         let cloned = tcp.try_clone()?;
         let mut reader = BufReader::new(cloned);
         let mut writer = BufWriter::new(tcp);
         let marked = Marked::with_defaults(&mut reader);
-        let mut response = String::from("MessageListener received request");
+        let mut response = String::from("Ok");
         for mail in marked {
             match self.process(mail) {
-                Ok(Some(mail)) => match mail {
-                    mail @ Bulk(_) if mail.command_equals(Action::Shutdown) => {
-                        return Ok(Some(mail));
-                    }
-                    mail @ Bulk(_) if mail.command_equals(Action::Echo("".to_string())) => {
-                        response.clear();
-                        let _rs = match mail.get_action() {
-                            Some(mut action) => action.execute(mail),
-                            None => None,
-                        };
-
-                        /***if let Some(text) = mail.messages()[0].as_text() {
-                            println!("The echo text {}", text);
-                            response.push_str(&text.chars().rev().collect::<String>())
-                        }***/
-                        break;
-                    }
-                    _ => continue,
-                },
-                Ok(None) => continue,
+                Ok(Shutdown) => return Ok(Shutdown),
+                Ok(Continue) => continue,
+                Ok(Echo(text)) => {
+                    response.clear();
+                    response.push_str(&text);
+                    break;
+                }
                 Err(err) => eprintln!("Error ingressing mail {}", err),
             }
         }
         writer.write_all(response.as_bytes())?;
         writer.flush()?;
-        Ok(None)
+        Ok(Continue)
+    }
+    //Process action from mails - that might contain command
+    fn process_cmd(cmd: Mail) -> Result<Action> {
+        match cmd.action() {
+            Some(Shutdown) => Ok(Shutdown),
+            Some(Continue) => Ok(Continue),
+            //Take out the echo action from mail, execute it feeding the mail, return the
+            //echo action from the ouput of the execution
+            //Executing echo action reverses the string inside it
+            Some(mut echo @ Echo(_)) => Ok(echo
+                .execute(cmd)
+                .map_or(Continue, |mail| mail.action().unwrap_or(Continue))),
+            None => Ok(Continue),
+        }
     }
 
-    fn process(&self, payload: Vec<u8>) -> Result<Option<Mail>> {
+    fn process(&self, payload: Vec<u8>) -> Result<Action> {
         let payload = from_bytes::<'_, Mail>(&payload)?;
         match payload {
-            m @ Mail::Bulk(_) if m.is_command() => Ok(Some(m)),
-            m @ Mail::Bulk(_) => ingress(m),
-            _ => Ok(None),
+            m @ Mail::Bulk(_) if m.is_command() => Self::process_cmd(m),
+            m @ Mail::Bulk(_) => ingress(m).map(|_| Continue),
+            _ => Ok(Continue),
         }
     }
 }

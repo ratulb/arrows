@@ -133,7 +133,7 @@ impl RichMail {
  * Issues to be resolved and things to be done
  * 1. Documentation - absolute priority
  * 2. Test mode/Dev mode - routing
- * 3. Config
+ * 3. Config - Done
  * 4. Read documentation doc
  * 5. All examples should run
  * 6. Check first message panic
