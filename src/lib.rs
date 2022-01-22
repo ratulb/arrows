@@ -17,7 +17,7 @@ pub mod macros;
 
 pub mod routing;
 mod store;
-
+mod demos;
 use std::collections::HashMap;
 ///This function is responsible for gathering and dispatching messages received from the
 ///macro invocation of `send!`. Multiple messages can be grouped for one more actors in
