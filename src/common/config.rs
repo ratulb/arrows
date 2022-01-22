@@ -52,7 +52,7 @@ impl Config {
                 (host.to_string(), port.to_string())
             }
             Err(err) => {
-                eprintln!("{}", err);
+                eprintln!("LISTEN_ADDR: {}", err);
                 let port = env::var("PORT").unwrap_or_else(|_| "7171".to_string());
                 match local_ip() {
                     Ok(ip) => (ip.to_string(), port),
