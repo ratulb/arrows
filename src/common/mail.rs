@@ -93,7 +93,7 @@ impl Mail {
         }
     }
 
-    ///Get the embedded [Action](arrows::Action) out if this mail is a command
+    ///Get the embedded [Action](crate::Action) out if this mail is a command
     ///
     pub fn action(&self) -> Option<Action> {
         if !self.is_command() {
@@ -194,8 +194,8 @@ impl From<Vec<Msg>> for Mail {
         Bulk(msgs)
     }
 }
-///[Msg](arrows::Msg) content type can also be [Command](arrows::Content::Command). `Action`
-///represents tasks corresponding to Commands.
+///[Msg](crate::Msg) content type can also be Command. `Action` represents tasks
+///corresponding to Commands.
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum Action {
@@ -324,7 +324,7 @@ impl Msg {
         }
         false
     }
-    ///Get the embedded [Action](arrows::Action) out if this [Msg](arrows::Msg) content
+    ///Get the embedded [Action](crate::Action) out if this [Msg](crate::Msg) content
     ///is really is Command
     pub fn action(&self) -> Option<Action> {
         if !self.is_command() {
