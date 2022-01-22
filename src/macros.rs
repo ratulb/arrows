@@ -58,8 +58,8 @@
 ///define_actor!("new_actor", actor_producer);
 ///
 ///```
-///At this point - the actor would be running. We can send messages to the actor which it will
-///receive and sending out messages.
+///At this stage, the actor would have received a start up signal and be ready to process
+///messages.
 ///
 ///```
 ///use arrows::send;

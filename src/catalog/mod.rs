@@ -1,3 +1,8 @@
+//! Catalog
+//! Manages a pool of actors, exposes an API [define_actor()] for defining actors in the 
+//! system.
+//!Provides internal apis for activatation/restoration of actors, a handle to backend store.
+
 mod actors;
 mod panics;
 use crate::apis::Store;
@@ -214,7 +219,7 @@ impl Context {
         }
     }
 
-    //Exclusive mutable handle to Context - sigleton lock. Discretionary usage advisable
+    //Exclusive mutable handle to Context - sigleton lock.
     pub(crate) fn handle() -> ReentrantMutexGuard<'static, RefCell<Context>> {
         CTX.lock()
     }
@@ -246,6 +251,7 @@ pub(crate) fn load_messages(rowids: Vec<i64>) -> Vec<RichMail> {
 pub(crate) fn past_events() -> Vec<RichMail> {
     Context::handle().borrow_mut().past_events()
 }
+///[catalog]:define_actor
 ///Define an actor in the system providing the actor address(Addr) and an implmentation of
 ///`Producer`. Existing actor with the same address, if any, would be removed and a
 ///pre-shutdown signal would be sent to the removed instance. New actor would be added to
@@ -258,21 +264,15 @@ pub fn define_actor(addr: Addr, producer: impl Producer) -> Result<Option<Cached
     Context::handle().borrow_mut().define_actor(addr, producer)
 }
 
-//Send off a payload of messages which could be directed to different actors in local or
-//remote systems. Where messages would be delivered is decided on the host field to of the to
-//address(Addr) of each message
 pub(crate) fn ingress(mail: Mail) -> std::io::Result<Option<Mail>> {
     Context::handle().borrow_mut().ingress(mail)
 }
-//Outgoing actor execution result
 pub(crate) fn egress(mail: RichMail) {
     Context::handle().borrow_mut().egress(mail);
 }
-//Restore an actor that might not been running
 pub(crate) fn restore(addr: Addr) -> Result<Option<CachedActor>, Error> {
     Context::handle().borrow_mut().restore(addr)
 }
-//TODO Make Receive(in routing take mail) -> Send mail
 pub(crate) fn handle_invocation(mail: RichMail) {
     Context::handle().borrow_mut().handle_invocation(mail);
 }

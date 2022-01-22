@@ -53,7 +53,7 @@ impl Config {
             }
             Err(err) => {
                 eprintln!("{}", err);
-                let port = env::var("PORT").unwrap_or("7171".to_string());
+                let port = env::var("PORT").unwrap_or_else(|_| "7171".to_string());
                 match local_ip() {
                     Ok(ip) => (ip.to_string(), port),
                     Err(err) => {
