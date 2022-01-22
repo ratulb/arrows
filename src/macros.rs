@@ -45,8 +45,8 @@
 ///}
 ///
 ///````
-///At this point - we have our `Actor` and `Producer` implementations are ready.
-///we can use the `define_actor` macro to register the producer into the system. The producer
+///At this point - we have our `Actor` and `Producer` implementations ready. we can use
+///the `define_actor` macro to register the producer into the system. The producer
 ///would be persisted into the system, the actor will be activated and would receive a post
 ///start signal. Same prodcer instance would be called to create instances of the actor at
 ///system restart/actor activation points at different times in the actor's life-cycle.
