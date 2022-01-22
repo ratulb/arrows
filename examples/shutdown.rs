@@ -3,5 +3,5 @@ use arrows::Addr;
 use arrows::Msg;
 
 fn main() {
-    let rs = send!(Addr::listen_addr(), Msg::shutdown());
+    let _rs = send!(Addr::listen_addr(), Msg::shutdown());
 }

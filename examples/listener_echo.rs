@@ -1,11 +1,11 @@
 use arrows::send;
-use arrows::Msg;
 use arrows::Addr;
+use arrows::Msg;
 
 fn main() {
     //Fire an echo message to the listener - it should reverse the string and send it back if
     //alive
-    //let m = Msg::echo("This is an echo message to the listener");
-    let m = Msg::echo("renetsil eht ot egassem ohce na si sihT");
-    let _rs = send!(Addr::listen_addr(), m);
+    //let m = Msg::echo("This is an echo message back from the listener");
+    let m = Msg::echo("renetsil eht morf kcab egassem ohce na si sihT");
+    send!(Addr::listen_addr(), m);
 }

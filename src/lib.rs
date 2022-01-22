@@ -11,13 +11,15 @@ pub use common::mail::{Action, Mail, Msg};
 pub use common::utils::*;
 pub(crate) use store::*;
 
+pub use demos::*;
+
 pub mod catalog;
 pub mod common;
 pub mod macros;
 
+pub mod demos;
 pub mod routing;
 mod store;
-mod demos;
 use std::collections::HashMap;
 ///This function is responsible for gathering and dispatching messages received from the
 ///macro invocation of `send!`. Multiple messages can be grouped for one more actors in
