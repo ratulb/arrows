@@ -136,6 +136,10 @@ impl Addr {
     pub fn as_bytes(&self) -> Vec<u8> {
         option_of_bytes(self).unwrap_or_default()
     }
+    ///The address of the listener
+    pub fn listen_addr() -> Self {
+        Addr::new("listener")
+    }
 }
 
 impl std::fmt::Display for Addr {

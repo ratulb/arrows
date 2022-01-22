@@ -66,7 +66,7 @@ impl Config {
 
         let port: u16 = port.parse().expect("port num");
         let db_buff_size: usize = env::var("db_buff_size")
-            .unwrap_or("1".to_string())
+            .unwrap_or_else(|_| "1".to_string())
             .parse()
             .expect("db_buff_size");
 

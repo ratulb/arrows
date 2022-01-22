@@ -524,8 +524,8 @@ impl std::fmt::Display for Mail {
             Bulk(ref msgs) => {
                 writeln!(f, "Bulk({})", msgs.len())?;
                 if !msgs.is_empty() {
-                    for i in 0..msgs.len() - 1 {
-                        let _ = write!(f, "{}", msgs[i]);
+                    for msg in msgs.iter().take(msgs.len() - 1) {
+                        let _ = write!(f, "{}", msg);
                         let _rs = writeln!(f);
                     }
                     write!(f, "{}", msgs[msgs.len() - 1])

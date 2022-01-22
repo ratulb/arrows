@@ -7,15 +7,26 @@ pub struct NewActor;
 
 impl Actor for NewActor {
     fn receive(&mut self, _incoming: Mail) -> Option<Mail> {
+        println!("I am the actor {}", self.type_name());
         Some(Msg::from_text("Reply from new actor").into())
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 struct NewProducer;
+#[derive(Debug, Serialize, Deserialize, Default)]
+struct NewProducer2;
 
-#[typetag::serde(name = "new_actor_producer")]
+//#[typetag::serde(name = "new_actor_producer")]
+#[typetag::serde]
 impl Producer for NewProducer {
+    fn produce(&mut self) -> Box<dyn Actor> {
+        Box::new(NewActor)
+    }
+}
+
+#[typetag::serde]
+impl Producer for NewProducer2 {
     fn produce(&mut self) -> Box<dyn Actor> {
         Box::new(NewActor)
     }

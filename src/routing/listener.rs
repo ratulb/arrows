@@ -28,7 +28,7 @@ impl MessageListener {
     ///variable `DB_PATH`) in the node.
     ///
     pub fn start() {
-        let listener_addr = Addr::new("listener");
+        let listener_addr = Addr::listen_addr();
         println!("Starting listener with config {:?}", Config::get_shared());
         let listener =
             MessageListener::new(listener_addr.get_socket_addr().expect("Socket address"));

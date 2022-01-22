@@ -1,1 +1,1 @@
-cargo run --example send_to_example_actor
+cargo run --example send_to_new_actor

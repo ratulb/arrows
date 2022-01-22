@@ -446,7 +446,7 @@ impl Store {
         Ok(())
     }
 }
-pub(crate) fn sql_to_io(err: rusqlite::Error) -> std::io::Error {
+fn sql_to_io(err: rusqlite::Error) -> std::io::Error {
     eprintln!("rusqlite::Error has occured: {:?}", err);
     Error::new(ErrorKind::Other, "rusqlite error")
 }

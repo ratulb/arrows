@@ -1,5 +1,5 @@
 //! Catalog
-//! Manages a pool of actors, exposes an API [define_actor()] for defining actors in the 
+//! Manages a pool of actors, exposes an API [define_actor()] for defining actors in the
 //! system.
 //!Provides internal apis for activatation/restoration of actors, a handle to backend store.
 
@@ -83,6 +83,7 @@ impl Context {
         ctx_init.store(false, Ordering::Release);
         ctx
     }
+
     ///Ingress incoming mail to the backing store
     pub fn ingress(&mut self, payload: Mail) -> std::io::Result<Option<Mail>> {
         match self.store.persist(payload) {
@@ -237,6 +238,11 @@ impl Context {
     pub(crate) fn past_events(&mut self) -> Vec<RichMail> {
         let events = self.store.read_events().expect("Past events");
         self.load_messages(events)
+    }
+}
+impl Drop for Context {
+    fn drop(&mut self) {
+        self.handle.take().map(JoinHandle::join);
     }
 }
 
