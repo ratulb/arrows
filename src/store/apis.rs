@@ -84,7 +84,8 @@ impl Store {
         //Commit any active tx to avoid nested transaction issue
         match self.conn.inner.execute_batch(TX_COMMIT) {
             Ok(_any_tx) => (),
-            Err(err) => println!("{}", err),
+            //Err(err) => println!("{}", err),
+            Err(_err) => (),
         }
         self.conn.inner.execute_batch(TX_BEGIN)?;
         let stmt = Self::message_insert_stmt(&mut self.message_insert_stmt);

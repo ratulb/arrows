@@ -231,7 +231,7 @@ fn pre_shutdown(mut actor: CachedActor) -> Option<CachedActor> {
         &mut actor,
         RichMail::RichContent(Mail::Blank, true, 0, None, None),
     );
-    println!("Pre shutdown hook fired for actor ({})", actor.get_addr());
+    println!("Pre shutdown hook fired for actor ({})", actor.get_addr().get_name());
     Some(actor)
 }
 //Post startup message
@@ -240,6 +240,6 @@ fn post_start(mut actor: CachedActor) -> Option<CachedActor> {
         &mut actor,
         RichMail::RichContent(Mail::Blank, true, 0, None, None),
     );
-    println!("Post start hook fired for actor ({})", actor.get_addr());
+    println!("Post start hook fired for actor ({})", actor.get_addr().get_name());
     Some(actor)
 }

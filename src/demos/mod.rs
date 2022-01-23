@@ -12,15 +12,16 @@ pub struct DemoActor;
 impl Actor for DemoActor {
     fn receive(&mut self, incoming: Mail) -> Option<Mail> {
         match incoming {
-            Mail::Trade(msg) => println!("DemoActor received: {}", msg),
-            bulk @ Mail::Bulk(_) => println!("DemoActor received: {}", bulk),
+            Mail::Trade(msg) => println!("DemoActor received: {:?}", msg.as_text()),
+            bulk @ Mail::Bulk(_) => 
+                println!("DemoActor received: {:?}", bulk.messages()[0].as_text()),
             Mail::Blank => println!("DemoActor received blank"),
         }
         Some(Msg::from_text("Message from DemoActor").into())
     }
 }
 
-///Produces DemoActor1 instances
+///Produces DemoActor instances
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct DemoActorProducer;
 

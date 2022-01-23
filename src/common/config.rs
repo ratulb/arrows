@@ -51,8 +51,8 @@ impl Config {
                 let port = hostport.next().unwrap_or("7171");
                 (host.to_string(), port.to_string())
             }
-            Err(err) => {
-                eprintln!("LISTEN_ADDR: {}", err);
+            Err(_err) => {
+                //eprintln!("LISTEN_ADDR: {}", err);
                 let port = env::var("PORT").unwrap_or_else(|_| "7171".to_string());
                 match local_ip() {
                     Ok(ip) => (ip.to_string(), port),

@@ -89,8 +89,8 @@
 //! How to get started:
 //! 1) Check this repository out
 //! 2) Launch an extra terminal
-//! 3) Fire the `register.sh` script in the examples directory.
-//! 4) In another terminal launch the `server.sh` script in the examples directory
+//! 3) Fire the `register.sh` script in the project directory.
+//! 4) In another terminal launch the `server.sh` script in the same directory
 //! 5) From previous termainal launch the `send.sh` script - actors should start receiving
 //! messages.
 //!
