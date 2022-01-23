@@ -5,9 +5,9 @@
 //!
 //![send!](crate::send)
 
-///This macro defines a new actor instance in the system. It takes a literal string as 
+///This macro defines a new actor instance in the system. It takes a literal string as
 ///actor name and an implmentation of [Producer](crate::common::actor::Producer) that is
-///called to return an [Actor](crate::common::actor::Actor). The actor becomes active 
+///called to return an [Actor](crate::common::actor::Actor). The actor becomes active
 ///as soon as it is defined and receives a startup signal.
 ///
 ///
@@ -164,7 +164,7 @@ macro_rules! send {
                         msgs.push(msg);
                     )*
             )*
-            $crate::recv(actor_msgs);
+            let _rs = $crate::routing::messenger::Messenger::send(actor_msgs);
     } };
 
     (@SIZE; $($msg:expr),*) => {
@@ -176,33 +176,4 @@ macro_rules! send {
     (@TO_ADDR; $actor_name:literal) => {
         $crate::Addr::new($actor_name)
     };
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{Actor, Mail, Msg, Producer};
-    use serde::{Deserialize, Serialize};
-
-    pub struct TestActor;
-
-    impl Actor for TestActor {
-        fn receive(&mut self, _incoming: Mail) -> std::option::Option<Mail> {
-            Some(Msg::from_text("Reply from test actor").into())
-        }
-    }
-
-    #[derive(Debug, Serialize, Deserialize, Default)]
-    struct TestActorProducer;
-    #[typetag::serde] 
-    impl Producer for TestActorProducer {
-        fn produce(&mut self) -> Box<dyn Actor> {
-            Box::new(TestActor)
-        }
-    }
-    #[test]
-    fn define_test_actor_test() {
-        let producer = TestActorProducer::default();
-        define_actor!("test_actor", producer);
-        send!("test_actor", Msg::from_text("Test message"));
-    }
 }

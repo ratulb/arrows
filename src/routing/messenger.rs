@@ -17,10 +17,73 @@ use std::thread;
 use std::time::Duration;
 
 ///The client face of actor system. Sends out messages with text or binary(v8) as payload.
-pub(crate) struct Messenger;
+pub struct Messenger;
 
 impl Messenger {
-    pub(crate) fn send(mut mails: HashMap<&Addr, Vec<Msg>>) -> Result<()> {
+    ///This function is responsible for dispatching messages received from the macro invocation of
+    ///`send!`. Multiple messages can be grouped for one more actors in one `send!` macro invocation
+    ///as shown below:
+    ///
+    ///Example
+    ///
+    ///```
+    ///use arrows::send;
+    ///use arrows::Msg;
+    ///
+    ///let m1 = Msg::with_text("Message to actor1");
+    ///let m2 = Msg::with_text("Message to actor1");
+    ///let m3 = Msg::with_text("Message to actor2");
+    ///let m4 = Msg::with_text("Message to actor1");
+    ///let m5 = Msg::with_text("Message to actor1");
+    ///send!("actor1", (m1, m2), "actor2", (m3), "actor1", (m4, m5));
+    ///```
+    ///Grouping within braces is not necessary while sending only to one actor:
+    ///
+    ///```
+    ///let m6 = Msg::with_text("Message to actor3")
+    ///let m7 = Msg::with_text("Message to actor3")
+    ///send!("actor3",m6,m7);
+    ///
+    ///```
+    ///Actors identified with string literal such as 'actor3' is assumed to be running in the
+    ///local system(if they are not running - they would be resurrected).
+    ///
+    ///Actors running in remote systems - need to identified by the `Addr` construct:
+    ///
+    ///```
+    ///use arrows::send;
+    ///use arrows::Msg;
+    ///use arrows::Addr;
+    ///
+    ///let remote_addr1 = Addr::remote("actor1", "10.10.10.10:7171");
+    ///let remote_addr2 = Addr::remote("actor2", "11.11.11.11:8181");
+    ///
+    ///let m1 = Msg::with_text("Message to remote actor1");
+    ///let m2 = Msg::with_text("Message to remote actor1");
+    ///let m3 = Msg::with_text("Message to remote actor2");
+    ///let m4 = Msg::with_text("Message to remote actor2");
+    ///
+    ///send!(remote_addr1, (m1,m2), remote_addr2, (m3,m4));
+    ///
+    ///```
+    ///Messages for each actor will always be delivered in the order they are ingested into
+    ///the system. Actor will not process out of sequence message. To prevent loss, messages
+    ///are persisted into an embedded store backed by highly performant sqlite db.
+    ///
+    ///
+    ///A new implementation of actor may be swapped in - replaching an actively running actor
+    ///in the system. Swapped in actor would take over from an outgoing actor and start
+    ///processing messages from where the outgoing left off. An actor would never process an
+    ///out of sequence message i.e. it would never increment its message sequence counter until
+    ///it has successfully processed the received message.
+    ///
+    ///Actors can change their behaviour while still running. They can create other actors
+    ///copies of themselves.
+    ///
+    ///Actors are allowed to panic a set number of times(currently 3).
+    ///                                  
+
+    pub fn send(mut mails: HashMap<&Addr, Vec<Msg>>) -> Result<()> {
         mails.iter_mut().for_each(|(addr, msgs)| {
             msgs.iter_mut().for_each(|msg| {
                 msg.set_recipient_addr(addr);
