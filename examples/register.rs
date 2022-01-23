@@ -1,5 +1,5 @@
 use arrows::define_actor;
-use arrows::{Addr, Msg};
+
 use arrows::{AnotherProducer, NewProducer};
 
 fn main() {
