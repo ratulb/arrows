@@ -1,17 +1,15 @@
-//! This module defines macros for actor definition and invocation.
+//! This module defines macros for actor regsistration and invocation.
 //!
 //!
 //![define_actor!](crate::define_actor)
 //!
 //![send!](crate::send)
 
-///This macro defines an actor in the system. It takes a literal string as actor name
-///and an implmentation of [Producer](crate::common::actor::Producer) that is called to
-///return an [Actor](crate::common::actor::Actor). The actor becomes active as soon as it
-///is defined and receives a startup signal.
+///This macro defines a new actor instance in the system. It takes a literal string as 
+///actor name and an implmentation of [Producer](crate::common::actor::Producer) that is
+///called to return an [Actor](crate::common::actor::Actor). The actor becomes active 
+///as soon as it is defined and receives a startup signal.
 ///
-///Each Producer implementation should also be tagged with a `typetag` attribute name that
-///should not collide with any other name in the system.
 ///
 ///Example
 ///
@@ -30,14 +28,12 @@
 ///```
 ///
 ///Next we implement the [Producer](crate::Producer) trait to produce `NewActor`
-///intances on demand. We also tag the Producer implementation with the typetag
-///"new_actor_producer".
+///intances on demand.
 ///
 ///```
 ///#[derive(Debug, Serialize, Deserialize, Default)]
 ///struct NewProducer;
 ///
-///#[typetag::serde(name = "new_actor_producer")]
 ///impl Producer for NewProducer {
 ///    fn produce(&mut self) -> Box<dyn Actor> {
 ///        Box::new(NewActor)
@@ -46,10 +42,11 @@
 ///
 ///````
 ///At this point - we have our `Actor` and `Producer` implementations ready. we can use
-///the `define_actor` macro to register the producer into the system. The producer
-///would be persisted into the system, the actor will be activated and would receive a post
-///start signal. Same prodcer instance would be called to create instances of the actor at
-///system restart/actor activation points at different times in the actor's life-cycle.
+///the `define_actor` macro to register an actor instance in the system. The producer will
+///be called to return an actor instance and the producer itself would would be persisted
+///in the system, the actor will be activated and would receive a post start signal. Same
+///prodcer instance would be called to create instances of the actor at system restart/actor
+///activation points at different times in the actor's life-cycle.
 ///
 ///```
 ///use arrows::define_actor;
@@ -93,10 +90,10 @@ macro_rules! define_actor {
         let _res = $crate::catalog::define_actor(actor_addr, $actor_producer);
     }};
 }
-///Sends one or more messages to one or more actors defined in the system.
-///This function is responsible for gathering and dispatching messages received from the
-///macro invocation of `send!`. Multiple messages can be grouped for one more actors in
-///one `send!` macro invocation as shown below:
+///Sends one or more messages to one or more actors defined in the system. This function is
+///responsible for gathering and dispatching messages received from the macro invocation
+///of `send!`. Multiple messages can be grouped for one more actors in one `send!` macro
+///invocation as shown below:
 ///
 ///Example
 ///
@@ -196,8 +193,7 @@ mod tests {
 
     #[derive(Debug, Serialize, Deserialize, Default)]
     struct TestActorProducer;
-
-    #[typetag::serde(name = "test_actor_producer")]
+    #[typetag::serde] 
     impl Producer for TestActorProducer {
         fn produce(&mut self) -> Box<dyn Actor> {
             Box::new(TestActor)
