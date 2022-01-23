@@ -1,13 +1,10 @@
-use arrows::define_actor;
-use arrows::send;
-use arrows::Addr;
-use arrows::AnotherProducer;
-use arrows::Msg;
-use arrows::NewProducer;
+use arrows::{define_actor,send};
+use arrows::{Addr, Msg};
+use arrows::{NewProducer,AnotherProducer};
 
 fn main() {
     let actor_producer = NewProducer::default();
-    /***    define_actor!("new_actor", actor_producer);
+    /***define_actor!("new_actor", actor_producer);
 
     let another_producer = AnotherProducer::default();
     define_actor!("another_actor", another_producer);***/
