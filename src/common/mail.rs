@@ -42,7 +42,7 @@ use Mail::*;
 
 impl Mail {
     ///Get a handle to the inner message
-    pub(crate) fn message(&self) -> &Msg {
+    pub fn message(&self) -> &Msg {
         match self {
             Trade(ref msg) => msg,
             _ => panic!("message is supported only on Trade variant"),

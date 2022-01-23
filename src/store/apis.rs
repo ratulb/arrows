@@ -229,7 +229,7 @@ impl Store {
         let mut stmt = self.conn.inner.prepare_cached(ACTOR_DEF_INSERT).ok();
         match stmt {
             Some(ref mut s) => s.execute(
-                named_params! { ":actor_id": &identity as &dyn ToSql,":addr": &addr.as_bytes() as &dyn ToSql, ":actor_def": &actor_def as &dyn ToSql },
+                named_params! { ":actor_id": &identity as &dyn ToSql,":actor_name": addr.get_name() as &dyn ToSql, ":actor_def": &actor_def as &dyn ToSql },
             )?,
             None => panic!(),
         };
@@ -258,20 +258,18 @@ impl Store {
     pub(crate) fn retrieve_actor_def(
         &mut self,
         actor_id: &str,
-    ) -> Result<Option<(Addr, String, i64)>> {
+    ) -> Result<Option<(String, String, i64)>> {
         let mut stmt = self.conn.inner.prepare_cached(ACTOR_DEF)?;
         let mut rows = stmt.query(rusqlite::params![actor_id])?;
         if let Some(row) = rows.next()? {
-            let value: Value = row.get(0)?;
-            let addr: Addr = value_to_addr(value);
+            let actor_name: String = row.get(0)?;
             let actor_def: String = row.get(1)?;
             let msg_seq: i64 = row.get(2)?;
-            return Ok(Some((addr, actor_def, msg_seq)));
+            return Ok(Some((actor_name, actor_def, msg_seq)));
         }
         Ok(None)
     }
 
-    #[inline(always)]
     fn message_insert_stmt(stmt: &mut Option<String>) -> &str {
         match stmt {
             Some(ref s) => s,

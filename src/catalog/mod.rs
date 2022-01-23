@@ -119,7 +119,7 @@ impl Context {
             .map_err(|err| Error::Other(Box::new(err)))
     }
     //identity - numeric string of actor address(Addr)
-    pub(crate) fn retrieve_actor_def(&mut self, identity: &str) -> Option<(Addr, String, i64)> {
+    pub(crate) fn retrieve_actor_def(&mut self, identity: &str) -> Option<(String, String, i64)> {
         let result = self.store.retrieve_actor_def(identity);
         match result {
             Ok(addr_text_seq) => addr_text_seq,
@@ -226,9 +226,13 @@ impl Context {
     }
 
     pub(crate) fn perist_buffered(&mut self, events: Vec<DBEvent>) -> Vec<i64> {
-        self.store
-            .persist_events(events.into_iter())
-            .expect("Events persisted")
+        match self.store.persist_events(events.into_iter()) {
+            Ok(events) => events,
+            Err(err) => {
+                eprintln!("{}", err);
+                Vec::new()
+            }
+        }
     }
 
     pub(crate) fn load_messages(&mut self, rowids: Vec<i64>) -> Vec<RichMail> {

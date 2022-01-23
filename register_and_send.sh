@@ -1,1 +1,1 @@
-cargo run --example call_register_and_send
+cargo run --example register_and_send
