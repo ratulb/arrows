@@ -36,7 +36,7 @@
 //!     }
 //! }
 //!
-//!//The `define_actor` - macro actually defines a new actor instance in the system. The
+//!//The `define_actor` - macro actually defines a new actor `instance` in the system. The
 //!//actor instance along with the producer - get persisted in the backing store, the actor
 //!//instance gets activated and receives a startup signal and becomes ready to process
 //!//incoming messages. The producer defintion gets used to restart/restore the actor as
@@ -47,7 +47,8 @@
 //!let producer = ActorProducer::default();
 //!define_actor!("demo_actor", producer);
 //!
-//!//At this stage - the actor instance `demo_actor` is ready for incoming messages.
+//!//At this stage - the actor instance `demo_actor` is ready for incoming messages. It
+//!//should have already received the startup signal.
 //!
 //!use arrows::send;
 //!
