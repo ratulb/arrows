@@ -10,7 +10,7 @@
 * Runtime swapping of actor behaviour with another actor definition(Actor binaries has to be available in system - no runtime injection of binaries)
 * No out of sequence delivery of messages 
 * Swapped in actor resumes from where the swapped out instance left off.
-* Actor loading/Unloading is based on typetag(https://github.com/dtolnay/typetag). A huge thanks to the ingenuity of its author https://github.com/dtolnay
+* Actor loading/Unloading is based on typetag(https://github.com/dtolnay/typetag).
 * Multiple instances of the same actor - with different named identifier
 * Macro for defining actor(`define_actor!`)
 * Macro for sending message(s) to actor(s) - (`send!`)
@@ -33,7 +33,6 @@ impl Actor for ExampleActor {
 }
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct ExampleActorProducer;
-#[typetag::serde(name = "example_actor_producer")]
 impl Producer for ExampleActorProducer {
     fn produce(&mut self) -> Box<dyn Actor> {
         Box::new(ExampleActor)
