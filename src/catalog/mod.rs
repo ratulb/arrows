@@ -280,9 +280,9 @@ pub(crate) fn ingress(mail: Mail) -> std::io::Result<Option<Mail>> {
 pub(crate) fn egress(mail: RichMail) {
     Context::handle().borrow_mut().egress(mail);
 }
-pub(crate) fn restore(addr: Addr) -> Result<Option<CachedActor>, Error> {
+/***pub(crate) fn restore(addr: Addr) -> Result<Option<CachedActor>, Error> {
     Context::handle().borrow_mut().restore(addr)
-}
+}***/
 pub(crate) fn handle_invocation(mail: RichMail) {
     Context::handle().borrow_mut().handle_invocation(mail);
 }

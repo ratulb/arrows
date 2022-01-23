@@ -124,7 +124,7 @@ impl CachedActor {
         actor.binary.is_some()
     }
 
-    pub(crate) fn re_define_self(&mut self, text: &str) -> bool {
+    /***pub(crate) fn re_define_self(&mut self, text: &str) -> bool {
         let re_incarnate = Self::new(text, Addr::default(), None);
         match re_incarnate {
             Some(mut re_incarnate) => {
@@ -137,7 +137,7 @@ impl CachedActor {
             }
             None => false,
         }
-    }
+    }***/
 
     pub(crate) fn take_over_from(this: &mut CachedActor, other: &CachedActor) {
         this.sequence = other.sequence;
@@ -160,10 +160,10 @@ impl CachedActor {
                     Mail::set_from(&mut outcome, CachedActor::get_addr(actor));
                     CachedActor::push_outcome(CachedActor::output_buffer(actor), outcome);
                     CachedActor::increment_sequence(CachedActor::get_sequence_mut(actor));
-                    println!(
+                    /***println!(
                         "CachedActor current message seq {:?}",
                         CachedActor::get_sequence_mut(actor)
-                    );
+                    );***/
                     Self::flush_buffer(actor);
                 }
                 Err(err) => return Err(err),

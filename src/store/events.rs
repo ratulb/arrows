@@ -83,7 +83,7 @@ impl EventBuffer {
         self.overflown() || self.has_matured()
     }
     pub(crate) fn add(&mut self, event: DBEvent) {
-        println!("Bufferingg event = {:?}", event);
+        //println!("Bufferingg event = {:?}", event);
         self.events.push(event);
         if self.events.len() == 1 {
             self.earliest_event_instant = Some(Instant::now());

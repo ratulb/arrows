@@ -1,3 +1,4 @@
+#![allow(clippy::wrong_self_convention)]
 use crate::common::utils::from_bytes;
 use crate::constants::*;
 use crate::dbconnection::DBConnection;
@@ -65,7 +66,6 @@ impl Store {
     }
 
     pub(crate) fn persist(&mut self, mail: Mail) -> Result<()> {
-        println!("Entered perist");
         match mail {
             Blank if self.buffer.is_empty() => Ok(()),
             Blank => self.persist_buffer(),
@@ -115,7 +115,6 @@ impl Store {
     }
 
     pub(crate) fn egress_messages(store: &mut Store, mut mail: RichMail) -> Result<()> {
-        println!("Entered egress_messages");
         match store.conn.inner.execute_batch(TX_COMMIT) {
             Ok(_any_tx) => (),
             Err(err) => println!("{}", err),

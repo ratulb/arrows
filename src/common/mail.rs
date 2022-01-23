@@ -1,3 +1,4 @@
+#![allow(clippy::large_enum_variant)]
 use crate::Result;
 use crate::{
     common::utils::{compute_hash, from_bytes, option_of_bytes},

@@ -99,7 +99,7 @@
 //!
 //!
 //!
-
+#![allow(dead_code)]
 #![deny(rust_2018_idioms)]
 #![warn(missing_docs)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
