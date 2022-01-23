@@ -111,7 +111,6 @@ impl EventTracker {
         Self {
             buffer: EventBuffer::new(),
             router: Router::new(num_cpus::get()),
-            //router: Router::new(1),
         }
     }
     pub(crate) fn track(&mut self, event: DBEvent) {
