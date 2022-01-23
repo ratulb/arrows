@@ -1,5 +1,5 @@
 //! Catalog
-//! Manages a pool of actors, exposes an API [define_actor()] for defining actors in the
+//! Manages a pool of actors, exposes an API [define_actor()] for instantiating actors in the
 //! system.
 //!Provides internal apis for activatation/restoration of actors, a handle to backend store.
 

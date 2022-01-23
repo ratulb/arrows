@@ -20,9 +20,9 @@ use std::time::Duration;
 pub struct Messenger;
 
 impl Messenger {
-    ///This function is responsible for dispatching messages received from the macro invocation of
-    ///`send!`. Multiple messages can be grouped for one more actors in one `send!` macro invocation
-    ///as shown below:
+    ///This function is responsible for dispatching messages received from the macro
+    ///invocation of `send!`. Multiple messages can be grouped for one more actors in one
+    ///`send!` macro invocation as shown below:
     ///
     ///Example
     ///

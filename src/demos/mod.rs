@@ -1,33 +1,33 @@
-//! #Demos
-//!Do all the definition and initialization for capability demonstration. This is due to
-//!the fact that the final binary need to be cognizant of defined entitities like actor
-//!implementations and their corresponding producers.
+//! Demos
+//! A module that contains the sample definitions. This is due to the fact that the
+//!final binary need to be cognizant of defined entitities like actor implementations
+//!and their corresponding producers.
 
 use crate::{Actor, Mail, Msg, Producer};
 use serde::{Deserialize, Serialize};
 
 ///A sample actor
-pub struct NewActor;
+pub struct DemoActor;
 
-impl Actor for NewActor {
+impl Actor for DemoActor {
     fn receive(&mut self, incoming: Mail) -> Option<Mail> {
         match incoming {
-            Mail::Trade(msg) => println!("NewActor received: {:?}", msg.as_text()),
-            Mail::Bulk(msgs) => println!("NewActor received: {:?}", msgs[0].as_text()),
-            Mail::Blank => println!("NewActor received blank"),
+            Mail::Trade(msg) => println!("DemoActor received: {}", msg),
+            bulk @ Mail::Bulk(_) => println!("DemoActor received: {}", bulk),
+            Mail::Blank => println!("DemoActor received blank"),
         }
-        Some(Msg::from_text("Message from NewActor").into())
+        Some(Msg::from_text("Message from DemoActor").into())
     }
 }
 
-///Produces NewActor instances
+///Produces DemoActor1 instances
 #[derive(Debug, Serialize, Deserialize, Default)]
-pub struct NewProducer;
+pub struct DemoActorProducer;
 
 #[typetag::serde]
-impl Producer for NewProducer {
+impl Producer for DemoActorProducer {
     fn produce(&mut self) -> Box<dyn Actor> {
-        Box::new(NewActor)
+        Box::new(DemoActor)
     }
 }
 

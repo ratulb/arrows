@@ -1,11 +1,11 @@
 use arrows::define_actor;
 
-use arrows::{AnotherProducer, NewProducer};
+use arrows::{AnotherProducer, DemoActorProducer};
 
 fn main() {
-    let actor_producer = NewProducer::default();
+    let producer = DemoActorProducer::default();
     //Define actor instance with a producer instance
-    define_actor!("new_actor", actor_producer);
+    define_actor!("demo_actor", producer);
 
     //Another actor producer combination
     let another_producer = AnotherProducer::default();

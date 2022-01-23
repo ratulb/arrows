@@ -113,13 +113,13 @@ macro_rules! define_actor {
 ///```
 ///let m6 = Msg::with_text("Message to actor3")
 ///let m7 = Msg::with_text("Message to actor3")
-///send!("actor3",m6,m7);
+///send!("actor3", m6, m7);
 ///
 ///```
 ///Actors identified with string literal such as 'actor3' is assumed to be running in the
 ///local system(they would be resurrected - if they are not - on message send).
 ///
-///Actors running in remote systems - need to identified by the `Addr` construct:
+///Actors running in remote systems - need to be identified by the `Addr` construct:
 ///
 ///```
 ///use arrows::Addr;
