@@ -24,7 +24,7 @@ pub fn option_of_bytes<T: ?Sized + std::fmt::Debug + Serialize>(t: &T) -> Option
     match serialize(t) {
         Ok(bytes) => Some(bytes),
         Err(err) => {
-            eprintln!("Error serializing: {}", err);
+            error("Error serializing", &err);
             None
         }
     }
@@ -35,12 +35,15 @@ pub fn from_bytes<'a, T: std::fmt::Debug + Deserialize<'a>>(bytes: &'a [u8]) -> 
     match deserialize(bytes) {
         Ok(t) => Ok(t),
         Err(err) => {
-            eprintln!("Error derializing: {}", err);
+            error("Error deserializing", &err);
             let err = Into::<bincode::ErrorKind>::into(*err);
             let err: Error = err.into();
             Err(err)
         }
     }
+}
+pub(crate) fn error(ctx: &str, err: &dyn std::error::Error) {
+    eprintln!("{}: {:?}", ctx, err);
 }
 
 #[cfg(test)]
