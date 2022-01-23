@@ -11,7 +11,8 @@ repository = "https://github.com/ratulb/arrows"
 [dependencies]
 local-ip-address = "0.4.4"
 fallible-streaming-iterator = "0.1.9"
-byte_marks = { git = "https://github.com/ratulb/byte_marks" }
+#byte_marks = { git = "https://github.com/ratulb/byte_marks" }
+byte_marks = "0.1.11"
 clap = "2.34.0"
 structopt = "0.3.25"
 num_cpus = "1.13.1"
