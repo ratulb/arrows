@@ -1,1 +1,1 @@
-cargo run --example listener_echo
+cargo run --example echo
