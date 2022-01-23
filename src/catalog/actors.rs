@@ -177,7 +177,7 @@ impl CachedActor {
             let buffered = std::mem::take(CachedActor::output_buffer(actor));
             if let Some(ref channel) = actor.channel {
                 channel
-                    .send(RichMail::Content(
+                    .send(RichMail::RichContent(
                         Mail::fold(buffered),
                         false,
                         CachedActor::get_sequence(actor),
@@ -229,7 +229,7 @@ impl CachedActor {
 fn pre_shutdown(mut actor: CachedActor) -> Option<CachedActor> {
     let _ignored = CachedActor::receive(
         &mut actor,
-        RichMail::Content(Mail::Blank, true, 0, None, None),
+        RichMail::RichContent(Mail::Blank, true, 0, None, None),
     );
     println!("Pre shutdown hook fired for actor ({})", actor.get_addr());
     Some(actor)
@@ -238,7 +238,7 @@ fn pre_shutdown(mut actor: CachedActor) -> Option<CachedActor> {
 fn post_start(mut actor: CachedActor) -> Option<CachedActor> {
     let _ignored = CachedActor::receive(
         &mut actor,
-        RichMail::Content(Mail::Blank, true, 0, None, None),
+        RichMail::RichContent(Mail::Blank, true, 0, None, None),
     );
     println!("Post start hook fired for actor ({})", actor.get_addr());
     Some(actor)

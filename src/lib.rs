@@ -7,11 +7,11 @@ pub use common::actor::{Actor, Producer};
 pub use common::addr::Addr;
 pub use common::config::Config;
 pub use common::errs::{Error, Result};
+pub(crate) use common::mail::RichMail;
 pub use common::mail::{Action, Mail, Msg};
 pub use common::utils::*;
-pub(crate) use store::*;
-
 pub use demos::*;
+pub(crate) use store::*;
 
 pub mod catalog;
 pub mod common;
@@ -86,48 +86,6 @@ use std::collections::HashMap;
 pub fn recv(msgs: HashMap<&Addr, Vec<Msg>>) {
     use crate::routing::messenger::Messenger;
     if let Err(err) = Messenger::send(msgs) {
-        eprintln!("Error sending msgs {:?}", err);
-    }
-}
-
-//A mail with extra details - inbound/outbound, seq, from & destined to
-pub(crate) enum RichMail {
-    Content(Mail, bool, i64, Option<Addr>, Option<Addr>),
-}
-use RichMail::Content;
-impl RichMail {
-    pub(crate) fn mail(&self) -> &Mail {
-        let Content(mail, _, _, _, _) = self;
-        mail
-    }
-
-    pub(crate) fn mail_out(&mut self) -> Mail {
-        let Content(mail, _, _, _, _) = self;
-        std::mem::replace(mail, Mail::Blank)
-    }
-
-    pub(crate) fn replace_mail(&mut self, msgs: Vec<Msg>) {
-        let Content(mail, _, _, _, _) = self;
-        *mail = Mail::Bulk(msgs);
-    }
-
-    pub(crate) fn to(&self) -> Option<&Addr> {
-        let Content(_, _, _, _, to) = self;
-        to.as_ref()
-    }
-
-    pub(crate) fn from(&self) -> Option<&Addr> {
-        let Content(_, _, _, from, _) = self;
-        from.as_ref()
-    }
-
-    pub(crate) fn inbound(&self) -> bool {
-        let Content(_, inbound, _, _, _) = self;
-        *inbound
-    }
-
-    pub(crate) fn seq(&self) -> i64 {
-        let Content(_, _, seq, _, _) = self;
-        *seq
+        error("Error sending msgs", &err);
     }
 }

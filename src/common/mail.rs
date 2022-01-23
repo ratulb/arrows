@@ -479,6 +479,43 @@ impl From<Msg> for Mail {
     }
 }
 
+//A mail with extra details - inbound/outbound, seq, from & destined to
+pub(crate) enum RichMail {
+    RichContent(Mail, bool, i64, Option<Addr>, Option<Addr>),
+}
+use RichMail::RichContent;
+impl RichMail {
+    pub(crate) fn mail(&self) -> &Mail {
+        let RichContent(mail, _, _, _, _) = self;
+        mail
+    }
+    pub(crate) fn mail_out(&mut self) -> Mail {
+        let RichContent(mail, _, _, _, _) = self;
+        std::mem::replace(mail, Mail::Blank)
+    }
+
+    pub(crate) fn replace_mail(&mut self, msgs: Vec<Msg>) {
+        let RichContent(mail, _, _, _, _) = self;
+        *mail = Mail::Bulk(msgs);
+    }
+    pub(crate) fn to(&self) -> Option<&Addr> {
+        let RichContent(_, _, _, _, to) = self;
+        to.as_ref()
+    }
+    pub(crate) fn from(&self) -> Option<&Addr> {
+        let RichContent(_, _, _, from, _) = self;
+        from.as_ref()
+    }
+    pub(crate) fn inbound(&self) -> bool {
+        let RichContent(_, inbound, _, _, _) = self;
+        *inbound
+    }
+    pub(crate) fn seq(&self) -> i64 {
+        let RichContent(_, _, seq, _, _) = self;
+        *seq
+    }
+}
+
 impl std::fmt::Display for Msg {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         {

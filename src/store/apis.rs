@@ -299,7 +299,7 @@ impl Store {
             let msg_seq: i64 = row.get(2)?;
             let msg = value_to_msg(value);
             let to = msg.get_to().clone();
-            msgs.push(RichMail::Content(
+            msgs.push(RichMail::RichContent(
                 Mail::Trade(msg),
                 inbound == 1,
                 msg_seq,

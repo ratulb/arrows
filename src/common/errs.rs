@@ -20,6 +20,23 @@ pub enum Error {
     ///bincode - this variant captures errors related bincode
     Bincode(bincode::ErrorKind),
 }
+
+use std::fmt::{Display, Formatter, Result as FResult};
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FResult {
+        match *self {
+            Self::Registration(ref err) => write!(f, "IO error: {}", err),
+            Self::MsgSendError(ref err) => write!(f, "Send error: {}", err),
+            Self::SerdeJson(ref err) => write!(f, "Serde Error: {}", err),
+            Self::Other(ref err) => write!(f, "Other: {}", err),
+            Self::InvalidData => write!(f, "Invalida data"),
+            Self::RegistrationError => write!(f, "RegistrationError"),
+            Self::RestorationError => write!(f, "RestorationError"),
+            Self::Bincode(ref err) => write!(f, "Bincode: {}", err),
+        }
+    }
+}
+
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Error {
         Error::Registration(err)
@@ -41,5 +58,8 @@ impl From<Error> for std::io::Error {
         std::io::Error::new(std::io::ErrorKind::Other, "Arrows error")
     }
 }
+
+impl std::error::Error for Error {}
+
 ///Success cases mostly related to the Mail enum, error cases are this crates' exposed erros
 pub type Result<T> = std::result::Result<T, self::Error>;
