@@ -37,7 +37,7 @@ impl Producer for ActorProducer {
 //The `define_actor` - macro actually defines a new actor `instance` in the system. The
 //actor instance along with the producer - get persisted in the backing store, the actor
 //instance gets activated and receives a startup signal and becomes ready to process
-//incoming messages. The producer defintion gets used to restart/restore the actor as
+//incoming messages. The producer defintion is used to restart/restore the actor as
 //required.
 
 use arrows::define_actor;

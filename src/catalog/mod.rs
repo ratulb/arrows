@@ -31,7 +31,7 @@ lazy_static! {
 ///Maintains a pool of actors, a handle to the backing store, exposes an API for
 ///defining(registering) new actor [Producer](crate::Producer).
 #[derive(Debug)]
-pub struct Context {
+pub(crate) struct Context {
     actors: Actors,
     store: Store,
     handle: Option<JoinHandle<()>>,
