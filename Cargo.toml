@@ -1,12 +1,13 @@
 [package]
 name = "arrows"
-version = "0.1.9"
+version = "0.1.10"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 license = "AGPL-3.0-or-later"
 description = "An actor framework in rust with message durability and ingestion order processing of of messages"
 repository = "https://github.com/ratulb/arrows"
+documentation = "https://docs.rs/arrows"
 
 [dependencies]
 local-ip-address = "0.4.4"
