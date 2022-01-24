@@ -1,7 +1,7 @@
 //! Demos
-//! A module that contains the sample definitions. This is due to the fact that the
-//!final binary need to be cognizant of defined entitities like actor implementations
-//!and their corresponding producers.
+//! Contains the sample definitions. This is due to the fact that the final binary need
+//!to be cognizant of defined entitities like actor implementations and their corresponding
+//!producers.
 
 use crate::{Actor, Mail, Msg, Producer};
 use serde::{Deserialize, Serialize};
