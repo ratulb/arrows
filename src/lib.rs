@@ -1,6 +1,6 @@
 //! # Arrows
 //! An actor framework in rust with message durability and ingestion order processing of
-//! of messages. Message persistence via an embedded sqlite instance. Message content can
+//! messages. Message persistence via an embedded sqlite instance. Message content can
 //! be text or binary(Vec<u8>). Messages themselves get stored as binany in the backing
 //! store.
 //!
@@ -88,7 +88,7 @@
 //!
 //! ```
 //! How to get started:
-//! 1) Check this repository out
+//! 1) Check the github repository out
 //! 2) Launch an extra terminal
 //! 3) Fire the `register.sh` script in the project directory.
 //! 4) In another terminal launch the `server.sh` script in the same directory
