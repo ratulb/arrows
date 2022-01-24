@@ -77,8 +77,7 @@ impl Debug for dyn Actor {
 #[typetag::serde]
 pub trait Producer {
     ///The method to be implemented to create `Actor` instances. The implementing type
-    ///should be tagged with a non-colliding `typetag` name in the format
-    ///#[typetag::serde(name = "an_actor_producer")]
+    ///should be tagged as `#[typetag::serde`
     ///
     ///<https://github.com/dtolnay/typetag>
     ///
