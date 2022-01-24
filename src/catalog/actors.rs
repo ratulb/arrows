@@ -18,7 +18,7 @@ impl Actors {
     pub(super) fn new() -> Self {
         //Set panic handler for for the actors. We don't want to eject actors on the very
         //first instance that it panics. Panics may be due to corrupt messages.
-        //Hence we maintain a tolerable count limit.
+        //Hence we maintain a tolerance limit.
         //Just initialize it once for setting the actor panic hook
         let _panic_watch = PanicWatch::new();
         Self {
