@@ -1,5 +1,5 @@
 # Arrows
-###### An actor framework in rust with message durability and ingestion order processing of of messages. Message persistence via an embedded sqlite instance. Message content can be text or binary(Vec<u8>). Messages themselves get stored as binany in the backing store.
+#### An actor framework in rust with message durability and ingestion order processing of of messages. Message persistence via an embedded sqlite instance. Message content can be text or binary(Vec<u8>). Messages themselves get stored as binany in the backing store.
 
 ```rust
 use crate::{Actor, Mail, Msg, Producer};
@@ -84,7 +84,7 @@ send!("remote_actor", m1, m2);
 //While sending to a single actor - its not recessary to group messages within braces.
 ```
 
-##### How to get started:
+### How to get started:
 
 * Check this repository out
 * Launch an extra terminal
@@ -93,4 +93,4 @@ send!("remote_actor", m1, m2);
 * From previous termainal launch the `send.sh` script - actors should start receiving messages
 
 
-##### Contribution: This project is still evolving. Contributions are welcome.
+### Contribution: This project is still evolving. Contributions are welcome.
