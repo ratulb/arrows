@@ -1,5 +1,5 @@
 //!`Messenger` sends out  messages to remote or local system. Tries to boot up
-//!listener binary in case of local connection failre.
+//!listener binary in case of local connection failure.
 //!
 //!Uses a tcp client which serializes collection of messages. Each collection of messages
 //!ends with byte marks <https://github.com/ratulb/byte_marks>. This is how the receiving
