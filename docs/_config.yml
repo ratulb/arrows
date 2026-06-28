@@ -11,3 +11,6 @@ show_excerpts: true
 
 exclude:
   - README.md
+  - vendor/
+  - Gemfile
+  - Gemfile.lock
