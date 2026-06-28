@@ -9,6 +9,8 @@ plugins:
   - jekyll-seo-tag
 show_excerpts: true
 
+header_pages: []
+
 exclude:
   - README.md
   - vendor/
