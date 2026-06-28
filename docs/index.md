@@ -1,4 +1,7 @@
-# Arrows
+---
+layout: page
+title: Arrows
+---
 
 **An actor framework in Rust with message durability and ingestion-order processing.**
 
@@ -103,8 +106,6 @@ pub trait Producer {
 }
 ```
 
-Implementations must be tagged with `#[typetag::serde]` for serializable dispatch.
-
 ### Message model
 
 | Type | Description |
@@ -113,18 +114,12 @@ Implementations must be tagged with `#[typetag::serde]` for serializable dispatc
 | `Mail::Trade(Msg)` | A single-message envelope delivered to the actor |
 | `Mail::Bulk(Vec<Msg>)` | A batched envelope for multiple messages |
 | `Mail::Blank` | An empty envelope (no-op) |
-| `Action::Shutdown` | Command to shut down the message listener |
-| `Action::Echo(String)` | Command to test listener liveness |
-| `Action::Continue` | Signals normal operation |
 
 ### Address model
 
 ```rust
-// Local actor address
-let addr = Addr::new("my_actor");
-
-// Remote actor on another node
-let remote = Addr::remote("my_actor", "10.0.0.1:7171");
+let addr = Addr::new("my_actor");                         // local
+let remote = Addr::remote("my_actor", "10.0.0.1:7171");   // remote
 ```
 
 Addresses embed the node's IP and port, making remote routing transparent.
@@ -137,7 +132,6 @@ Addresses embed the node's IP and port, making remote routing transparent.
 use arrows::{Actor, Mail, Msg, Producer, define_actor, send};
 use serde::{Deserialize, Serialize};
 
-// 1. Define an actor
 struct MyActor;
 
 impl Actor for MyActor {
@@ -155,7 +149,6 @@ impl Actor for MyActor {
     }
 }
 
-// 2. Define a producer
 #[derive(Debug, Serialize, Deserialize, Default)]
 struct MyProducer;
 
@@ -166,35 +159,23 @@ impl Producer for MyProducer {
     }
 }
 
-// 3. Register the actor
 define_actor!("my_actor", MyProducer::default());
 
-// 4. Send messages
-let m1 = Msg::from_text("Hello, actor!");
+let m1 = Msg::from_text("Hello!");
 let m2 = Msg::from_text("Hello again!");
-
 send!("my_actor", (m1, m2));
-
-// Sending to remote actors
-let remote = Addr::remote("remote_actor", "192.168.1.10:7171");
-let m3 = Msg::with_text("Remote message", "local", "remote_actor");
-send!(remote, m3);
 ```
 
 ---
 
 ## Configuration
 
-Arrows is configured via environment variables:
-
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `LISTEN_ADDR` | auto-detect | `IP:PORT` to bind the listener |
-| `PORT` | `7171` | Listener port (when `LISTEN_ADDR` is unset) |
-| `DB_PATH` | `/tmp` | Directory for the embedded SQLite database |
-| `db_buff_size` | `1` | Message buffer size before flushing to disk |
-
-The listener binary also accepts CLI flags:
+| `PORT` | `7171` | Listener port |
+| `DB_PATH` | `/tmp` | SQLite database directory |
+| `db_buff_size` | `1` | Buffer size before flush |
 
 ```bash
 cargo run --bin arrows -- -i user --addr 127.0.0.1:8181 -d /tmp/mydb
@@ -202,24 +183,6 @@ cargo run --bin arrows -- -i user --addr 127.0.0.1:8181 -d /tmp/mydb
 
 ---
 
-## Project structure
-
-| Path | Purpose |
-|------|---------|
-| `src/bin/arrows.rs` | Listener binary entrypoint |
-| `src/lib.rs` | Public API re-exports |
-| `src/common/actor.rs` | `Actor` and `Producer` traits |
-| `src/common/mail.rs` | `Msg`, `Mail`, `Action` types |
-| `src/common/addr.rs` | `Addr` — actor addressing |
-| `src/common/config.rs` | Runtime configuration |
-| `src/routing/` | Message routing and delivery |
-| `src/store/` | SQLite-backed persistence layer |
-| `src/macros.rs` | `define_actor!` and `send!` macros |
-| `src/catalog/` | Actor registry and lifecycle |
-| `src/demos/` | Sample actor implementations |
-
----
-
 ## License
 
-AGPL-3.0-or-later. See [LICENSE](LICENSE).
+AGPL-3.0-or-later.

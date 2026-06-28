@@ -1,0 +1,13 @@
+title: "Arrows"
+description: "An actor framework in Rust with message durability"
+author: rbsomeg
+baseurl: "/arrows"
+url: "https://ratulb.github.io"
+theme: minima
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
+show_excerpts: true
+
+exclude:
+  - README.md
